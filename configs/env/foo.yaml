@@ -1,0 +1,12 @@
+env:
+  name: simple
+  num_envs: 10
+  num_obs: 30
+  num_states: 40
+  num_act: 10
+
+
+sim:
+  headless: True
+  device_id: 0
+  engine: PHYSX

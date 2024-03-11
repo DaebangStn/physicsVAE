@@ -1,0 +1,566 @@
+<?xml version="1.0" ?>
+<robot name="Human">
+  <link name="Pelvis">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 -0.9809 0.0116"/>
+      <geometry>
+        <mesh filename="skeleton_obj/Pelvis.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="0.2583 0.1454 0.1294"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.0 0.0"/>
+      <mass value="8.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <link name="FemurR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0903 -0.9337 0.0116"/>
+      <geometry>
+        <mesh filename="skeleton_obj/R_Femur.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.01720174382201833 -0.0024001203450538817 0.01740172395335235" xyz="0.20240048 -0.20754012 0.02392032"/>
+      <geometry>
+        <box size="0.1271 0.4043 0.1398"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.01720174382201833 -0.0024001203450538817 0.01740172395335235" xyz="0.20240048 -0.20754012 0.02392032"/>
+      <mass value="7.5"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_RightUpLeg" type="spherical">
+    <parent link="Pelvis"/>
+    <child link="FemurR"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.0903 -0.04720000000000002 0.0"/>
+  </joint>
+  <link name="TibiaR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0995 -0.5387 0.0103"/>
+      <geometry>
+        <mesh filename="skeleton_obj/R_Tibia.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-3.054382183687735 -0.0029999897250608874 -0.034806829384111816" xyz="-0.01213736 0.8424994000000001 0.002613780000000003"/>
+      <geometry>
+        <box size="0.0998 0.4156 0.0941 "/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-3.054382183687735 -0.0029999897250608874 -0.034806829384111816" xyz="-0.01213736 0.8424994000000001 0.002613780000000003"/>
+      <mass value="4.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_RightLeg" type="revolute">
+    <parent link="FemurR"/>
+    <child link="TibiaR"/>
+    <axis xyz="1 0 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.0092 -0.395 0.001299999999999999"/>
+  </joint>
+  <link name="TalusR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.08 -0.0776 0.0419"/>
+      <geometry>
+        <mesh filename="skeleton_obj/TalusR.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-3.141592653589793 0.0 -0.0" xyz="-0.0126 0.1179 -0.06609999999999999"/>
+      <geometry>
+        <box size="0.0756 0.0498 0.1570"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-3.141592653589793 0.0 -0.0" xyz="-0.0126 0.1179 -0.06609999999999999"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_RightFoot" type="spherical">
+    <parent link="TibiaR"/>
+    <child link="TalusR"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.019500000000000003 -0.46109999999999995 -0.0316"/>
+  </joint>
+  <link name="FootPinkyR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.1215 -0.0116 -0.0494"/>
+      <geometry>
+        <mesh filename="skeleton_obj/FootPinkyR.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-3.141592653589793 0.0 -0.0" xyz="-0.0029 0.042499999999999996 0.13040000000000002"/>
+      <geometry>
+        <box size="0.0407 0.0262 0.0563 "/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-3.141592653589793 0.0 -0.0" xyz="-0.0029 0.042499999999999996 0.13040000000000002"/>
+      <mass value="0.1"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="FootPinkyRrevolute" type="revolute">
+    <parent link="TalusR"/>
+    <child link="FootPinkyR"/>
+    <axis xyz="1 0 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.041499999999999995 -0.066 0.09129999999999999"/>
+  </joint>
+  <link name="FootThumbR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0756 -0.0118 -0.0676"/>
+      <geometry>
+        <mesh filename="skeleton_obj/FootThumbR.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-3.141592653589793 0.0 -0.0" xyz="-0.000899999999999998 0.0426 0.1614"/>
+      <geometry>
+        <box size="0.0422 0.0238 0.0529 "/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-3.141592653589793 0.0 -0.0" xyz="-0.000899999999999998 0.0426 0.1614"/>
+      <mass value="0.1"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="FootThumbRrevolute" type="revolute">
+    <parent link="TalusR"/>
+    <child link="FootThumbR"/>
+    <axis xyz="1 0 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.004400000000000001 -0.0658 0.10949999999999999"/>
+  </joint>
+  <link name="FemurL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.0903 -0.9337 0.0116"/>
+      <geometry>
+        <mesh filename="skeleton_obj/L_Femur.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.01720174382201833 -0.0024001203450538817 0.01740172395335235" xyz="0.021836599999999998 -0.21070062 -0.014005680000000003"/>
+      <geometry>
+        <box size="0.1271 0.4043 0.1398"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.01720174382201833 -0.0024001203450538817 0.01740172395335235" xyz="0.021836599999999998 -0.21070062 -0.014005680000000003"/>
+      <mass value="7.5"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_LeftUpLeg" type="spherical">
+    <parent link="Pelvis"/>
+    <child link="FemurL"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.0903 -0.04720000000000002 0.0"/>
+  </joint>
+  <link name="TibiaL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.0995 -0.5387 0.0103"/>
+      <geometry>
+        <mesh filename="skeleton_obj/L_Tibia.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0.08721046990205808 -0.0029999897250608874 -0.034806829384111816" xyz="-0.025417960000000003 -0.2319543 -0.07081377999999999"/>
+      <geometry>
+        <box size="0.0998 0.4156 0.0941 "/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0.08721046990205808 -0.0029999897250608874 -0.034806829384111816" xyz="-0.025417960000000003 -0.2319543 -0.07081377999999999"/>
+      <mass value="4.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_LeftLeg" type="revolute">
+    <parent link="FemurL"/>
+    <child link="TibiaL"/>
+    <axis xyz="1 0 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.0092 -0.395 0.001299999999999999"/>
+  </joint>
+  <link name="TalusL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.08 -0.0776 0.0419"/>
+      <geometry>
+        <mesh filename="skeleton_obj/TalusL.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0126 -0.0373 0.0177"/>
+      <geometry>
+        <box size="0.0756 0.0498 0.1570"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0126 -0.0373 0.0177"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_LeftFoot" type="spherical">
+    <parent link="TibiaL"/>
+    <child link="TalusL"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.019500000000000003 -0.46109999999999995 -0.0316"/>
+  </joint>
+  <link name="FootPinkyL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.1215 -0.0116 -0.0494"/>
+      <geometry>
+        <mesh filename="skeleton_obj/FootPinkyL.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0029 0.0193 0.0316"/>
+      <geometry>
+        <box size="0.0407 0.0262 0.0563 "/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0029 0.0193 0.0316"/>
+      <mass value="0.1"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="FootPinkyLrevolute" type="revolute">
+    <parent link="TalusL"/>
+    <child link="FootPinkyL"/>
+    <axis xyz="1 0 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.041499999999999995 -0.066 0.09129999999999999"/>
+  </joint>
+  <link name="FootThumbL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.0756 -0.0118 -0.0676"/>
+      <geometry>
+        <mesh filename="skeleton_obj/FootThumbL.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.000899999999999998 0.019000000000000003 0.0262"/>
+      <geometry>
+        <box size="0.0422 0.0238 0.0529 "/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.000899999999999998 0.019000000000000003 0.0262"/>
+      <mass value="0.1"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="FootThumbLrevolute" type="revolute">
+    <parent link="TalusL"/>
+    <child link="FootThumbL"/>
+    <axis xyz="1 0 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.004400000000000001 -0.0658 0.10949999999999999"/>
+  </joint>
+  <link name="Spine">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 -1.0675 0.0116"/>
+      <geometry>
+        <mesh filename="skeleton_obj/Spine.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.05290000000000017 0.0"/>
+      <geometry>
+        <box size="0.1070 0.0976 0.0684"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.05290000000000017 0.0"/>
+      <mass value="10.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_Spine" type="spherical">
+    <parent link="Pelvis"/>
+    <child link="Spine"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.0865999999999999 0.0"/>
+  </joint>
+  <link name="Torso">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 -1.1761 0.0116"/>
+      <geometry>
+        <mesh filename="skeleton_obj/Torso.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.1471 0.0"/>
+      <geometry>
+        <box size="0.2298 0.2381 0.1537"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.1471 0.0"/>
+      <mass value="14.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_Spine1" type="spherical">
+    <parent link="Spine"/>
+    <child link="Torso"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.10860000000000003 0.0"/>
+  </joint>
+  <link name="Neck">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 -1.4844 0.0116"/>
+      <geometry>
+        <mesh filename="skeleton_obj/Neck.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.04530000000000012 0.0"/>
+      <geometry>
+        <box size="0.0793 0.0728 0.0652"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.04530000000000012 0.0"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_Neck" type="spherical">
+    <parent link="Torso"/>
+    <child link="Neck"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.3083 0.0"/>
+  </joint>
+  <link name="Head">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 -1.5652 0.0116"/>
+      <geometry>
+        <mesh filename="skeleton_obj/Skull.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.08750000000000013 0.002999999999999999"/>
+      <geometry>
+        <box size="0.1129 0.1144 0.1166"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.08750000000000013 0.002999999999999999"/>
+      <mass value="5.5"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Headspherical" type="spherical">
+    <parent link="Neck"/>
+    <child link="Head"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.0 0.08079999999999998 0.0"/>
+  </joint>
+  <link name="ShoulderR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.0147 -1.4535 0.0353"/>
+      <geometry>
+        <mesh filename="skeleton_obj/R_Shoulder.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="3.140491001556744 0.05492713539364353 0.004807173786350863" xyz="-0.07450728000000001 2.91779208 -0.07090282"/>
+      <geometry>
+        <box size="0.1635 0.0634 0.0645"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="3.140491001556744 0.05492713539364353 0.004807173786350863" xyz="-0.07450728000000001 2.91779208 -0.07090282"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_RightShoulder" type="spherical">
+    <parent link="Torso"/>
+    <child link="ShoulderR"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.0147 0.2774000000000001 -0.0237"/>
+  </joint>
+  <link name="ArmR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.1995 -1.435 0.0353"/>
+      <geometry>
+        <mesh filename="skeleton_obj/R_Humerus.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="1.8697968479354523 -0.08128743389389821 -0.036229120758874765" xyz="-0.21376786 1.8315687 -1.40481183"/>
+      <geometry>
+        <box size="0.3329 0.0542 0.0499"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="1.8697968479354523 -0.08128743389389821 -0.036229120758874765" xyz="-0.21376786 1.8315687 -1.40481183"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_RightArm" type="spherical">
+    <parent link="ShoulderR"/>
+    <child link="ArmR"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.18480000000000002 -0.01849999999999996 0.0"/>
+  </joint>
+  <link name="ForeArmR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.5234 -1.4607 0.0105"/>
+      <geometry>
+        <mesh filename="skeleton_obj/R_Radius.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="1.9216254347002837 -0.08570864310760473 -0.08269945848860204" xyz="-0.26883055 1.9430928600000001 -1.4288640400000001"/>
+      <geometry>
+        <box size="0.2630 0.0506 0.0513"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="1.9216254347002837 -0.08570864310760473 -0.08269945848860204" xyz="-0.26883055 1.9430928600000001 -1.4288640400000001"/>
+      <mass value="1.5"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_RightForeArm" type="revolute">
+    <parent link="ArmR"/>
+    <child link="ForeArmR"/>
+    <axis xyz="0 1 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.32389999999999997 0.025700000000000056 0.024799999999999996"/>
+  </joint>
+  <link name="HandR">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="0.8102 -1.4694 -0.0194"/>
+      <geometry>
+        <mesh filename="skeleton_obj/R_Hand.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="2.941135878812405 -0.035306073465457534 -0.2380864048326317" xyz="-0.44008652000000004 3.05139606 -0.28708158000000006"/>
+      <geometry>
+        <box size="0.1306 0.0104 0.0846"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="2.941135878812405 -0.035306073465457534 -0.2380864048326317" xyz="-0.44008652000000004 3.05139606 -0.28708158000000006"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_RightHand" type="spherical">
+    <parent link="ForeArmR"/>
+    <child link="HandR"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="-0.28680000000000005 0.00869999999999993 0.029900000000000003"/>
+  </joint>
+  <link name="ShoulderL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.0147 -1.4535 0.0353"/>
+      <geometry>
+        <mesh filename="skeleton_obj/L_Shoulder.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.0011016520330492305 0.05492713539364353 0.004807173786350863" xyz="0.09233682 0.010869739999999961 0.0019168800000000027"/>
+      <geometry>
+        <box size="0.1635 0.0634 0.0645"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.0011016520330492305 0.05492713539364353 0.004807173786350863" xyz="0.09233682 0.010869739999999961 0.0019168800000000027"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_LeftShoulder" type="spherical">
+    <parent link="Torso"/>
+    <child link="ShoulderL"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.0147 0.2774000000000001 -0.0237"/>
+  </joint>
+  <link name="ArmL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.1995 -1.435 0.0353"/>
+      <geometry>
+        <mesh filename="skeleton_obj/L_Humerus.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-1.271795805654341 -0.08128743389389821 -0.036229120758874765" xyz="0.10442814 1.0461382 1.35447033"/>
+      <geometry>
+        <box size="0.3329 0.0542 0.0499"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-1.271795805654341 -0.08128743389389821 -0.036229120758874765" xyz="0.10442814 1.0461382 1.35447033"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_LeftArm" type="spherical">
+    <parent link="ShoulderL"/>
+    <child link="ArmL"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.18480000000000002 -0.01849999999999996 0.0"/>
+  </joint>
+  <link name="ForeArmL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.5234 -1.4607 0.0105"/>
+      <geometry>
+        <mesh filename="skeleton_obj/L_Radius.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-1.2199672188895097 -0.08570864310760473 -0.08269945848860204" xyz="0.02660172999999999 0.94258758 1.30516112"/>
+      <geometry>
+        <box size="0.2630 0.0506 0.0513"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-1.2199672188895097 -0.08570864310760473 -0.08269945848860204" xyz="0.02660172999999999 0.94258758 1.30516112"/>
+      <mass value="1.5"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_LeftForeArm" type="revolute">
+    <parent link="ArmL"/>
+    <child link="ForeArmL"/>
+    <axis xyz="0 1 0"/>
+    <dynamics friction="0.5"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.32389999999999997 0.025700000000000056 0.024799999999999996"/>
+  </joint>
+  <link name="HandL">
+    <visual>
+      <origin rpy="-0.0 0.0 -0.0" xyz="-0.8102 -1.4694 -0.0194"/>
+      <geometry>
+        <mesh filename="skeleton_obj/L_Hand.obj" scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="-0.2004567747773882 -0.035306073465457534 -0.2380864048326317" xyz="-0.25121899999999986 0.24005966 0.21947734"/>
+      <geometry>
+        <box size="0.1306 0.0104 0.0846"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="-0.2004567747773882 -0.035306073465457534 -0.2380864048326317" xyz="-0.25121899999999986 0.24005966 0.21947734"/>
+      <mass value="1.0"/>
+      <inertia ixx="1.0" ixy="1.0" ixz="1.0" iyy="1.0" iyz="1.0" izz="1.0"/>
+    </inertial>
+  </link>
+  <joint name="Character1_LeftHand" type="spherical">
+    <parent link="ForeArmL"/>
+    <child link="HandL"/>
+    <origin rpy="-0.0 0.0 -0.0" xyz="0.28680000000000005 0.00869999999999993 0.029900000000000003"/>
+  </joint>
+</robot>
