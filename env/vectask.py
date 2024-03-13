@@ -22,7 +22,6 @@ class VecTask:
         self._sim = None
 
         self._parse_sim_param(**kwargs)
-        self._gym.prepare_sim(self._sim)
 
         # Environment related variable
         self._num_envs = None
@@ -34,11 +33,26 @@ class VecTask:
         self._parse_env_param(**kwargs)
         self._allocate_buffers()
 
+        self._create_sim()
+        self._gym.prepare_sim(self._sim)
+
         # rl-games related variables
         self._num_agents = 1  # used for multi-agent environments
-        self.observation_space = spaces.Box(low=np.ones(self._num_obs) * -np.Inf, high=np.ones(self._num_obs) * np.Inf)
-        self.state_space = spaces.Box(low=np.ones(self._num_states) * -np.Inf, high=np.ones(self._num_states) * np.Inf)
-        self.action_space = spaces.Box(low=np.ones(self._num_actions) * -1., high=np.ones(self._num_actions) * 1.)
+        # To make no precision warning, we should use np.full. Not np.ones * scale
+        self.observation_space = spaces.Box(
+            low=np.full(self._num_obs, -np.Inf, dtype=np.float32),
+            high=np.full(self._num_obs, np.Inf, dtype=np.float32),
+            dtype=np.float32)
+        self.state_space = spaces.Box(
+            low=np.full(self._num_states, -np.Inf, dtype=np.float32),
+            high=np.full(self._num_states, np.Inf, dtype=np.float32),
+            dtype=np.float32)
+        self.action_space = spaces.Box(
+            low=np.full(self._num_actions, -1.0, dtype=np.float32),
+            high=np.full(self._num_actions, 1.0, dtype=np.float32),
+            dtype=np.float32)
+
+        self._create_ground()
 
         self._viewer = None
         if not self._headless:
@@ -52,21 +66,26 @@ class VecTask:
         self._compute_device = sim_cfg['device_id']
         self._graphics_device = self._compute_device if not self._headless else -1
 
+        self._sim_params = gymapi.SimParams()
         engine = sim_cfg['engine']
         if engine == 'PHYSX':
-            sim_engine = gymapi.SIM_PHYSX
-        elif engine == 'FLEX':
-            sim_engine = gymapi.FLEX
+            self._sim_engine = gymapi.SIM_PHYSX
+            self._sim_params.physx.use_gpu = True
         else:
             raise ValueError('Unknown engine {}'.format(engine))
+        self._sim_params.use_gpu_pipeline = True
 
-        sim_params = gymapi.SimParams()
         # set z axis to upward
-        sim_params.up_axis = gymapi.UP_AXIS_Z
-        sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.81)
+        self._sim_params.up_axis = gymapi.UP_AXIS_Z
+        # self._sim_params.gravity = gymapi.Vec3(0.0, 0.0, 0.0)
+        self._sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.81)
 
-        self._sim = self._gym.create_sim(self._compute_device, self._graphics_device, type=sim_engine,
-                                         params=sim_params)
+        return sim_cfg  # for child class
+
+    def _create_sim(self):
+        self._sim = self._gym.create_sim(self._compute_device, self._graphics_device, type=self._sim_engine,
+                                         params=self._sim_params)
+        self._create_envs()
 
     def _parse_env_param(self, **kwargs):
         env_cfg = kwargs['env']
@@ -75,6 +94,8 @@ class VecTask:
         self._num_obs = env_cfg['num_obs']
         self._num_actions = env_cfg['num_act']
         self._num_states = env_cfg['num_states']
+
+        return env_cfg  # for child class
 
     def _allocate_buffers(self):
         self._buf = {
@@ -87,12 +108,20 @@ class VecTask:
 
     def _install_viewer(self):
         self._viewer = self._gym.create_viewer(self._sim, gymapi.CameraProperties())
-        self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_ESCAPE, "QUIT")
+        self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_Q, "QUIT")
 
         # Suppose Z axis upward
-        self._gym.viewer_camera_look_at(self._viewer, None,
-                                        cam_pos=gymapi.Vec3(10.0, 10.0, 10.0),
-                                        cam_target=gymapi.Vec3(0.0, 0.0, 0.0))
+        cam_pos = gymapi.Vec3(3.0, 3.0, 3.0)
+        cam_target = gymapi.Vec3(0.0, 0.0, 1.0)
+        self._gym.viewer_camera_look_at(self._viewer, None, cam_pos, cam_target)
+
+    def _create_ground(self):
+        param = gymapi.PlaneParams()
+        param.normal = gymapi.Vec3(0.0, 0.0, 1.0)
+        param.dynamic_friction = 0.5
+        param.static_friction = 0.5
+        param.restitution = 0.5
+        self._gym.add_ground(self._sim, param)
 
     # Called by rl-games
     def get_number_of_agents(self):
@@ -116,19 +145,19 @@ class VecTask:
 
     # Called by rl-games
     def set_train_info(self, env_frames, *args, **kwargs):
-        """
-        Send the information in the direction algo->environment.
-        Most common use case: tell the environment how far along we are in the training process. This is useful
-        for implementing curriculums and things such as that.
+        """Send the information in the direction algo->environment.
+        Most common use case: tell the environment how far along we are in the training process.
+        This is useful for implementing curriculums and things such as that.
         """
         pass
 
     @abstractmethod
     def step(self, actions: torch.Tensor) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
         """Step the physics of the environment.
-        Args:
+
+        :arg:
             actions: actions to apply
-        Returns:
+        :return:
             Observations, rewards, resets, info
             Observations are dict of observations (currently only one member called 'obs')
         """
@@ -136,9 +165,19 @@ class VecTask:
 
     @abstractmethod
     def reset(self, env_ids: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
-        """Reset environments having the provided indices.
-            If env_ids is None, then reset all environments.
-        Returns:
+        """Reset environments having the provided indices. If env_ids is None, then reset all environments.
+
+        :return:
             Observation dictionary
+        """
+        pass
+
+    @abstractmethod
+    def _create_envs(self):
+        """VecTask didn't create any environments (just created ground in _parse_sim_param)
+        So that child class must implement this method and append it to the __init__
+
+        :return:
+            None
         """
         pass

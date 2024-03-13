@@ -1,4 +1,5 @@
 import isaacgym
+from isaacgym import gymtorch
 from rl_games.torch_runner import Runner
 from rl_games.algos_torch import model_builder
 from rl_games.common import env_configurations, vecenv

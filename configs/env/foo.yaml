@@ -1,12 +1,16 @@
 env:
   name: simple
-  num_envs: 10
+  num_envs: 1
+  spacing: 4
+
+  humanoid_asset_filename:  # from the project root
+    assets/urdf/amp_humanoid.xml
   num_obs: 30
   num_states: 40
   num_act: 10
 
 
 sim:
-  headless: True
+  headless: False
   device_id: 0
   engine: PHYSX

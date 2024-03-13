@@ -2,7 +2,7 @@ algo:
   name: simple
 
 model:
-  name: continuous_a2c_logstd
+  name: continuous_a2c_logstd  # continuous_a2c has internal error
 
 network:
   name: actor_critic
@@ -48,4 +48,3 @@ config:
   learning_rate: 2e-5
   entropy_coef: 0.0
   bounds_loss_coef: 10
-
