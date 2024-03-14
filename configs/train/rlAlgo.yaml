@@ -1,12 +1,14 @@
+test: False
+
 algo:
-  name: simple
+  name: rlAlgo
 
 model:
   name: continuous_a2c_logstd  # continuous_a2c has internal error
 
 network:
   name: actor_critic
-  separate: False
+  separate: True
 
   space:
     continuous:
@@ -28,10 +30,15 @@ network:
 
 seed: 1
 
+checkpoint:  # from the project root
+  runs/rlTask_16-22-09-33/nn/rlTask.pth
+
+
 config:
   normalize_input: True
   normalize_value: True
   reward_shaper: {}
+  save_frequency: 200
 
   # learning hyperparameters
   lr_schedule: constant
@@ -43,7 +50,7 @@ config:
   grad_norm: 1.0
   gamma: 0.99
   tau: 0.95
-  minibatch_size: 2
+  minibatch_size: 16384
   mini_epochs: 6
   learning_rate: 2e-5
   entropy_coef: 0.0

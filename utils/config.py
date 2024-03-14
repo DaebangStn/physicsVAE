@@ -1,6 +1,10 @@
+import os
+import random
 import yaml
 from typing import Tuple
 from pathlib import Path
+import torch
+import numpy as np
 from argparse import Namespace
 
 from .fixed_gymutil import parse_arguments
@@ -33,10 +37,15 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
 
     # TODO: Overriding parameters passed on the cli
     config_run = {
-        "play": True if args.test else False,
-        "train": True if not args.test else False
+        "play": config_train["test"],
+        "train": not config_train["test"],
+        "checkpoint": config_train["checkpoint"] if "checkpoint" in config_train else None
     }
     config_env["sim"]["device_id"] = args.compute_device_id
+
+    if config_train["test"]:
+        config_env["sim"]["headless"] = False
+        config_env["env"]["num_envs"] = 1
 
     # Overriding config_env to config_train
     config_train["config"]["name"] = config_env["env"]["name"]
@@ -45,3 +54,16 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     config_train["config"]["env_config"] = config_env
 
     return config_run, config_train
+
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True

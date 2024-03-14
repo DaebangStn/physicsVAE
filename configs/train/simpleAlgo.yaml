@@ -1,0 +1,52 @@
+test: True
+
+algo:
+  name: simpleAlgo
+
+model:
+  name: continuous_a2c_logstd  # continuous_a2c has internal error
+
+network:
+  name: actor_critic
+  separate: False
+
+  space:
+    continuous:
+      mu_activation: None
+      sigma_activation: None
+      mu_init:
+        name: default
+      sigma_init:
+        name: const_initializer
+        val: 3.0
+      fixed_sigma: True
+      learn_sigma: False
+
+  mlp:
+    units: [1024, 512]
+    activation: relu
+    initializer:
+      name: default
+
+seed: 1
+
+config:
+  normalize_input: True
+  normalize_value: True
+  reward_shaper: {}
+
+  # learning hyperparameters
+  lr_schedule: constant
+  e_clip: 0.2
+  clip_value: False
+  horizon_length: 32
+  normalize_advantage: True
+  critic_coef: 5
+  grad_norm: 1.0
+  gamma: 0.99
+  tau: 0.95
+  minibatch_size: 2
+  mini_epochs: 6
+  learning_rate: 2e-5
+  entropy_coef: 0.0
+  bounds_loss_coef: 10

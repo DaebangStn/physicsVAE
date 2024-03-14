@@ -29,7 +29,6 @@ class VecTask:
         self._num_obs = None
         self._num_actions = None
         self._num_states = None
-        self._buf = None
 
         self._parse_env_param(**kwargs)
 
@@ -39,9 +38,11 @@ class VecTask:
         self.action_space = None
         self.state_space = None
 
-        self._allocate_buffers()
-
         self._create_sim()
+
+        self._buf = None
+        self._raw_buf = None
+        self._allocate_buffers()
 
         self._viewer = None
         if not self._headless:
@@ -53,17 +54,17 @@ class VecTask:
         :arg:
             actions: actions to apply
         :return:
-            Observations, rewards, resets, info
+            Observations, rewards, reset, info
             Observations are dict of observations (currently only one member called 'obs')
         """
         self._pre_physics(actions)
         self._run_physics()
         self._post_physics(actions)
 
-        return self._buf['obs'], self._buf['rew'], torch.ones_like(self._buf['resets']), self._buf['info']
+        return self._buf['obs'], self._buf['rew'], self._buf['reset'], self._buf['info']
 
-    def reset(self, env_ids: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
-        """Reset environments having the provided indices. If env_ids is None, then reset all environments.
+    def reset(self) -> Dict[str, torch.Tensor]:
+        """Reset environments with the self._buf["reset"]
 
         :return:
             Observation dictionary
@@ -73,24 +74,27 @@ class VecTask:
     def render(self):
         """Draw the frame to the viewer, and check for keyboard events."""
         if self._viewer is None:
-            print("Rendering without viewer. Invalid access")
-            sys.exit()
+            return  # do not render when viewer is not declared
 
         for evt in self._gym.query_viewer_action_events(self._viewer):
             if evt.action == "QUIT" and evt.value > 0:
                 sys.exit()
 
-        self._gym.fetch_results(self._sim, None)
+        if self._sim_engine == gymapi.SIM_PHYSX:
+            self._gym.fetch_results(self._sim, None)
+        elif self._sim_engine == gymapi.SIM_FLEX:
+            self._gym.fetch_results(self._sim, True)
 
         self._gym.step_graphics(self._sim)
         self._gym.draw_viewer(self._viewer, self._sim, True)
 
     def _allocate_buffers(self):
+        # Algorithm related tensors (Observation and State are not strictly separated)
         self._buf = {
             'obs': torch.zeros((self._num_envs, self._num_obs), dtype=torch.float32, device=self._compute_device),
             'states': torch.zeros((self._num_envs, self._num_states), dtype=torch.float32, device=self._compute_device),
             'rew': torch.zeros(self._num_envs, dtype=torch.float32, device=self._compute_device),
-            'resets': torch.zeros(self._num_envs, dtype=torch.float32, device=self._compute_device),
+            'reset': torch.ones(self._num_envs, dtype=torch.bool, device=self._compute_device),
             'info': {},
         }
 
@@ -152,9 +156,12 @@ class VecTask:
         if engine == 'PHYSX':
             self._sim_engine = gymapi.SIM_PHYSX
             self._sim_params.physx.use_gpu = True
+            self._sim_params.use_gpu_pipeline = True
+        elif engine == 'FLEX':
+            self._sim_engine = gymapi.SIM_FLEX
+            self._sim_params.flex.solver_type = 5
         else:
             raise ValueError('Unknown engine {}'.format(engine))
-        self._sim_params.use_gpu_pipeline = True
 
         # set z axis to upward
         self._sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -184,6 +191,14 @@ class VecTask:
         self.render()
         self._gym.simulate(self._sim)
 
+    def _refresh_tensors(self):
+        self._gym.refresh_dof_state_tensor(self._sim)
+        self._gym.refresh_actor_root_state_tensor(self._sim)
+        self._gym.refresh_rigid_body_state_tensor(self._sim)
+        self._gym.refresh_force_sensor_tensor(self._sim)
+        self._gym.refresh_dof_force_tensor(self._sim)
+        self._gym.refresh_net_contact_force_tensor(self._sim)
+
     # Called by rl-games
     def get_number_of_agents(self):
         return self._num_agents
@@ -211,6 +226,20 @@ class VecTask:
         This is useful for implementing curriculums and things such as that.
         """
         pass
+
+    # Called by rl-games
+    def get_env_state(self):
+        """Return serializable environment state to be saved to checkpoint.
+        Can be used for stateful training sessions, i.e. with adaptive curriculums.
+        """
+        return None
+
+    # Called by rl-games
+    def set_env_state(self, env_state):
+        """Used on the restore process.
+        """
+        pass
+
 
     @abstractmethod
     def _create_envs(self):

@@ -1,0 +1,16 @@
+env:
+  name: simpleTask
+  num_envs: 10
+  spacing: 2
+
+  humanoid_asset_filename:  # from the project root
+    assets/urdf/simple_humanoid.urdf
+  num_obs: 1
+  num_states: 1  # do not use
+  num_act: 1
+
+
+sim:
+  headless: True
+  device_id: 0
+  engine: FLEX
