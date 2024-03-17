@@ -20,7 +20,6 @@ network:
         name: const_initializer
         val: 3.0
       fixed_sigma: True
-      learn_sigma: False
 
   mlp:
     units: [1024, 512]
@@ -30,7 +29,7 @@ network:
 
 seed: 1
 
-config:
+hparam:
   normalize_input: True
   normalize_value: True
   reward_shaper: {}

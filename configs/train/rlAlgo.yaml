@@ -20,7 +20,6 @@ network:
         name: const_initializer
         val: 3.0
       fixed_sigma: True
-      learn_sigma: False
 
   mlp:
     units: [1024, 512]
@@ -34,7 +33,7 @@ checkpoint:  # from the project root
 #  runs/rlTask_17-07-43-38/nn/rlTask.pth
 
 
-config:
+hparam:
   normalize_input: True
   normalize_value: True
   reward_shaper: {}
