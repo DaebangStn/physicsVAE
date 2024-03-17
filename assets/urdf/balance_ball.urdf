@@ -1,0 +1,80 @@
+<?xml version="1.0" ?>
+
+<robot name="balance_ball">
+	<link name="plate">
+		<collision>
+				<origin xyz="0 0 1.0" rpy="0 0 0"/>
+				<geometry>
+					<box size="6.0 6.0 0.0001"/>
+				</geometry>
+		</collision>
+	</link>
+
+	<joint name = "attach1" type = "fixed">
+		<origin xyz = "0.0 0.0 0.0" rpy = "0 0 0"/>
+		<parent link = "plate"/>
+		<child link = "ball1"/>
+	</joint>
+	<link name="ball1">
+		<fem>
+			<origin rpy="0.0 0.0 0.0" xyz="1.5 1.5 0"/>
+			<density value="1"/>
+			<youngs value="4e3"/>
+			<poissons value="0.45"/>
+			<damping value="0.0"/>
+			<attachDistance value="0.0"/>
+			<tetmesh filename="icosphere.tet"/>
+		</fem>
+	</link>
+
+	<joint name = "attach2" type = "fixed">
+		<origin xyz = "0.0 0.0 0.0" rpy = "0 0 0"/>
+		<parent link = "plate"/>
+		<child link = "ball2"/>
+	</joint>
+	<link name="ball2">
+		<fem>
+			<origin rpy="0.0 0.0 0.0" xyz="-1.5 -1.5 0"/>
+			<density value="1"/>
+			<youngs value="4e3"/>
+			<poissons value="0.45"/>
+			<damping value="0.0"/>
+			<attachDistance value="0.0"/>
+			<tetmesh filename="icosphere.tet"/>
+		</fem>
+	</link>
+
+	<joint name = "attach3" type = "fixed">
+		<origin xyz = "0.0 0.0 0.0" rpy = "0 0 0"/>
+		<parent link = "plate"/>
+		<child link = "ball3"/>
+	</joint>
+	<link name="ball3">
+		<fem>
+			<origin rpy="0.0 0.0 0.0" xyz="-1.5 1.5 0"/>
+			<density value="1"/>
+			<youngs value="4e3"/>
+			<poissons value="0.45"/>
+			<damping value="0.0"/>
+			<attachDistance value="0.0"/>
+			<tetmesh filename="icosphere.tet"/>
+		</fem>
+	</link>
+
+	<joint name = "attach4" type = "fixed">
+		<origin xyz = "0.0 0.0 0.0" rpy = "0 0 0"/>
+		<parent link = "plate"/>
+		<child link = "ball4"/>
+	</joint>
+	<link name="ball4">
+		<fem>
+			<origin rpy="0.0 0.0 0.0" xyz="1.5 -1.5 0"/>
+			<density value="1"/>
+			<youngs value="4e3"/>
+			<poissons value="0.45"/>
+			<damping value="0.0"/>
+			<attachDistance value="0.0"/>
+			<tetmesh filename="icosphere.tet"/>
+		</fem>
+	</link>
+</robot>

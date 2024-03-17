@@ -1,5 +1,4 @@
 import time
-import torch
 from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common.a2c_common import swap_and_flatten01
 

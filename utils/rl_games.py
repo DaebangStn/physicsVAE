@@ -18,7 +18,6 @@ def register_env_rl_games(name: str, env: Type['VecTask']):
     env_configurations.register(name, {'vecenv_type': name, 'env_creator': lambda **kwargs: env(**kwargs)})
 
 
-
 def register_builder_to_runner(name: str, runner: Runner, algo: Type['BaseAlgorithm'], player: Type['BasePlayer']):
     runner.algo_factory.register_builder(name, lambda **kwargs: algo(**kwargs))
     runner.player_factory.register_builder(name, lambda **kwargs: player(**kwargs))

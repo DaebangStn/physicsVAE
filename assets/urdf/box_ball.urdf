@@ -1,0 +1,53 @@
+<?xml version="1.0" ?>
+
+<robot name="balance_ball">
+	<link name="plate">
+		<collision>
+				<origin xyz="0 0 0.05" rpy="0 0 0"/>
+				<geometry>
+					<box size="2.4 2.4 0.1"/>
+				</geometry>
+		</collision>
+		<collision>
+				<origin xyz="1.2 0 0.5" rpy="0 0 0"/>
+				<geometry>
+					<box size="0.1 2.4 1"/>
+				</geometry>
+		</collision>
+		<collision>
+				<origin xyz="0 1.2 0.5" rpy="0 0 0"/>
+				<geometry>
+					<box size="2.4 0.1 1"/>
+				</geometry>
+		</collision>
+		<collision>
+				<origin xyz="-1.2 0 0.5" rpy="0 0 0"/>
+				<geometry>
+					<box size="0.1 2.4 1"/>
+				</geometry>
+		</collision>
+		<collision>
+				<origin xyz="0 -1.2 0.5" rpy="0 0 0"/>
+				<geometry>
+					<box size="2.4 0.1 1"/>
+				</geometry>
+		</collision>
+	</link>
+
+	<joint name = "attach" type = "fixed">
+		<origin xyz = "0.0 0.0 0.0" rpy = "0 0 0"/>
+		<parent link = "plate"/>
+		<child link = "ball"/>
+	</joint>
+	<link name="ball">
+		<fem>
+			<origin rpy="0.0 0.0 0.0" xyz="0 0 1.2"/>
+			<density value="5"/>
+			<youngs value="5e3"/>
+			<poissons value="0.45"/>
+			<damping value="0.0"/>
+			<attachDistance value="0.0"/>
+			<tetmesh filename="icosphere.tet"/>
+		</fem>
+	</link>
+</robot>

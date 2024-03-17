@@ -80,11 +80,6 @@ class VecTask:
             if evt.action == "QUIT" and evt.value > 0:
                 sys.exit()
 
-        if self._sim_engine == gymapi.SIM_PHYSX:
-            self._gym.fetch_results(self._sim, None)
-        elif self._sim_engine == gymapi.SIM_FLEX:
-            self._gym.fetch_results(self._sim, True)
-
         self._gym.step_graphics(self._sim)
         self._gym.draw_viewer(self._viewer, self._sim, True)
 
@@ -188,8 +183,10 @@ class VecTask:
         return env_cfg
 
     def _run_physics(self):
-        self.render()
         self._gym.simulate(self._sim)
+        self._gym.fetch_results(self._sim, None)
+
+        self.render()
 
     def _refresh_tensors(self):
         self._gym.refresh_dof_state_tensor(self._sim)

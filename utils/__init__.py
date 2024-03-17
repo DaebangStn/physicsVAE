@@ -57,3 +57,12 @@ def set_tensor_like_r_body_state(gym, sim, value, num_envs=None):
         numpy_like[i]['vel']['angular']['y'] = item[11]
         numpy_like[i]['vel']['angular']['z'] = item[12]
     gym.set_sim_rigid_body_states(sim, numpy_like, gymapi.STATE_ALL)
+
+
+def set_tensor_like_dof_pose_state(gym, envs, handles, values: np.ndarray):
+    assert values.shape[0] == len(envs), f"Received {values.shape[0]} data, but environments have different {len(envs)}"
+
+    for i, env in enumerate(envs):
+        value = values[i]
+        gym.set_actor_dof_position_targets(env, handles[i], value)
+        pass

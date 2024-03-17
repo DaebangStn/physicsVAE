@@ -1,0 +1,19 @@
+env:
+  name: balanceTask
+  num_envs: 2048
+  spacing: 4
+
+  humanoid_asset_filename:  # from the project root
+    assets/urdf/amp_humanoid.xml
+  balance_asset_filename:  # from the project root
+    assets/urdf/box_ball.urdf
+  num_obs: 208
+  num_states: 1  # do not use
+  num_act: 28  # number of dof
+  max_episode_steps: 300
+
+
+sim:
+  headless: True
+  device_id: 0
+  engine: FLEX

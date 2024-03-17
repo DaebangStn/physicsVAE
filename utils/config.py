@@ -45,7 +45,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
 
     if config_train["test"]:
         config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 1
+        config_env["env"]["num_envs"] = 2
 
     # Overriding config_env to config_train
     config_train["config"]["name"] = config_env["env"]["name"]
