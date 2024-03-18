@@ -1,4 +1,5 @@
 import time
+import yaml
 from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common.a2c_common import swap_and_flatten01
 
@@ -6,6 +7,7 @@ from rl_games.common.a2c_common import swap_and_flatten01
 class RlAlgorithm(A2CAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._save_config(**kwargs)
 
     def play_steps(self):
         update_list = self.update_list
@@ -72,3 +74,24 @@ class RlAlgorithm(A2CAgent):
         batch_dict['step_time'] = step_time
 
         return batch_dict
+
+    def _save_config(self, **kwargs):
+        algo_config = kwargs['params']
+        env_config = self.vec_env.config
+
+        with open(self.experiment_dir + '/algo_config.yaml', 'w') as file:
+            yaml.dump(self.remove_unserializable(algo_config), file)
+        with open(self.experiment_dir + '/env_config.yaml', 'w') as file:
+            yaml.dump(self.remove_unserializable(env_config), file)
+
+    @staticmethod
+    def remove_unserializable(config):
+        clean_config = {}
+        for k, v in config.items():
+            if isinstance(v, dict):
+                clean_config[k] = RlAlgorithm.remove_unserializable(v)
+            elif not isinstance(v, (int, float, str, bool, list)):
+                print(f'[config] Ignoring unserializable value: {k}')
+            else:
+                clean_config[k] = v
+        return clean_config
