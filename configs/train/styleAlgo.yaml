@@ -1,13 +1,16 @@
 test: False
 
 algo:
-  name: rlAlgo
+  name: styleAlgo
+  style:
+    motion_file: assets/motions/reallusion_sword_shield/RL_Avatar_Atk_2xCombo01_Motion.npy
+    joint_information_path: assets/urdf/joint_information.yaml
 
 model:
-  name: continuous_a2c_logstd  # continuous_a2c has internal error
+  name: style
 
 network:
-  name: actor_critic
+  name: style
   separate: True
 
   space:
@@ -20,6 +23,7 @@ network:
         name: const_initializer
         val: 3.0
       fixed_sigma: True
+#      learn_sigma: False
 
   mlp:
     units: [1024, 512]
@@ -27,10 +31,17 @@ network:
     initializer:
       name: default
 
+  disc:
+    units: [8]
+    activation: relu
+    initializer:
+      name: default
+
+
 seed: 1
 
 checkpoint:  # from the project root
-  runs/rlTask_19-07-19-46/nn/rlTask.pth
+#  runs/rlTask_18-17-24-58/nn/last_rlTask_ep_4200_rew_-44.079414.pth
 
 
 hparam:
@@ -39,10 +50,8 @@ hparam:
   reward_shaper: {}
   save_frequency: 200
 
-  # learning hyperparameters
+  # learning
   lr_schedule: constant
-#  kl_threshold: 0.008
-  bound_loss_type: regularisation
   e_clip: 0.2
   clip_value: False
   horizon_length: 32
@@ -55,4 +64,17 @@ hparam:
   mini_epochs: 6
   learning_rate: 2e-5
   entropy_coef: 0.0
-  bounds_loss_coef: 0.01
+  bounds_loss_coef: 10
+
+  # style
+  style:
+    task_rew_scale: 0
+    disc_rew_scale: 1
+
+    disc:
+      obs_traj_len: 10
+      loss_coef: 5
+      weight_reg_scale: 0.01
+      grad_penalty_scale: 5
+
+

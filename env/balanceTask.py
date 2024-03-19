@@ -1,10 +1,9 @@
 from typing import Dict
-import torch
-from isaacgym import gymtorch
 
 from env.vectask import VecTask
 from utils import *
 from utils.env import *
+from utils.env import get_tensor_like_r_body_state, set_tensor_like_r_body_state, set_tensor_like_dof_pose_state
 
 
 class BalanceTask(VecTask):

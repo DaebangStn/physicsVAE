@@ -1,8 +1,9 @@
 import os
+from typing import Tuple
 import torch
-import numpy as np
-from isaacgym import gymapi
 
+from poselib.motion_lib import MotionLib
+from utils import angle
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 
@@ -11,58 +12,89 @@ def to_torch(x, dtype=torch.float, device='cuda:0', requires_grad=False):
     return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
 
 
-def get_tensor_like_r_body_state(gym, sim, num_envs=None):
-    value = gym.get_sim_rigid_body_states(sim, gymapi.STATE_ALL)
-    tensor_like = np.zeros((len(value['pose']['p']['x']), 13), dtype=np.float32)
-    for i, item in enumerate(value):
-        tensor_like[i] = [
-            item['pose']['p']['x'], item['pose']['p']['y'], item['pose']['p']['z'],
-            item['pose']['r']['x'], item['pose']['r']['y'], item['pose']['r']['z'], item['pose']['r']['w'],
-            item['vel']['linear']['x'], item['vel']['linear']['y'], item['vel']['linear']['z'],
-            item['vel']['angular']['x'], item['vel']['angular']['y'], item['vel']['angular']['z']
-        ]
-    if num_envs is not None:
-        row_per_env = tensor_like.shape[0] // num_envs
-        tensor_like = tensor_like.reshape(num_envs, row_per_env, 13)
-    return tensor_like
+class MotionLibFetcher:
+    def __init__(self, **kwargs):
+        self._num_envs = kwargs.pop('num_envs')
+        self._traj_len = kwargs.pop('traj_len')
+        self._dt = kwargs.pop('dt')
+        self._device = kwargs.get('device')
+        self._motion_lib = MotionLib(**kwargs)
+
+    def fetch(self, n: int = 1):
+        motion_ids = self._motion_lib.sample_motions(n * self._num_envs)
+
+        motion_length = self._dt * (self._traj_len + 1)
+        start_time = self._motion_lib.sample_time(motion_ids, truncate_time=motion_length)
+        end_time = (start_time + motion_length).unsqueeze(-1)
+        time_steps = - self._dt * torch.arange(0, self._traj_len, device=self._device)
+        capture_time = (time_steps + end_time).view(-1)
+
+        motion_ids = torch.tile(motion_ids.unsqueeze(-1), [1, self._traj_len]).view(-1)
+        state = retarget_obs(self._motion_lib.get_motion_state(motion_ids, capture_time))
+        # TODO: check the motion index is in order.
+        # TODO: whether [traj1, traj1, ..., traj2, traj2, ...] or [traj1, traj2, ..., traj1, traj2, ...]
+        return state.view(n * self._num_envs, -1)
 
 
-def set_tensor_like_r_body_state(gym, sim, value, num_envs=None):
-    if num_envs is not None:
-        rows = num_envs * value.shape[1]
-        value = value.reshape(rows, 13)
-    dtype = [
-        ('pose', [
-            ('p', [('x', '<f4'), ('y', '<f4'), ('z', '<f4')]),
-            ('r', [('x', '<f4'), ('y', '<f4'), ('z', '<f4'), ('w', '<f4')])
-        ]),
-        ('vel', [
-            ('linear', [('x', '<f4'), ('y', '<f4'), ('z', '<f4')]),
-            ('angular', [('x', '<f4'), ('y', '<f4'), ('z', '<f4')])
-        ])
-    ]
-    numpy_like = np.empty((value.shape[0]), dtype=dtype)
-    for i, item in enumerate(value):
-        numpy_like[i]['pose']['p']['x'] = item[0]
-        numpy_like[i]['pose']['p']['y'] = item[1]
-        numpy_like[i]['pose']['p']['z'] = item[2]
-        numpy_like[i]['pose']['r']['x'] = item[3]
-        numpy_like[i]['pose']['r']['y'] = item[4]
-        numpy_like[i]['pose']['r']['z'] = item[5]
-        numpy_like[i]['pose']['r']['w'] = item[6]
-        numpy_like[i]['vel']['linear']['x'] = item[7]
-        numpy_like[i]['vel']['linear']['y'] = item[8]
-        numpy_like[i]['vel']['linear']['z'] = item[9]
-        numpy_like[i]['vel']['angular']['x'] = item[10]
-        numpy_like[i]['vel']['angular']['y'] = item[11]
-        numpy_like[i]['vel']['angular']['z'] = item[12]
-    gym.set_sim_rigid_body_states(sim, numpy_like, gymapi.STATE_ALL)
+class TensorHistoryFIFO:
+    def __init__(self, max_size: int):
+        self._q = self.TensorFIFO(max_size)
+
+    def push(self, x: torch.Tensor, resets: torch.Tensor):
+        assert x.shape[0] == resets.shape[0], f"[{self.__class__}]shape mismatch: {x.shape[0]} != {resets.shape[0]}"
+        if len(self._q) == 0:
+            for i in range(self._q.max_len):
+                self._q.push(x)
+        elif torch.any(resets):
+            for i in range(self._q.max_len):
+                self._q.set_row(i, x, resets)
+        self._q.push(x)
+
+    @property
+    def history(self):
+        return torch.cat(self._q.list, dim=1)
+
+    def __len__(self):
+        return len(self._q)
+
+    class TensorFIFO:
+        def __init__(self, max_size: int):
+            self._q = []
+            self._max_size = max_size
+
+        def push(self, item: torch.Tensor):
+            self._q.insert(0, item)
+            if len(self._q) > self._max_size:
+                self._q.pop()
+
+        def set_row(self, idx: int, item: torch.Tensor, set_flag: torch.Tensor):
+            assert idx < len(self._q), f"[{self.__class__}] index out of range: {idx} >= {len(self._q)}"
+            assert item.shape[0] == set_flag.shape[0], \
+                f"[{self.__class__}] set_flag shape mismatch: {item.shape[0]} != {set_flag.shape[0]}"
+            assert item.shape == self._q[0].shape, \
+                f"[{self.__class__}] item shape mismatch: {item.shape} != {self._q[0].shape}"
+
+            self._q[idx] = torch.where(set_flag, item, self._q[idx])
+
+        @property
+        def max_len(self):
+            return self._max_size
+
+        @property
+        def list(self):
+            return self._q
+
+        def __getitem__(self, idx):
+            return self._q[idx]
+
+        def __repr__(self):
+            return repr(self._q)
+
+        def __len__(self):
+            return len(self._q)
 
 
-def set_tensor_like_dof_pose_state(gym, envs, handles, values: np.ndarray):
-    assert values.shape[0] == len(envs), f"Received {values.shape[0]} data, but environments have different {len(envs)}"
-
-    for i, env in enumerate(envs):
-        value = values[i]
-        gym.set_actor_dof_position_targets(env, handles[i], value)
-        pass
+@torch.jit.script
+def retarget_obs(motion_lib_state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]):
+    (root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos) = motion_lib_state
+    return torch.cat((dof_pos, dof_vel, root_pos, root_rot, root_vel, root_ang_vel), dim=-1)

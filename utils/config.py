@@ -48,10 +48,29 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_env["env"]["num_envs"] = 2
 
     # Overriding config_env to config_train
+    config_train["config"] = {}
     config_train["config"]["name"] = config_env["env"]["name"]
     config_train["config"]["env_name"] = config_env["env"]["name"]
     config_train["config"]["num_actors"] = config_env["env"]["num_envs"]
     config_train["config"]["env_config"] = config_env
+    config_train["config"].update(config_train["hparam"])
+
+    # Compute discriminator related values
+    if "style" in config_train["algo"]:
+        assert "disc" in config_train["network"], "Inconsistent config for style"
+        config_train["network"]["disc"]["num_inputs"] = (
+                config_train["hparam"]["style"]["disc"]["obs_traj_len"] * config_env["env"]["num_obs"])
+
+        # Preprocess MotionLib config
+        assert "joint_information_path" in config_train["algo"]["style"], "Joint information not found in config"
+        joint_info_path = Path(config_train["algo"]["style"]['joint_information_path'])
+        assert joint_info_path.exists(), f"Config path {joint_info_path} does not exist"
+        with open(joint_info_path.as_posix(), 'r') as f:
+            joint_info = yaml.load(f, Loader=yaml.SafeLoader)
+            asset_filename = config_env["env"]["humanoid_asset_filename"]
+            asset_filename = Path(asset_filename).stem
+            assert asset_filename in joint_info, f"Asset {asset_filename} not found in joint information"
+            config_train["algo"]["style"]["joint_information"] = joint_info[asset_filename]
 
     return config_run, config_train
 

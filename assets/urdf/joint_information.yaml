@@ -1,0 +1,17 @@
+# This yaml intended to use with ASE MotionLib (poselib/motion_lib.py)
+# I cannot understand meaning of each values, so don't ask to me.
+
+amp_humanoid:
+  dof_body_ids:  # Maybe indices of movable body
+    [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14]
+  dof_offsets:  # Each joints starting dof indices
+    [0, 3, 6, 9, 10, 13, 14, 17, 18, 21, 24, 25, 28]
+  key_body_names:
+    ["right_hand", "left_hand", "right_foot", "left_foot"]
+amp_humanoid_sword_shield:
+  dof_body_ids:  # Maybe indices of movable body
+    [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16]
+  dof_offsets:  # Each joints starting dof indices
+    [0, 3, 6, 9, 10, 13, 16, 17, 20, 21, 24, 27, 28, 31]
+  key_body_names:
+    ["right_hand", "left_hand", "right_foot", "left_foot", "sword", "shield"]

@@ -15,6 +15,7 @@ class VecTask:
         torch._C._jit_set_profiling_executor(False)
 
         self._gym = gymapi.acquire_gym()
+        self._config = kwargs
 
         # Simulation related variables
         self._headless = None
@@ -147,6 +148,7 @@ class VecTask:
         self._graphics_device = self._compute_device if not self._headless else -1
 
         self._sim_params = gymapi.SimParams()
+        self._dt = self._sim_params.dt
         engine = sim_cfg['engine']
         if engine == 'PHYSX':
             self._sim_engine = gymapi.SIM_PHYSX
@@ -196,6 +198,14 @@ class VecTask:
         self._gym.refresh_dof_force_tensor(self._sim)
         self._gym.refresh_net_contact_force_tensor(self._sim)
 
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def dt(self):
+        return self._dt
+
     # Called by rl-games
     def get_number_of_agents(self):
         return self._num_agents
@@ -229,14 +239,13 @@ class VecTask:
         """Return serializable environment state to be saved to checkpoint.
         Can be used for stateful training sessions, i.e. with adaptive curriculums.
         """
-        return None
+        pass
 
     # Called by rl-games
     def set_env_state(self, env_state):
         """Used on the restore process.
         """
         pass
-
 
     @abstractmethod
     def _create_envs(self):

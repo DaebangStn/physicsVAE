@@ -12,6 +12,7 @@ class RlTask(VecTask):
     def __init__(self, **kwargs):
         self._env_spacing = None
         self._humanoid_asset_filename = None
+        self._humanoid_head_rBody_id = None
         self._action_ofs = None
         self._action_scale = None
         self._max_episode_steps = None
@@ -23,6 +24,10 @@ class RlTask(VecTask):
         super().__init__(**kwargs)
 
         self._build_tensors()
+
+    def key_body_ids(self, key_body_names: List[str]) -> List[int]:
+        return [self._gym.find_actor_rigid_body_handle(self._envs[0], self._humanoids[0], name)
+                for name in key_body_names]
 
     def render(self):
         super().render()
@@ -99,6 +104,9 @@ class RlTask(VecTask):
             self._humanoids.append(humanoid)
             self._gym.end_aggregate(env)
 
+        self._humanoid_head_rBody_id = (
+            self._gym.find_actor_rigid_body_index(self._envs[0], self._humanoids[0], "head", gymapi.DOMAIN_ENV))
+
         dof_prop = self._gym.get_actor_dof_properties(self._envs[0], self._humanoids[0])
         self._action_ofs = to_torch(0.5 * (dof_prop['upper'] + dof_prop['lower']), device=self._compute_device)
         self._action_scale = to_torch(0.5 * (dof_prop['upper'] - dof_prop['lower']), device=self._compute_device)
@@ -108,9 +116,10 @@ class RlTask(VecTask):
         self._buf["obs"] = torch.cat([self._buf["dPos"], self._buf["dVel"], self._buf["actor"]], dim=-1)
 
     def _compute_reset(self):
-        height_criteria = 0.7
+        height_criteria = 0.5
         force_criteria = 1.0
-        actor_height = self._buf["aPos"][..., 2]
+
+        actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
         actor_down = actor_height < height_criteria
         # contact_off = (self._buf["sensor"] ** 2).sum(dim=1) < force_criteria
         self._buf["terminate"] = actor_down  # & contact_off
@@ -118,11 +127,11 @@ class RlTask(VecTask):
         self._buf["reset"] = tooLongEpisode | self._buf["terminate"]
 
     def _compute_reward(self):
-        reset_reward = -10000.0
-        actor_height = self._buf["aPos"][..., 2]
+        reset_reward = -100.0
+        actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
         self._buf["rew"] = torch.where(self._buf["terminate"],
                                        reset_reward,
-                                       self._buf["elapsedStep"] + actor_height * 1000)
+                                       self._buf["elapsedStep"] * 0.01 + actor_height)
 
     def _parse_env_param(self, **kwargs):
         env_cfg = super()._parse_env_param(**kwargs)
