@@ -5,9 +5,9 @@ class StyleModel(ModelA2CContinuousLogStd):
     def __init__(self, network):
         super().__init__(network)
 
-    def build(self, config):
-        net = self.network_builder.build('', **config)
-        return self.NetworkWrapper(net, **config)
+    def build(self, **kwargs):
+        net = self.network_builder.build('', **kwargs)
+        return self.NetworkWrapper(net, **kwargs)
 
     class NetworkWrapper(ModelA2CContinuousLogStd.Network):
         """torch.nn.Module which post-processes the network(variable 'net') output
@@ -20,8 +20,7 @@ class StyleModel(ModelA2CContinuousLogStd):
             output_dict = super().forward(input_dict)
             if input_dict.get('is_train', False):
                 output_dict['rollout_disc'] = self.disc(input_dict['rollout_obs'])
-            # TODO, implement replay buffer
-            #     output_dict['replay_disc'] = self.a2c_network.disc(input_dict['replay_obs'])
+                output_dict['replay_disc'] = self.a2c_network.disc(input_dict['replay_obs'])
                 output_dict['demo_disc'] = self.disc(input_dict['demo_obs'])
             return output_dict
 

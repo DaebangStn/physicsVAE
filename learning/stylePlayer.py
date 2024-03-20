@@ -1,11 +1,29 @@
 import time
+
 import torch
+from rl_games.common.player import BasePlayer
 from rl_games.algos_torch.players import PpoPlayerContinuous
+
+from utils.rl_games import rl_games_net_build_param
 
 
 class StylePlayer(PpoPlayerContinuous):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        BasePlayer.__init__(self, kwargs['params'])
+
+        self.network = None
+        self.model = None
+
+        self.num_actors = None
+        self.actions_num = None
+        self.actions_low = None
+        self.actions_high = None
+
+        self.normalize_input = None
+        self.normalize_value = None
+        self.is_rnn = None
+        self._init_variables(**kwargs)
+
         self.max_steps = int(1e30)
         self.games_num = int(1e30)
 
@@ -119,3 +137,19 @@ class StylePlayer(PpoPlayerContinuous):
         else:
             print('av reward:', sum_rewards / games_played * n_game_life,
                   'av steps:', sum_steps / games_played * n_game_life)
+
+    def _init_variables(self, **kwargs):
+        self.network = self.config['network']
+
+        self.num_actors = self.env.num
+        self.actions_num = self.action_space.shape[0]
+        self.actions_low = torch.from_numpy(self.action_space.low.copy()).float().to(self.device)
+        self.actions_high = torch.from_numpy(self.action_space.high.copy()).float().to(self.device)
+
+        self.normalize_input = self.config['normalize_input']
+        self.normalize_value = self.config.get('normalize_value', False)
+
+        self.model = self.network.build(**kwargs['params']['network'], **rl_games_net_build_param(self))
+        self.model.to(self.device)
+        self.model.eval()
+        self.is_rnn = self.model.is_rnn()

@@ -2,6 +2,7 @@ test: False
 
 algo:
   name: rlAlgo
+  memo: make_it_walk
 
 model:
   name: continuous_a2c_logstd  # continuous_a2c has internal error

@@ -1,10 +1,9 @@
 from typing import Dict
-import torch
 from isaacgym import gymtorch
 
 
 from env.vectask import VecTask
-from utils import PROJECT_ROOT, to_torch
+from utils import PROJECT_ROOT
 from utils.env import *
 
 

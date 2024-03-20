@@ -206,6 +206,10 @@ class VecTask:
     def dt(self):
         return self._dt
 
+    @property
+    def num(self):
+        return self._num_envs
+
     # Called by rl-games
     def get_number_of_agents(self):
         return self._num_agents

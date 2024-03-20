@@ -3,7 +3,8 @@ from typing import Dict
 from env.vectask import VecTask
 from utils import *
 from utils.env import *
-from utils.env import get_tensor_like_r_body_state, set_tensor_like_r_body_state, set_tensor_like_dof_pose_state
+from utils.env import get_tensor_like_r_body_state, set_tensor_like_r_body_state, set_tensor_like_dof_pose_state, \
+    to_torch
 
 
 class BalanceTask(VecTask):

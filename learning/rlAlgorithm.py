@@ -1,5 +1,7 @@
 import time
 import yaml
+import torch
+from rl_games.common import common_losses
 from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common.a2c_common import swap_and_flatten01
 
@@ -74,6 +76,47 @@ class RlAlgorithm(A2CAgent):
         batch_dict['step_time'] = step_time
 
         return batch_dict
+
+    def _unpack_input(self, input_dict):
+        value_preds_batch = input_dict['old_values']
+        old_action_log_probs_batch = input_dict['old_logp_actions']
+        advantage = input_dict['advantages']
+        old_mu_batch = input_dict['mu']
+        old_sigma_batch = input_dict['sigma']
+        return_batch = input_dict['returns']
+        actions_batch = input_dict['actions']
+        obs_batch = input_dict['obs']
+
+        obs_batch = self._preproc_obs(obs_batch)
+        lr_mul = 1.0
+        curr_e_clip = self.e_clip
+
+        batch_dict = {
+            'is_train': True,
+            'prev_actions': actions_batch,
+            'obs': obs_batch,
+            'rollout_obs': input_dict['rollout_obs'],
+            'replay_obs': input_dict['replay_obs'],
+            'demo_obs': input_dict['demo_obs'].requires_grad_(True),
+        }
+        return advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch, return_batch, value_preds_batch
+
+    def _bound_loss(self, mu):
+        if self.bound_loss_type == 'regularisation':
+            b_loss = self.reg_loss(mu)
+        elif self.bound_loss_type == 'bound':
+            b_loss = self.bound_loss(mu)
+        else:
+            b_loss = torch.zeros(1, device=self.ppo_device)
+        return b_loss
+
+    def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
+        if self.has_value_loss:
+            c_loss = common_losses.critic_loss(self.model, value_preds_batch, values, curr_e_clip, return_batch,
+                                               self.clip_value)
+        else:
+            c_loss = torch.zeros(1, device=self.ppo_device)
+        return c_loss
 
     def _save_config(self, **kwargs):
         algo_config = kwargs['params']

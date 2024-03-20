@@ -2,13 +2,13 @@ import time
 from typing import List
 import torch
 from torch.optim import Adam
-from rl_games.common import common_losses
 from rl_games.common.datasets import PPODataset
 from rl_games.common.a2c_common import ContinuousA2CBase, swap_and_flatten01
 from rl_games.algos_torch import torch_ext
 
-from utils import TensorHistoryFIFO, MotionLibFetcher
 from learning.rlAlgorithm import RlAlgorithm
+from utils.rl_games import rl_games_net_build_param
+from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
 
 class StyleAlgorithm(RlAlgorithm):
@@ -38,6 +38,7 @@ class StyleAlgorithm(RlAlgorithm):
 
         self.dataset = None
         self._demo_fetcher = None
+        self._replay_buffer = None
         self._prepare_data(**kwargs)
 
         # placeholders for the current episode
@@ -140,8 +141,7 @@ class StyleAlgorithm(RlAlgorithm):
             entropy = res_dict['entropy']
             mu = res_dict['mus']
             sigma = res_dict['sigmas']
-            # TODO, implement replay buffer
-            # agent_disc = torch.cat([res_dict['rollout_disc'], res_dict['replay_disc']], dim=0)
+            agent_disc = torch.cat([res_dict['rollout_disc'], res_dict['replay_disc']], dim=0)
 
             # 3. Calculate the loss
             a_loss = self.actor_loss_func(old_action_log_probs_batch, action_log_probs,
@@ -153,9 +153,7 @@ class StyleAlgorithm(RlAlgorithm):
                 [a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)])
             a_loss, c_loss, entropy, b_loss = losses
 
-            # TODO, implement replay buffer
-            # d_loss = self._disc_loss(agent_disc, res_dict['demo_disc'], input_dict['demo_obs'])
-            d_loss = self._disc_loss(res_dict['rollout_disc'], res_dict['demo_disc'], input_dict)
+            d_loss = self._disc_loss(agent_disc, res_dict['demo_disc'], input_dict)
             loss = (a_loss
                     + 0.5 * c_loss * self.critic_coef
                     - entropy * self.entropy_coef
@@ -190,56 +188,17 @@ class StyleAlgorithm(RlAlgorithm):
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
+
         dataset_dict['rollout_obs'] = batch_dict['rollout_obs']
-        demo = self._demo_fetcher.fetch()
-        dataset_dict['demo_obs'] = torch.cat([demo] * self.horizon_length, dim=0)
-        dataset_length = dataset_dict['mu'].shape[0]
+        dataset_dict['replay_obs'] = (self._replay_buffer['rollout'].sample(self.batch_size)
+                                      if self._replay_buffer['rollout'].count > 0 else batch_dict['rollout_obs'])
+        dataset_dict['demo_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
+        self._update_replay_buffer(batch_dict['rollout_obs'])
+
         dataset_dict['mean_task_reward'] = (
-            torch.cat([batch_dict['mean_task_reward'].unsqueeze(-1)] * dataset_length))
+            torch.cat([batch_dict['mean_task_reward'].unsqueeze(-1)] * self.batch_size))
         dataset_dict['mean_style_reward'] = (
-            torch.cat([batch_dict['mean_style_reward'].unsqueeze(-1)] * dataset_length))
-
-    def _unpack_input(self, input_dict):
-        value_preds_batch = input_dict['old_values']
-        old_action_log_probs_batch = input_dict['old_logp_actions']
-        advantage = input_dict['advantages']
-        old_mu_batch = input_dict['mu']
-        old_sigma_batch = input_dict['sigma']
-        return_batch = input_dict['returns']
-        actions_batch = input_dict['actions']
-        obs_batch = input_dict['obs']
-
-        obs_batch = self._preproc_obs(obs_batch)
-        lr_mul = 1.0
-        curr_e_clip = self.e_clip
-
-        batch_dict = {
-            'is_train': True,
-            'prev_actions': actions_batch,
-            'obs': obs_batch,
-            'rollout_obs': input_dict['rollout_obs'],
-            # TODO, implement replay buffer
-            'replay_obs': None,
-            'demo_obs': input_dict['demo_obs'].requires_grad_(True),
-        }
-        return advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch, return_batch, value_preds_batch
-
-    def _bound_loss(self, mu):
-        if self.bound_loss_type == 'regularisation':
-            b_loss = self.reg_loss(mu)
-        elif self.bound_loss_type == 'bound':
-            b_loss = self.bound_loss(mu)
-        else:
-            b_loss = torch.zeros(1, device=self.ppo_device)
-        return b_loss
-
-    def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
-        if self.has_value_loss:
-            c_loss = common_losses.critic_loss(self.model, value_preds_batch, values, curr_e_clip, return_batch,
-                                               self.clip_value)
-        else:
-            c_loss = torch.zeros(1, device=self.ppo_device)
-        return c_loss
+            torch.cat([batch_dict['mean_style_reward'].unsqueeze(-1)] * self.batch_size))
 
     def _disc_loss(self, agent_disc, demo_disc, input_dict):
         obs_demo = input_dict['demo_obs']
@@ -288,22 +247,25 @@ class StyleAlgorithm(RlAlgorithm):
             reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
         return reward.view(self.horizon_length, self.num_actors, -1)
 
+    def _demo_fetcher_config(self, algo_conf):
+        return {
+            # Demo dimension
+            'traj_len': self._disc_obs_traj_len,
+            'dt': self.vec_env.dt,
+
+            # Motion Lib
+            'motion_file': algo_conf['motion_file'],
+            'dof_body_ids': algo_conf['joint_information']['dof_body_ids'],
+            'dof_offsets': algo_conf['joint_information']['dof_offsets'],
+            'key_body_ids': self._find_key_body_ids(algo_conf['joint_information']['key_body_names']),
+            'device': self.device
+        }
+
     def _find_key_body_ids(self, key_body_names: List[str]) -> List[int]:
         return self.vec_env.key_body_ids(key_body_names)
 
-    def _rl_games_compatible_keywords(self):
-        return {
-            'actions_num': self.actions_num,
-            'input_shape': self.obs_shape,
-            'num_seqs': self.num_actors * self.num_agents,
-            'value_size': self.env_info.get('value_size', 1),
-            'normalize_value': self.normalize_value,
-            'normalize_input': self.normalize_input,
-            'obs_shape': self.obs_shape,
-        }
-
     def _init_learning_variables(self, **kwargs):
-        self.model = self.network.build({**kwargs['params']['network'], **self._rl_games_compatible_keywords()})
+        self.model = self.network.build(**kwargs['params']['network'], **rl_games_net_build_param(self))
         self.model.to(self.ppo_device)
 
         config_hparam = self.config
@@ -328,25 +290,26 @@ class StyleAlgorithm(RlAlgorithm):
         self._disc_rew_scale = config_rew['disc_rew_scale']
 
     def _prepare_data(self, **kwargs):
-        algo_conf = kwargs['params']['algo']["style"]
 
         self.dataset = PPODataset(self.batch_size, self.minibatch_size, self.is_discrete, self.is_rnn,
                                   self.ppo_device, self.seq_length)
 
-        demo_fetcher_config = {
-            # Demo dimension
-            'num_envs': self.num_actors * self.num_agents,
-            'traj_len': self._disc_obs_traj_len,
-            'dt': self.vec_env.dt,
+        algo_conf = kwargs['params']['algo']["style"]
+        self._demo_fetcher = MotionLibFetcher(**self._demo_fetcher_config(algo_conf))
 
-            # Motion Lib
-            'motion_file': algo_conf['motion_file'],
-            'dof_body_ids': algo_conf['joint_information']['dof_body_ids'],
-            'dof_offsets': algo_conf['joint_information']['dof_offsets'],
-            'key_body_ids': self._find_key_body_ids(algo_conf['joint_information']['key_body_names']),
-            'device': self.device
+        config_style = self.config['style']
+        self._replay_buffer = {
+            'demo': SingleTensorBuffer(config_style['replay_buf_size'], self.device),
+            'rollout': SingleTensorBuffer(config_style['replay_buf_size'], self.device),
         }
-        self._demo_fetcher = MotionLibFetcher(**demo_fetcher_config)
+        demo_obs = self._demo_fetcher.fetch(config_style['replay_buf_size'])
+        self._replay_buffer['demo'].store(demo_obs)
+        print(f'[StyleAlgorithm] Demo buffer size: {self._replay_buffer["demo"].count}')
+
+    def _update_replay_buffer(self, rollout_obs):
+        demo_obs = self._demo_fetcher.fetch(self.batch_size // 2048)  # 2048 is a magic number for performance
+        self._replay_buffer['demo'].store(demo_obs)
+        self._replay_buffer['rollout'].store(rollout_obs)
 
     def _write_disc_stat(self, **kwargs):
         frame = self.frame // self.num_agents

@@ -32,7 +32,7 @@ network:
       name: default
 
   disc:
-    units: [8]
+    units: [1024, 512]
     activation: relu
     initializer:
       name: default
@@ -41,7 +41,7 @@ network:
 seed: 1
 
 checkpoint:  # from the project root
-#  runs/rlTask_18-17-24-58/nn/last_rlTask_ep_4200_rew_-44.079414.pth
+#  runs/rlTask_19-22-22-29/nn/rlTask.pth
 
 
 hparam:
@@ -70,6 +70,7 @@ hparam:
   style:
     task_rew_scale: 0
     disc_rew_scale: 1
+    replay_buf_size: 100000
 
     disc:
       obs_traj_len: 10

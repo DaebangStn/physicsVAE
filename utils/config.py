@@ -2,6 +2,8 @@ import os
 import random
 import yaml
 from typing import Tuple
+from datetime import datetime
+
 from pathlib import Path
 import torch
 import numpy as np
@@ -35,7 +37,10 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     with open(config_env_path.as_posix(), 'r') as f:
         config_env = yaml.load(f, Loader=yaml.SafeLoader)
 
-    # TODO: Overriding parameters passed on the cli
+    # Overriding parameters passed on the cli
+    if args.test:
+        config_train["test"] = args.test
+
     config_run = {
         "play": config_train["test"],
         "train": not config_train["test"],
@@ -49,6 +54,10 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
 
     # Overriding config_env to config_train
     config_train["config"] = {}
+    config_train["config"]["full_experiment_name"] = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] +
+                                                      "_" + datetime.now().strftime("%d-%H-%M-%S"))
+    if "memo" in config_train["algo"].keys():
+        config_train["config"]["full_experiment_name"] += "_" + config_train["algo"]["memo"]
     config_train["config"]["name"] = config_env["env"]["name"]
     config_train["config"]["env_name"] = config_env["env"]["name"]
     config_train["config"]["num_actors"] = config_env["env"]["num_envs"]

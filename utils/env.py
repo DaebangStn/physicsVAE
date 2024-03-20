@@ -1,6 +1,7 @@
 import math
 from typing import List
 import numpy as np
+import torch
 from isaacgym import gymapi
 
 
@@ -107,3 +108,7 @@ def set_tensor_like_dof_pose_state(gym, envs, handles, values: np.ndarray):
         value = values[i]
         gym.set_actor_dof_position_targets(env, handles[i], value)
         pass
+
+
+def to_torch(x, dtype=torch.float, device='cuda:0', requires_grad=False):
+    return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)

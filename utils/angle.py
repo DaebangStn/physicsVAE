@@ -110,11 +110,11 @@ def slerp(q0, q1, t):
     cos_half_theta = torch.abs(cos_half_theta)
     cos_half_theta = torch.unsqueeze(cos_half_theta, dim=-1)
 
-    half_theta = torch.acos(cos_half_theta);
-    sin_half_theta = torch.sqrt(1.0 - cos_half_theta * cos_half_theta);
+    half_theta = torch.acos(cos_half_theta)
+    sin_half_theta = torch.sqrt(1.0 - cos_half_theta * cos_half_theta)
 
-    ratioA = torch.sin((1 - t) * half_theta) / sin_half_theta;
-    ratioB = torch.sin(t * half_theta) / sin_half_theta;
+    ratioA = torch.sin((1 - t) * half_theta) / sin_half_theta
+    ratioB = torch.sin(t * half_theta) / sin_half_theta
 
     new_q = ratioA * q0 + ratioB * q1
 
