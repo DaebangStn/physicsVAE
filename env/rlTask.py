@@ -130,7 +130,7 @@ class RlTask(VecTask):
         actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
         self._buf["rew"] = torch.where(self._buf["terminate"],
                                        reset_reward,
-                                       self._buf["elapsedStep"] * 0.01 + actor_height)
+                                       self._buf["elapsedStep"] * 0.01)
 
     def _parse_env_param(self, **kwargs):
         env_cfg = super()._parse_env_param(**kwargs)

@@ -41,6 +41,9 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     if args.test:
         config_train["test"] = args.test
 
+    if config_train["test"]:
+        assert config_train["checkpoint"] is not None, "Checkpoint path not found in config"
+
     config_run = {
         "play": config_train["test"],
         "train": not config_train["test"],

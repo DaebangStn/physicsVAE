@@ -3,7 +3,7 @@ test: False
 algo:
   name: styleAlgo
   style:
-    motion_file: assets/motions/reallusion_sword_shield/RL_Avatar_Atk_2xCombo01_Motion.npy
+    motion_file: assets/motions/amp_humanoid_walk.npy
     joint_information_path: assets/urdf/joint_information.yaml
 
 model:
@@ -41,35 +41,40 @@ network:
 seed: 1
 
 checkpoint:  # from the project root
-#  runs/rlTask_19-22-22-29/nn/rlTask.pth
+#  runs/rlTask_rlAlgo_20-19-43-03_do_not_fly_but_fast_learn/nn/rlTask.pth
 
 
 hparam:
   normalize_input: True
   normalize_value: True
+  normalize_advantage: True
+  clip_value: False
   reward_shaper: {}
   save_frequency: 200
 
-  # learning
-  lr_schedule: constant
-  e_clip: 0.2
-  clip_value: False
+  # learning hyperparameters
   horizon_length: 32
-  normalize_advantage: True
-  critic_coef: 5
-  grad_norm: 1.0
   gamma: 0.99
   tau: 0.95
+  e_clip: 0.2
+  grad_norm: 1.0
+
   minibatch_size: 16384
   mini_epochs: 6
-  learning_rate: 2e-5
+
+  learning_rate: 5e-4
+  lr_schedule: adaptive
+  kl_threshold: 0.008
+
+  bound_loss_type: regularisation
+  bounds_loss_coef: 0.00001
+  critic_coef: 5
   entropy_coef: 0.0
-  bounds_loss_coef: 10
 
   # style
   style:
-    task_rew_scale: 0
-    disc_rew_scale: 1
+    task_rew_scale: 0.1
+    disc_rew_scale: 1.0
     replay_buf_size: 100000
 
     disc:
@@ -77,5 +82,3 @@ hparam:
       loss_coef: 5
       weight_reg_scale: 0.01
       grad_penalty_scale: 5
-
-
