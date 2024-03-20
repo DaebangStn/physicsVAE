@@ -47,6 +47,7 @@ class StyleAlgorithm(RlAlgorithm):
         self.current_rewards = None
         self.current_shaped_rewards = None
         self.current_lengths = None
+        self._last_last_lr = self.last_lr
 
         self._save_config(**kwargs)
 

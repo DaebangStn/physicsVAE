@@ -2,6 +2,7 @@ import time
 import yaml
 import torch
 from rl_games.common import common_losses
+from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common.a2c_common import swap_and_flatten01
 
@@ -9,7 +10,64 @@ from rl_games.common.a2c_common import swap_and_flatten01
 class RlAlgorithm(A2CAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        self._last_last_lr = self.last_lr
+
         self._save_config(**kwargs)
+
+    def calc_gradients(self, input_dict):
+        # 1. Unpack the input
+        (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch,
+         old_sigma_batch, return_batch, value_preds_batch) = self._unpack_input(input_dict)
+
+        with ((torch.cuda.amp.autocast(enabled=self.mixed_precision))):
+            # 2. Run the model
+            res_dict = self.model(batch_dict)
+            action_log_probs = res_dict['prev_neglogp']
+            values = res_dict['values']
+            entropy = res_dict['entropy']
+            mu = res_dict['mus']
+            sigma = res_dict['sigmas']
+
+            # 3. Calculate the loss
+            a_loss = self.actor_loss_func(old_action_log_probs_batch, action_log_probs,
+                                          advantage, self.ppo, curr_e_clip)
+            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, values)
+            b_loss = self._bound_loss(mu)
+
+            losses, _ = torch_ext.apply_masks(  # vestige for RNN
+                [a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)])
+            a_loss, c_loss, entropy, b_loss = losses
+
+            loss = (a_loss
+                    + 0.5 * c_loss * self.critic_coef
+                    - entropy * self.entropy_coef
+                    + b_loss * self.bounds_loss_coef)
+
+            # 4. Zero the gradients
+            if self.multi_gpu:
+                self.optimizer.zero_grad()
+            else:
+                for param in self.model.parameters():
+                    param.grad = None
+
+        # 5. Back propagate the loss
+        self.scaler.scale(loss).backward()
+        self.trancate_gradients_and_step()
+
+        # 6. Store the results
+        self.diagnostics.mini_batch(
+            self, {
+                'values': value_preds_batch,
+                'returns': return_batch,
+                'new_neglogp': action_log_probs,
+                'old_neglogp': old_action_log_probs_batch,
+            }, curr_e_clip, 0)
+
+        with torch.no_grad():
+            kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, True)
+        self.train_result = (a_loss, c_loss, entropy, kl_dist, self.last_lr, lr_mul,
+                             mu.detach(), sigma.detach(), b_loss)
 
     def play_steps(self):
         update_list = self.update_list
@@ -88,17 +146,22 @@ class RlAlgorithm(A2CAgent):
         obs_batch = input_dict['obs']
 
         obs_batch = self._preproc_obs(obs_batch)
-        lr_mul = 1.0
+        lr_mul = self._last_last_lr / self.last_lr
+        self._last_last_lr = self.last_lr
         curr_e_clip = self.e_clip
 
         batch_dict = {
             'is_train': True,
             'prev_actions': actions_batch,
             'obs': obs_batch,
-            'rollout_obs': input_dict['rollout_obs'],
-            'replay_obs': input_dict['replay_obs'],
-            'demo_obs': input_dict['demo_obs'].requires_grad_(True),
+            'rollout_obs': input_dict.get('rollout_obs'),
+            'replay_obs': input_dict.get('replay_obs'),
+            'demo_obs': input_dict.get('demo_obs'),
         }
+
+        if batch_dict['demo_obs'] is not None:
+            batch_dict['demo_obs'].requires_grad_(True)
+
         return advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch, return_batch, value_preds_batch
 
     def _bound_loss(self, mu):
