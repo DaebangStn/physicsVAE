@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import torch
 
 from poselib.motion_lib import MotionLib
@@ -70,10 +68,8 @@ class MotionLibFetcher:
         capture_time = (time_steps + end_time).view(-1)
 
         motion_ids = torch.tile(motion_ids.unsqueeze(-1), [1, self._traj_len]).view(-1)
-        state = retarget_obs(self._motion_lib.get_motion_state(motion_ids, capture_time))
-        # TODO: check the motion index is in order.
-        # whether [traj1, traj1, ..., traj2, traj2, ...] or [traj1, traj2, ..., traj1, traj2, ...]
-        return state.view(n, -1)
+        # [traj1, traj1, ..., traj2, traj2, ...]
+        return self._motion_lib.get_motion_state(motion_ids, capture_time)
 
 
 class TensorHistoryFIFO:
@@ -132,9 +128,3 @@ class TensorHistoryFIFO:
 
         def __len__(self):
             return len(self._q)
-
-
-@torch.jit.script
-def retarget_obs(motion_lib_state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]):
-    (root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos) = motion_lib_state
-    return torch.cat((dof_pos, dof_vel, root_pos, root_rot, root_vel, root_ang_vel), dim=-1)

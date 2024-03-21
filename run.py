@@ -11,6 +11,7 @@ def build_runner():
     from env.simpleTask import SimpleTask
     from env.rlTask import RlTask
     from env.balanceTask import BalanceTask
+    from env.keypointTask import KeypointTask
 
     from learning.styleModel import StyleModel
     from learning.styleNetworkBuilder import StyleNetworkBuilder
@@ -27,6 +28,7 @@ def build_runner():
     register_env_rl_games('simpleTask', SimpleTask)
     register_env_rl_games('rlTask', RlTask)
     register_env_rl_games('balanceTask', BalanceTask)
+    register_env_rl_games('keypointTask', KeypointTask)
 
     register_net_n_model('style', StyleNetworkBuilder, StyleModel)
 

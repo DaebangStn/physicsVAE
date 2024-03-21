@@ -28,10 +28,10 @@ network:
     initializer:
       name: default
 
-seed: 1
 
 checkpoint:  # from the project root
-#  runs/rlTask_rlAlgo_20-19-43-03_do_not_fly_but_fast_learn/nn/rlTask.pth
+#  runs/rlTask_rlAlgo_20-19-58-52_removed_height_reward/nn/rlTask.pth
+
 
 hparam:
   normalize_input: True
@@ -59,3 +59,5 @@ hparam:
   bounds_loss_coef: 0.00001
   critic_coef: 5
   entropy_coef: 0.0
+
+seed: 1

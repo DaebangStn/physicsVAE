@@ -5,6 +5,28 @@ import numpy as np
 from isaacgym.torch_utils import *
 
 
+# @torch.jit.script
+def joint_tan_norm(dof: torch.Tensor, dof_ofs: list) -> torch.Tensor:
+    num_joint_obs = 6
+    num_joints = len(dof_ofs) - 1
+
+    tan_norm = torch.zeros(dof.shape[:-1] + (num_joint_obs * num_joints,), device=dof.device)
+    for i, ofs in enumerate(dof_ofs[:-1]):
+        dof_size = dof_ofs[i + 1] - ofs
+        dof_data = dof[..., ofs:ofs + dof_size]
+
+        if dof_size == 1:
+            axis = torch.tensor([0, 1, 0], device=dof.device, dtype=dof.dtype)
+            quat = quat_from_angle_axis(dof_data[..., 0], axis)
+        elif dof_size == 3:
+            quat = exp_map_to_quat(dof_data)
+        else:
+            raise ValueError(f"unsupported dof size: {dof_size}")
+
+        tan_norm[..., i * num_joint_obs:(i + 1) * num_joint_obs] = quat_to_tan_norm(quat)
+    return tan_norm
+
+
 @torch.jit.script
 def quat_to_angle_axis(q):
     # type: (Tensor) -> Tuple[Tensor, Tensor]

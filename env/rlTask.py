@@ -24,10 +24,6 @@ class RlTask(VecTask):
 
         self._build_tensors()
 
-    def key_body_ids(self, key_body_names: List[str]) -> List[int]:
-        return [self._gym.find_actor_rigid_body_handle(self._envs[0], self._humanoids[0], name)
-                for name in key_body_names]
-
     def render(self):
         super().render()
 

@@ -59,7 +59,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     config_train["config"] = {}
     config_train["config"]["full_experiment_name"] = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] +
                                                       "_" + datetime.now().strftime("%d-%H-%M-%S"))
-    if "memo" in config_train["algo"].keys():
+    if "memo" in config_train["algo"].keys() and config_train["algo"]["memo"] is not None:
         config_train["config"]["full_experiment_name"] += "_" + config_train["algo"]["memo"]
     config_train["config"]["name"] = config_env["env"]["name"]
     config_train["config"]["env_name"] = config_env["env"]["name"]

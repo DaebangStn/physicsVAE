@@ -2,6 +2,7 @@ test: False
 
 algo:
   name: styleAlgo
+  memo:
   style:
     motion_file: assets/motions/amp_humanoid_walk.npy
     joint_information_path: assets/urdf/joint_information.yaml
@@ -38,10 +39,8 @@ network:
       name: default
 
 
-seed: 1
-
 checkpoint:  # from the project root
-#  runs/rlTask_rlAlgo_20-19-43-03_do_not_fly_but_fast_learn/nn/rlTask.pth
+#  runs/rlTask_styleAlgo_21-13-44-10_why_my_reward_drops/nn/last_rlTask_ep_8000_rew_282.46582.pth
 
 
 hparam:
@@ -66,19 +65,23 @@ hparam:
   lr_schedule: adaptive
   kl_threshold: 0.008
 
-  bound_loss_type: regularisation
-  bounds_loss_coef: 0.00001
+#  bound_loss_type: regularisation
+#  bounds_loss_coef: 0.00001
+  bound_loss_type: bound
+  bounds_loss_coef: 0
   critic_coef: 5
   entropy_coef: 0.0
 
   # style
   style:
-    task_rew_scale: 0.1
+    task_rew_scale: 0.0
     disc_rew_scale: 1.0
-    replay_buf_size: 100000
+    replay_buf_size: 200000
 
     disc:
       obs_traj_len: 10
-      loss_coef: 5
+      loss_coef: 0.01
       weight_reg_scale: 0.01
       grad_penalty_scale: 5
+
+seed: 1

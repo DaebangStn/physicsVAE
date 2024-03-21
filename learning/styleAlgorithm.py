@@ -7,6 +7,7 @@ from rl_games.common.a2c_common import ContinuousA2CBase, swap_and_flatten01
 from rl_games.algos_torch import torch_ext
 
 from learning.rlAlgorithm import RlAlgorithm
+from utils.angle import *
 from utils.rl_games import rl_games_net_build_param
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
@@ -22,6 +23,7 @@ class StyleAlgorithm(RlAlgorithm):
         self.value_mean_std = None
         self.bound_loss_type = None
         self.optimizer = None
+        self.is_tensor_obses = True
         # discriminator related
         self._disc_obs_buf = None
         self._disc_obs_traj_len = None
@@ -36,6 +38,10 @@ class StyleAlgorithm(RlAlgorithm):
         self.init_rnn_from_model(self.model)
         self.algo_observer.after_init(self)
 
+        # env related
+        self._key_body_ids = None
+        self._dof_offsets = None
+
         self.dataset = None
         self._demo_fetcher = None
         self._replay_buffer = None
@@ -47,6 +53,10 @@ class StyleAlgorithm(RlAlgorithm):
         self.current_rewards = None
         self.current_shaped_rewards = None
         self.current_lengths = None
+        self._mean_task_reward = None
+        self._mean_style_reward = None
+        self._std_task_reward = None
+        self._std_style_reward = None
         self._last_last_lr = self.last_lr
 
         self._save_config(**kwargs)
@@ -124,8 +134,10 @@ class StyleAlgorithm(RlAlgorithm):
         batch_dict['played_frames'] = self.batch_size
         batch_dict['step_time'] = step_time
         batch_dict['rollout_obs'] = rollout_obs
-        batch_dict['mean_task_reward'] = task_reward.mean()
-        batch_dict['mean_style_reward'] = style_reward.mean()
+        self._mean_task_reward = task_reward.mean()
+        self._mean_style_reward = style_reward.mean()
+        self._std_task_reward = task_reward.std()
+        self._std_style_reward = style_reward.std()
 
         return batch_dict
 
@@ -186,6 +198,15 @@ class StyleAlgorithm(RlAlgorithm):
         self.train_result = (a_loss, c_loss, entropy, kl_dist, self.last_lr, lr_mul,
                              mu.detach(), sigma.detach(), b_loss)
 
+    def env_step(self, actions):
+        obs, rew, done, info = super().env_step(actions)
+        obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+        return {'obs': obs}, rew, done, info
+
+    def env_reset(self):
+        obs = super().env_reset()['obs']
+        return {'obs': style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)}
+
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
@@ -195,11 +216,6 @@ class StyleAlgorithm(RlAlgorithm):
                                       if self._replay_buffer['rollout'].count > 0 else batch_dict['rollout_obs'])
         dataset_dict['demo_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
         self._update_replay_buffer(batch_dict['rollout_obs'])
-
-        dataset_dict['mean_task_reward'] = (
-            torch.cat([batch_dict['mean_task_reward'].unsqueeze(-1)] * self.batch_size))
-        dataset_dict['mean_style_reward'] = (
-            torch.cat([batch_dict['mean_style_reward'].unsqueeze(-1)] * self.batch_size))
 
     def _disc_loss(self, agent_disc, demo_disc, input_dict):
         obs_demo = input_dict['demo_obs']
@@ -227,16 +243,22 @@ class StyleAlgorithm(RlAlgorithm):
         # (for logging) discriminator accuracy
         agent_acc = torch.mean((agent_disc < 0).float())
         demo_acc = torch.mean((demo_disc > 0).float())
+        agent_disc = torch.mean(agent_disc)
+        demo_disc = torch.mean(demo_disc)
 
         self._write_disc_stat(
             loss=loss.detach(),
             pred_loss=pred_loss.detach(),
-            weights_loss=weights_loss.detach(),
-            penalty_loss=penalty_loss.detach(),
-            agent_acc=agent_acc.detach(),
-            demo_acc=demo_acc.detach(),
-            mean_task_reward=input_dict['mean_task_reward'][0],
-            mean_style_reward=input_dict['mean_style_reward'][0],
+            disc_logit_loss=weights_loss.detach(),
+            disc_grad_penalty=penalty_loss.detach(),
+            disc_agent_acc=agent_acc.detach(),
+            disc_demo_acc=demo_acc.detach(),
+            disc_agent_logit=agent_disc.detach(),
+            disc_demo_logit=demo_disc.detach(),
+            task_reward_mean=self._mean_task_reward,
+            disc_reward_mean=self._mean_style_reward,
+            task_reward_std=self._std_task_reward,
+            disc_reward_std=self._std_style_reward,
         )
 
         return loss
@@ -257,8 +279,8 @@ class StyleAlgorithm(RlAlgorithm):
             # Motion Lib
             'motion_file': algo_conf['motion_file'],
             'dof_body_ids': algo_conf['joint_information']['dof_body_ids'],
-            'dof_offsets': algo_conf['joint_information']['dof_offsets'],
-            'key_body_ids': self._find_key_body_ids(algo_conf['joint_information']['key_body_names']),
+            'dof_offsets': self._dof_offsets,
+            'key_body_ids': self._key_body_ids,
             'device': self.device
         }
 
@@ -296,6 +318,8 @@ class StyleAlgorithm(RlAlgorithm):
                                   self.ppo_device, self.seq_length)
 
         algo_conf = kwargs['params']['algo']["style"]
+        self._key_body_ids = self._find_key_body_ids(algo_conf['joint_information']['key_body_names'])
+        self._dof_offsets = algo_conf['joint_information']['dof_offsets']
         self._demo_fetcher = MotionLibFetcher(**self._demo_fetcher_config(algo_conf))
 
         config_style = self.config['style']
@@ -303,16 +327,59 @@ class StyleAlgorithm(RlAlgorithm):
             'demo': SingleTensorBuffer(config_style['replay_buf_size'], self.device),
             'rollout': SingleTensorBuffer(config_style['replay_buf_size'], self.device),
         }
-        demo_obs = self._demo_fetcher.fetch(config_style['replay_buf_size'])
+        demo_obs = self._demo_fetcher.fetch(config_style['replay_buf_size'] // self._disc_obs_traj_len)
+        demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
-        print(f'[StyleAlgorithm] Demo buffer size: {self._replay_buffer["demo"].count}')
 
     def _update_replay_buffer(self, rollout_obs):
         demo_obs = self._demo_fetcher.fetch(self.batch_size // 2048)  # 2048 is a magic number for performance
+        demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_buffer['rollout'].store(rollout_obs)
 
     def _write_disc_stat(self, **kwargs):
         frame = self.frame // self.num_agents
         for k, v in kwargs.items():
-            self.writer.add_scalar(f'style/disc/{k}', v, frame)
+            if k == "loss":
+                self.writer.add_scalar(f'losses/disc_loss', v, frame)
+            else:
+                self.writer.add_scalar(f'info/{k}', v, frame)
+
+
+# @torch.jit.script
+def style_task_obs_angle_transform(obs: torch.Tensor, key_idx: torch.Tensor, dof_offsets: List[int]) -> torch.Tensor:
+    aPos, aRot, aVel, aAnVel, dPos, dVel, rPos = obs
+    keyPos = rPos[:, key_idx, :]
+    return local_angle_transform((aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos), dof_offsets)
+
+
+def motion_lib_angle_transform(
+        state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        dof_offsets: List[int], traj_len: int) -> torch.Tensor:
+    num_steps = int(state[0].shape[0] / traj_len)
+    obs = local_angle_transform(state, dof_offsets)
+    return obs.view(num_steps, -1)
+
+
+# @torch.jit.script
+def local_angle_transform(
+        state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        dof_offsets: List[int]) -> torch.Tensor:
+    aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos = state
+    hPos = aPos[..., 2].unsqueeze(-1)
+    inv_head_rot = calc_heading_quat_inv(aRot)
+    aRot = quat_to_tan_norm(aRot)
+
+    localVel = quat_rotate(inv_head_rot, aVel)
+    localAnVel = quat_rotate(inv_head_rot, aAnVel)
+
+    localKeyPos = keyPos - aPos.unsqueeze(-2)
+
+    inv_head_rot_expend = inv_head_rot.unsqueeze(-2)
+    inv_head_rot_expend = inv_head_rot_expend.repeat((1, localKeyPos.shape[1], 1))
+    flatKeyPos = localKeyPos.view(-1, localKeyPos.shape[-1])
+    inv_head_rot_flat = inv_head_rot_expend.view(-1, inv_head_rot_expend.shape[-1])
+
+    flatLocalKeyPos = quat_rotate(inv_head_rot_flat, flatKeyPos).view(localKeyPos.shape[0], -1)
+    dof = joint_tan_norm(dPos, dof_offsets)
+    return torch.cat([hPos, aRot, localVel, localAnVel, dof, dVel, flatLocalKeyPos], dim=-1)
