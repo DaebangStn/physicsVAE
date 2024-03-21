@@ -4,12 +4,18 @@ import torch
 from rl_games.common.player import BasePlayer
 from rl_games.algos_torch.players import PpoPlayerContinuous
 
+from learning.styleAlgorithm import style_task_obs_angle_transform
 from utils.rl_games import rl_games_net_build_param
 
 
 class StylePlayer(PpoPlayerContinuous):
     def __init__(self, **kwargs):
         BasePlayer.__init__(self, kwargs['params'])
+
+        # env related
+        self._key_body_ids = None
+        self._dof_offsets = None
+        self.is_tensor_obses = True
 
         self.network = None
         self.model = None
@@ -138,6 +144,15 @@ class StylePlayer(PpoPlayerContinuous):
             print('av reward:', sum_rewards / games_played * n_game_life,
                   'av steps:', sum_steps / games_played * n_game_life)
 
+    def env_step(self, env, actions):
+        obs, rew, done, info = super().env_step(env, actions)
+        obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        return obs, rew, done, info
+
+    def env_reset(self, env):
+        obs = super().env_reset(env)
+        return style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+
     def _init_variables(self, **kwargs):
         self.network = self.config['network']
 
@@ -153,3 +168,10 @@ class StylePlayer(PpoPlayerContinuous):
         self.model.to(self.device)
         self.model.eval()
         self.is_rnn = self.model.is_rnn()
+
+        algo_conf = kwargs['params']['algo']['style']
+        self._key_body_ids = self._find_key_body_ids(algo_conf['joint_information']['key_body_names'])
+        self._dof_offsets = algo_conf['joint_information']['dof_offsets']
+
+    def _find_key_body_ids(self, key_body_names):
+        return self.env.key_body_ids(key_body_names)
