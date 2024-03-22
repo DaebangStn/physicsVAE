@@ -13,6 +13,8 @@ def build_runner():
     from env.balanceTask import BalanceTask
     from env.keypointTask import KeypointTask
 
+    from learning.baseModel import BaseModel
+    from learning.baseNetworkBuilder import BaseNetworkBuilder
     from learning.styleModel import StyleModel
     from learning.styleNetworkBuilder import StyleNetworkBuilder
 
@@ -30,6 +32,7 @@ def build_runner():
     register_env_rl_games('balanceTask', BalanceTask)
     register_env_rl_games('keypointTask', KeypointTask)
 
+    register_net_n_model('base', BaseNetworkBuilder, BaseModel)
     register_net_n_model('style', StyleNetworkBuilder, StyleModel)
 
     _runner = Runner(algo_observer=IsaacAlgoObserver())

@@ -1,22 +1,14 @@
 import torch
 import torch.nn as nn
-from rl_games.algos_torch.network_builder import A2CBuilder
+
+from learning.baseNetworkBuilder import BaseNetworkBuilder
 
 
-class StyleNetworkBuilder(A2CBuilder):
+class StyleNetworkBuilder(BaseNetworkBuilder):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def build(self, placeholder, **kwargs):
-        """Return the actual torch.nn.Module which includes parameters.
-
-        :param placeholder: not used, for compatibility
-        :param kwargs: network parameters
-        :return: Network (torch.nn.Module)
-        """
-        return self.Network(self.params, **kwargs)
-
-    class Network(A2CBuilder.Network):
+    class Network(BaseNetworkBuilder.Network):
         """torch.nn.Module which includes actual parameters.
         Forwards returns [mu, logstd, value, states]
         """

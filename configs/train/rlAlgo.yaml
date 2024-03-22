@@ -5,10 +5,10 @@ algo:
   memo: removed_height_reward
 
 model:
-  name: continuous_a2c_logstd  # continuous_a2c has internal error
+  name: base
 
 network:
-  name: actor_critic
+  name: base
   separate: True
 
   space:
@@ -48,7 +48,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 16384
+  minibatch_size: 1024
   mini_epochs: 6
 
   learning_rate: 5e-4

@@ -1,6 +1,6 @@
 env:
   name: rlTask
-  num_envs: 2048
+  num_envs: 128
   spacing: 4
 
   humanoid_asset_filename:  # from the project root

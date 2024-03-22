@@ -2,7 +2,7 @@ test: False
 
 algo:
   name: styleAlgo
-  memo:
+  memo: fix_sigma3
   style:
     motion_file: assets/motions/amp_humanoid_walk.npy
     joint_information_path: assets/urdf/joint_information.yaml
@@ -22,7 +22,7 @@ network:
         name: default
       sigma_init:
         name: const_initializer
-        val: 3.0
+        val: -2.9
       fixed_sigma: True
 #      learn_sigma: False
 
@@ -40,7 +40,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/rlTask_styleAlgo_21-13-44-10_why_my_reward_drops/nn/last_rlTask_ep_8000_rew_282.46582.pth
+#  runs/keypointTask_styleAlgo_22-18-45-01_fix_sigma2/nn/keypointTask.pth
 
 
 hparam:
@@ -68,7 +68,7 @@ hparam:
 #  bound_loss_type: regularisation
 #  bounds_loss_coef: 0.00001
   bound_loss_type: bound
-  bounds_loss_coef: 0
+  bounds_loss_coef: 10
   critic_coef: 5
   entropy_coef: 0.0
 
@@ -76,11 +76,13 @@ hparam:
   style:
     task_rew_scale: 0.0
     disc_rew_scale: 1.0
-    replay_buf_size: 200000
+    replay_buf:
+      size: 200000
+      store_prob: 0.01
 
     disc:
-      obs_traj_len: 10
-      loss_coef: 0.01
+      obs_traj_len: 4
+      loss_coef: 1
       weight_reg_scale: 0.01
       grad_penalty_scale: 5
 

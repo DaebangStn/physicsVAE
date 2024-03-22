@@ -1,16 +1,42 @@
 import time
 import yaml
 import torch
+from torch.optim import Adam
+from rl_games.common.datasets import PPODataset
 from rl_games.common import common_losses
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.a2c_continuous import A2CAgent
-from rl_games.common.a2c_common import swap_and_flatten01
+from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase
+
+from utils.rl_games import rl_games_net_build_param
 
 
 class RlAlgorithm(A2CAgent):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        ContinuousA2CBase.__init__(self, **kwargs)
 
+        # rl-games default values
+        self.model = None
+        self.states = None
+        self.has_value_loss = True
+        self.value_mean_std = None
+        self.bound_loss_type = None
+        self.optimizer = None
+        self.is_tensor_obses = True
+        self._init_learning_variables(**kwargs)
+
+        self.init_rnn_from_model(self.model)
+        self.algo_observer.after_init(self)
+
+        self.dataset = None
+        self._prepare_data(**kwargs)
+
+        # placeholders for the current episode
+        self.train_result = None
+        self.dones = None
+        self.current_rewards = None
+        self.current_shaped_rewards = None
+        self.current_lengths = None
         self._last_last_lr = self.last_lr
 
         self._save_config(**kwargs)
@@ -44,6 +70,8 @@ class RlAlgorithm(A2CAgent):
                     - entropy * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
+            loss += self._additional_loss(input_dict, res_dict)
+
             # 4. Zero the gradients
             if self.multi_gpu:
                 self.optimizer.zero_grad()
@@ -73,6 +101,7 @@ class RlAlgorithm(A2CAgent):
         update_list = self.update_list
 
         step_time = 0.0
+        self._pre_rollout()
 
         for n in range(self.horizon_length):
             self.obs = self.env_reset()
@@ -86,12 +115,12 @@ class RlAlgorithm(A2CAgent):
 
             for k in update_list:
                 self.experience_buffer.update_data(k, n, res_dict[k])
-            if self.has_central_value:
-                self.experience_buffer.update_data('states', n, self.obs['states'])
 
+            self._pre_step()
             step_time_start = time.time()
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
             step_time_end = time.time()
+            self._post_step()
 
             step_time += (step_time_end - step_time_start)
 
@@ -119,6 +148,8 @@ class RlAlgorithm(A2CAgent):
             self.current_shaped_rewards = self.current_shaped_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
 
+        self._post_rollout1()
+
         last_values = self.get_values(self.obs)
 
         fdones = self.dones.float()
@@ -133,7 +164,51 @@ class RlAlgorithm(A2CAgent):
         batch_dict['played_frames'] = self.batch_size
         batch_dict['step_time'] = step_time
 
-        return batch_dict
+        return self._post_rollout2(batch_dict)
+
+    def _bound_loss(self, mu):
+        if self.bound_loss_type == 'regularisation':
+            b_loss = self.reg_loss(mu)
+        elif self.bound_loss_type == 'bound':
+            b_loss = self.bound_loss(mu)
+        else:
+            b_loss = torch.zeros(1, device=self.ppo_device)
+        return b_loss
+
+    def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
+        if self.has_value_loss:
+            c_loss = common_losses.critic_loss(self.model, value_preds_batch, values, curr_e_clip, return_batch,
+                                               self.clip_value)
+        else:
+            c_loss = torch.zeros(1, device=self.ppo_device)
+        return c_loss
+
+    def _init_learning_variables(self, **kwargs):
+        self.model = self.network.build(**kwargs['params']['network'], **rl_games_net_build_param(self))
+        self.model.to(self.ppo_device)
+
+        config_hparam = self.config
+
+        if self.normalize_value:
+            self.value_mean_std = self.model.value_mean_std
+        self.last_lr = float(self.last_lr)
+        self.optimizer = Adam(self.model.parameters(), float(self.last_lr), eps=1e-08,
+                              weight_decay=self.weight_decay)
+
+        self.bound_loss_type = config_hparam.get('bound_loss_type', 'bound')  # 'regularisation' or 'bound'
+
+    def _prepare_data(self, **kwargs):
+        self.dataset = PPODataset(self.batch_size, self.minibatch_size, self.is_discrete, self.is_rnn,
+                                  self.ppo_device, self.seq_length)
+
+    def _save_config(self, **kwargs):
+        algo_config = kwargs['params']
+        env_config = self.vec_env.config
+
+        with open(self.experiment_dir + '/algo_config.yaml', 'w') as file:
+            yaml.dump(self.remove_unserializable(algo_config), file)
+        with open(self.experiment_dir + '/env_config.yaml', 'w') as file:
+            yaml.dump(self.remove_unserializable(env_config), file)
 
     def _unpack_input(self, input_dict):
         value_preds_batch = input_dict['old_values']
@@ -162,33 +237,8 @@ class RlAlgorithm(A2CAgent):
         if batch_dict['demo_obs'] is not None:
             batch_dict['demo_obs'].requires_grad_(True)
 
-        return advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch, return_batch, value_preds_batch
-
-    def _bound_loss(self, mu):
-        if self.bound_loss_type == 'regularisation':
-            b_loss = self.reg_loss(mu)
-        elif self.bound_loss_type == 'bound':
-            b_loss = self.bound_loss(mu)
-        else:
-            b_loss = torch.zeros(1, device=self.ppo_device)
-        return b_loss
-
-    def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
-        if self.has_value_loss:
-            c_loss = common_losses.critic_loss(self.model, value_preds_batch, values, curr_e_clip, return_batch,
-                                               self.clip_value)
-        else:
-            c_loss = torch.zeros(1, device=self.ppo_device)
-        return c_loss
-
-    def _save_config(self, **kwargs):
-        algo_config = kwargs['params']
-        env_config = self.vec_env.config
-
-        with open(self.experiment_dir + '/algo_config.yaml', 'w') as file:
-            yaml.dump(self.remove_unserializable(algo_config), file)
-        with open(self.experiment_dir + '/env_config.yaml', 'w') as file:
-            yaml.dump(self.remove_unserializable(env_config), file)
+        return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
+                return_batch, value_preds_batch)
 
     @staticmethod
     def remove_unserializable(config):
@@ -201,3 +251,21 @@ class RlAlgorithm(A2CAgent):
             else:
                 clean_config[k] = v
         return clean_config
+
+    def _additional_loss(self, input_dict, res_dict):
+        return torch.zeros(1, device=self.ppo_device)[0]
+
+    def _pre_rollout(self):
+        pass
+
+    def _post_rollout1(self):
+        pass
+
+    def _post_rollout2(self, batch_dict):
+        return batch_dict
+
+    def _pre_step(self):
+        pass
+
+    def _post_step(self):
+        pass

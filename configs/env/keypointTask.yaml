@@ -1,6 +1,6 @@
 env:
   name: keypointTask
-  num_envs: 2048
+  num_envs: 4096
   spacing: 4
 
   humanoid_asset_filename:  # from the project root
