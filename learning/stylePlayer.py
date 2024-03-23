@@ -5,6 +5,7 @@ from rl_games.common.player import BasePlayer
 from rl_games.algos_torch.players import PpoPlayerContinuous
 
 from learning.styleAlgorithm import style_task_obs_angle_transform
+from utils.buffer import TensorHistoryFIFO
 from utils.rl_games import rl_games_net_build_param
 
 
@@ -16,6 +17,8 @@ class StylePlayer(PpoPlayerContinuous):
         self._key_body_ids = None
         self._dof_offsets = None
         self.is_tensor_obses = True
+        self._disc_obs_buf = None
+        self._disc_obs_traj_len = None
 
         self.network = None
         self.model = None
@@ -32,6 +35,8 @@ class StylePlayer(PpoPlayerContinuous):
 
         self.max_steps = int(1e30)
         self.games_num = int(1e30)
+
+        self.dones = torch.zeros(self.num_actors, dtype=torch.bool, device=self.device)
 
     def run(self):
         n_games = self.games_num
@@ -88,7 +93,11 @@ class StylePlayer(PpoPlayerContinuous):
                 else:
                     action = self.get_action(obses, is_deterministic)
 
+                self._disc_obs_buf.push(obses, self.dones)
+                self._disc_debug(self._disc_obs_buf.history)
+
                 obses, r, done, info = self.env_step(self.env, action)
+                self.dones = done.unsqueeze(1).to(self.device)
                 cr += r
                 steps += 1
 
@@ -172,6 +181,20 @@ class StylePlayer(PpoPlayerContinuous):
         algo_conf = kwargs['params']['algo']['style']
         self._key_body_ids = self._find_key_body_ids(algo_conf['joint_information']['key_body_names'])
         self._dof_offsets = algo_conf['joint_information']['dof_offsets']
+
+        style_conf = kwargs['params']['hparam']['style']
+        self._disc_obs_traj_len = style_conf['disc']['obs_traj_len']
+        self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+
+    def _disc_debug(self, obs):
+        with torch.no_grad():
+            disc = self.model.disc(obs)
+            prob = 1 / (1 + torch.exp(-disc))
+            reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.device)))
+
+            disc = torch.mean(disc).item()
+            reward = torch.mean(reward).item()
+        print(f"rollout_disc {disc:.3f} disc_reward {reward:.3f}")
 
     def _find_key_body_ids(self, key_body_names):
         return self.env.key_body_ids(key_body_names)
