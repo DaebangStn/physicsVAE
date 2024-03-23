@@ -95,7 +95,7 @@ class RlTask(VecTask):
             self._envs.append(env)
 
             self._gym.begin_aggregate(env, num_rigid_body, num_shape, self_collision)
-            humanoid = self._gym.create_actor(env, humanoid_asset, drop_transform(1.0), "humanoid", i, 0, 0)
+            humanoid = self._gym.create_actor(env, humanoid_asset, drop_transform(0.89), "humanoid", i, 0, 0)
             self._humanoids.append(humanoid)
             self._gym.end_aggregate(env)
 
