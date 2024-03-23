@@ -70,8 +70,8 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     # Compute discriminator related values
     if "style" in config_train["algo"]:
         assert "disc" in config_train["network"], "Inconsistent config for style"
-        config_train["network"]["disc"]["num_inputs"] = (
-                config_train["hparam"]["style"]["disc"]["obs_traj_len"] * config_env["env"]["num_obs"])
+        config_train["network"]["disc"]["num_inputs"] = (config_train["hparam"]["style"]["disc"]["obs_traj_len"] *
+                                                         config_train["hparam"]["style"]["disc"]["num_obs"])
 
         # Preprocess MotionLib config
         assert "joint_information_path" in config_train["algo"]["style"], "Joint information not found in config"

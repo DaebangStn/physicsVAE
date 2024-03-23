@@ -2,7 +2,7 @@ test: False
 
 algo:
   name: styleAlgo
-  memo: moving_mean_obs
+  memo: max_actor
   style:
     motion_file: assets/motions/amp_humanoid_walk.npy
     joint_information_path: assets/urdf/joint_information.yaml
@@ -39,7 +39,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_styleAlgo_23-14-14-18_after_debug/nn/last_keypointTask_ep_400_rew_47.246532.pth
+  runs/keypointTask_styleAlgo_23-21-25-49_max_actor/nn/keypointTask.pth
 
 
 hparam:
@@ -80,6 +80,7 @@ hparam:
       store_prob: 0.01
 
     disc:
+      num_obs: 125
       obs_traj_len: 4
       loss_coef: 1
       logit_reg_scale: 0.01

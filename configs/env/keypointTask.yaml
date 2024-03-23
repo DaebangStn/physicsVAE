@@ -5,7 +5,7 @@ env:
 
   humanoid_asset_filename:  # from the project root
     assets/urdf/amp_humanoid.xml
-  num_obs: 125
+  num_obs: 223
   num_states: 1  # do not use
   num_act: 28  # number of dof
   max_episode_steps: 1200

@@ -155,12 +155,13 @@ class StylePlayer(PpoPlayerContinuous):
 
     def env_step(self, env, actions):
         obs, rew, done, info = super().env_step(env, actions)
-        obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        obs, _ = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
         return obs, rew, done, info
 
     def env_reset(self, env):
         obs = super().env_reset(env)
-        return style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        obs, _ = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        return obs
 
     def _init_variables(self, **kwargs):
         self.network = self.config['network']
@@ -187,14 +188,15 @@ class StylePlayer(PpoPlayerContinuous):
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
 
     def _disc_debug(self, obs):
-        with torch.no_grad():
-            disc = self.model.disc(obs)
-            prob = 1 / (1 + torch.exp(-disc))
-            reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.device)))
-
-            disc = torch.mean(disc).item()
-            reward = torch.mean(reward).item()
-        print(f"rollout_disc {disc:.3f} disc_reward {reward:.3f}")
+        pass
+        # with torch.no_grad():
+        #     disc = self.model.disc(obs)
+        #     prob = 1 / (1 + torch.exp(-disc))
+        #     reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.device)))
+        #
+        #     disc = torch.mean(disc).item()
+        #     reward = torch.mean(reward).item()
+        # print(f"rollout_disc {disc:.3f} disc_reward {reward:.3f}")
 
     def _find_key_body_ids(self, key_body_names):
         return self.env.key_body_ids(key_body_names)

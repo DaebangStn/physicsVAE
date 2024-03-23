@@ -1,3 +1,4 @@
+import torch
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 
 from learning.base.algorithm import BaseAlgorithm
@@ -42,12 +43,13 @@ class StyleAlgorithm(BaseAlgorithm):
 
     def env_step(self, actions):
         obs, rew, done, info = super().env_step(actions)
-        obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
-        return {'obs': obs}, rew, done, info
+        obs, disc_obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+        return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
 
-    def env_reset(self):
+    def env_reset(self, **kwargs):
         obs = super().env_reset()['obs']
-        return {'obs': style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)}
+        obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        return {'obs': obs, 'disc_obs': disc_obs}
 
     def get_stats_weights(self, model_stats=False):
         weights = super().get_stats_weights(model_stats)
@@ -190,6 +192,7 @@ class StyleAlgorithm(BaseAlgorithm):
 
     def _pre_rollout(self):
         self._rollout_obses = []
+        self._disc_obs_buf.push(self.obs['disc_obs'], torch.zeros(self.num_actors, device=self.ppo_device))
 
     def _post_rollout1(self):
         rollout_obs = torch.cat(self._rollout_obses, dim=0)
@@ -208,8 +211,8 @@ class StyleAlgorithm(BaseAlgorithm):
         batch_dict['rollout_obs'] = self._rollout_obs
         return batch_dict
 
-    def _pre_step(self):
-        self._disc_obs_buf.push(self.obs['obs'], self.dones)
+    def _post_step(self):
+        self._disc_obs_buf.push(self.obs['disc_obs'], self.dones.unsqueeze(-1))
         self._rollout_obses.append(self._disc_obs_buf.history)
 
     def _unpack_input(self, input_dict):
@@ -254,7 +257,7 @@ class StyleAlgorithm(BaseAlgorithm):
 
 
 @torch.jit.script
-def local_angle_transform(
+def disc_obs_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int]) -> torch.Tensor:
     aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos = state
@@ -278,12 +281,61 @@ def local_angle_transform(
 
 
 @torch.jit.script
+def obs_transform(body_pos: torch.Tensor, body_rot: torch.Tensor, body_vel: torch.Tensor, body_ang_vel: torch.Tensor):
+    root_pos = body_pos[:, 0, :]
+    root_rot = body_rot[:, 0, :]
+
+    root_h = root_pos[:, 2:3]
+    heading_rot = calc_heading_quat_inv(root_rot)
+
+    root_h_obs = root_h
+
+    heading_rot_expand = heading_rot.unsqueeze(-2)
+    heading_rot_expand = heading_rot_expand.repeat((1, body_pos.shape[1], 1))
+    flat_heading_rot = heading_rot_expand.reshape(heading_rot_expand.shape[0] * heading_rot_expand.shape[1],
+                                                  heading_rot_expand.shape[2])
+
+    root_pos_expand = root_pos.unsqueeze(-2)
+    local_body_pos = body_pos - root_pos_expand
+    flat_local_body_pos = local_body_pos.reshape(local_body_pos.shape[0] * local_body_pos.shape[1],
+                                                 local_body_pos.shape[2])
+    flat_local_body_pos = quat_rotate(flat_heading_rot, flat_local_body_pos)
+    local_body_pos = flat_local_body_pos.reshape(local_body_pos.shape[0],
+                                                 local_body_pos.shape[1] * local_body_pos.shape[2])
+    local_body_pos = local_body_pos[..., 3:]  # remove root pos
+
+    flat_body_rot = body_rot.reshape(body_rot.shape[0] * body_rot.shape[1], body_rot.shape[2])
+    flat_local_body_rot = quat_mul(flat_heading_rot, flat_body_rot)
+    flat_local_body_rot_obs = quat_to_tan_norm(flat_local_body_rot)
+    local_body_rot_obs = flat_local_body_rot_obs.reshape(body_rot.shape[0],
+                                                         body_rot.shape[1] * flat_local_body_rot_obs.shape[1])
+
+    root_rot_obs = quat_to_tan_norm(root_rot)
+    local_body_rot_obs[..., 0:6] = root_rot_obs
+
+    flat_body_vel = body_vel.reshape(body_vel.shape[0] * body_vel.shape[1], body_vel.shape[2])
+    flat_local_body_vel = quat_rotate(flat_heading_rot, flat_body_vel)
+    local_body_vel = flat_local_body_vel.reshape(body_vel.shape[0], body_vel.shape[1] * body_vel.shape[2])
+
+    flat_body_ang_vel = body_ang_vel.reshape(body_ang_vel.shape[0] * body_ang_vel.shape[1], body_ang_vel.shape[2])
+    flat_local_body_ang_vel = quat_rotate(flat_heading_rot, flat_body_ang_vel)
+    local_body_ang_vel = flat_local_body_ang_vel.reshape(body_ang_vel.shape[0],
+                                                         body_ang_vel.shape[1] * body_ang_vel.shape[2])
+
+    obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel), dim=-1)
+    return obs
+
+
+@torch.jit.script
 def style_task_obs_angle_transform(
-        obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
-        key_idx: List[int], dof_offsets: List[int]) -> torch.Tensor:
-    aPos, aRot, aVel, aAnVel, dPos, dVel, rPos = obs
+        obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+                   torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        key_idx: List[int], dof_offsets: List[int]):
+    aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
+    obs = obs_transform(rPos, rRot, rVel, rAnVel)
     keyPos = rPos[:, key_idx, :]
-    return local_angle_transform((aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos), dof_offsets)
+    disc_obs = disc_obs_transform((aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos), dof_offsets)
+    return obs, disc_obs
 
 
 @torch.jit.script
@@ -291,5 +343,5 @@ def motion_lib_angle_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int], traj_len: int) -> torch.Tensor:
     num_steps = int(state[0].shape[0] / traj_len)
-    obs = local_angle_transform(state, dof_offsets)
+    obs = disc_obs_transform(state, dof_offsets)
     return obs.view(num_steps, -1)

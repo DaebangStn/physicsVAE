@@ -101,6 +101,7 @@ class BaseAlgorithm(A2CAgent):
         update_list = self.update_list
 
         step_time = 0.0
+        self.obs = self.env_reset()
         self._pre_rollout()
 
         for n in range(self.horizon_length):
