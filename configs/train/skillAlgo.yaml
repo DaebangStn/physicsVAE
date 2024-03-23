@@ -1,17 +1,17 @@
 test: False
 
 algo:
-  name: styleAlgo
-  memo: moving_mean_obs_001_disc
+  name: skillAlgo
+  memo: fix_sigma3
   style:
     motion_file: assets/motions/amp_humanoid_walk.npy
     joint_information_path: assets/urdf/joint_information.yaml
 
 model:
-  name: style
+  name: skill
 
 network:
-  name: style
+  name: skill
   separate: True
 
   space:
@@ -26,20 +26,20 @@ network:
       fixed_sigma: True
 
   mlp:
-    units: [1024, 512]
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
 
-  disc:
-    units: [1024, 512]
+  disc_enc:
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_styleAlgo_23-14-14-18_after_debug/nn/last_keypointTask_ep_400_rew_47.246532.pth
+#  runs/keypointTask_styleAlgo_22-18-45-01_fix_sigma2/nn/keypointTask.pth
 
 
 hparam:
@@ -48,7 +48,7 @@ hparam:
   normalize_advantage: True
   clip_value: False
   reward_shaper: {}
-  save_frequency: 25
+  save_frequency: 200
 
   # learning hyperparameters
   horizon_length: 32
@@ -81,9 +81,8 @@ hparam:
 
     disc:
       obs_traj_len: 4
-      loss_coef: 0.001
-      logit_reg_scale: 0.01
-      reg_scale: 0.0001
+      loss_coef: 1
+      weight_reg_scale: 0.01
       grad_penalty_scale: 5
 
 seed: 1

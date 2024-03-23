@@ -4,7 +4,7 @@ import torch
 from rl_games.common.player import BasePlayer
 from rl_games.algos_torch.players import PpoPlayerContinuous
 
-from learning.styleAlgorithm import style_task_obs_angle_transform
+from learning.style.algorithm import style_task_obs_angle_transform
 from utils.buffer import TensorHistoryFIFO
 from utils.rl_games import rl_games_net_build_param
 

@@ -3,7 +3,7 @@ import torch
 from rl_games.algos_torch.players import PpoPlayerContinuous
 
 
-class RlPlayer(PpoPlayerContinuous):
+class BasePlayer(PpoPlayerContinuous):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.max_steps = int(1e30)

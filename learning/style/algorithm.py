@@ -1,22 +1,23 @@
-import torch
-from typing import List, Tuple
+from rl_games.algos_torch.running_mean_std import RunningMeanStd
 
-from learning.rlAlgorithm import RlAlgorithm
+from learning.base.algorithm import BaseAlgorithm
 from utils.angle import *
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
 
-class StyleAlgorithm(RlAlgorithm):
+class StyleAlgorithm(BaseAlgorithm):
     def __init__(self, **kwargs):
         # discriminator related
         self._disc_obs_buf = None
         self._disc_obs_traj_len = None
         self._disc_loss_coef = None
-        self._disc_weight_reg_scale = None
+        self._disc_logit_reg_scale = None
+        self._disc_reg_scale = None
         self._disc_grad_penalty_scale = None
         # reward related
         self._task_rew_scale = None
         self._disc_rew_scale = None
+        self._running_mean_disc_obs = None
 
         # env related
         self._key_body_ids = None
@@ -53,55 +54,63 @@ class StyleAlgorithm(RlAlgorithm):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
 
-        dataset_dict['rollout_obs'] = batch_dict['rollout_obs']
-        dataset_dict['replay_obs'] = (self._replay_buffer['rollout'].sample(self.batch_size)
-                                      if self._replay_buffer['rollout'].count > 0 else batch_dict['rollout_obs'])
-        dataset_dict['demo_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
+        dataset_dict['rollout_obs'] = self._running_mean_disc_obs(batch_dict['rollout_obs'])
+        dataset_dict['replay_obs'] = (
+            self._running_mean_disc_obs((self._replay_buffer['rollout'].sample(self.batch_size)
+                                         if self._replay_buffer['rollout'].count > 0 else
+                                         batch_dict['rollout_obs'])))
+        dataset_dict['demo_obs'] = self._running_mean_disc_obs(self._replay_buffer['demo'].sample(self.batch_size))
         self._update_replay_buffer(batch_dict['rollout_obs'])
 
     def _additional_loss(self, input_dict, res_dict):
-        agent_disc = torch.cat([res_dict['rollout_disc'], res_dict['replay_disc']], dim=0)
-        d_loss = self._disc_loss(agent_disc, res_dict['demo_disc'], input_dict)
+        agent_disc_logit = torch.cat([res_dict['rollout_disc_logit'], res_dict['replay_disc_logit']], dim=0)
+        d_loss = self._disc_loss(agent_disc_logit, res_dict['demo_disc_logit'], input_dict)
         return d_loss * self._disc_loss_coef
 
-    def _disc_loss(self, agent_disc, demo_disc, input_dict):
+    def _disc_loss(self, agent_disc_logit, demo_disc_logit, input_dict):
         obs_demo = input_dict['demo_obs']
 
         # prediction
         bce = torch.nn.BCEWithLogitsLoss()
-        agent_loss = bce(agent_disc, torch.zeros_like(agent_disc))
-        demo_loss = bce(demo_disc, torch.ones_like(demo_disc))
+        agent_loss = bce(agent_disc_logit, torch.zeros_like(agent_disc_logit))
+        demo_loss = bce(demo_disc_logit, torch.ones_like(demo_disc_logit))
         pred_loss = agent_loss + demo_loss
 
         # weights regularization
-        weights = self.model.disc_logistics_weights
-        weights_loss = torch.sum(torch.square(weights))
+        # (logit)
+        logit_weights = self.model.disc_logistics_weights
+        logit_weights_loss = torch.sum(torch.square(logit_weights))
+        # (whole)
+        disc_weights = torch.cat(self.model.disc_weights, dim=-1)
+        disc_weights_loss = torch.sum(torch.square(disc_weights))
 
         # gradients penalty
-        demo_grad = torch.autograd.grad(demo_disc, obs_demo, create_graph=True,
+        demo_grad = torch.autograd.grad(demo_disc_logit, obs_demo, create_graph=True,
                                         retain_graph=True, only_inputs=True,
-                                        grad_outputs=torch.ones_like(demo_disc))[0]
+                                        grad_outputs=torch.ones_like(demo_disc_logit))[0]
         penalty_loss = torch.mean(torch.sum(torch.square(demo_grad), dim=-1))
 
         loss = (pred_loss +
-                self._disc_weight_reg_scale * weights_loss +
+                self._disc_logit_reg_scale * logit_weights_loss +
+                self._disc_reg_scale * disc_weights_loss +
                 self._disc_grad_penalty_scale * penalty_loss)
 
         # (for logging) discriminator accuracy
-        agent_acc = torch.mean((agent_disc < 0).float())
-        demo_acc = torch.mean((demo_disc > 0).float())
-        agent_disc = torch.mean(agent_disc)
-        demo_disc = torch.mean(demo_disc)
+        agent_acc = torch.mean((agent_disc_logit < 0).float())
+        demo_acc = torch.mean((demo_disc_logit > 0).float())
+        agent_disc_logit = torch.mean(agent_disc_logit)
+        demo_disc_logit = torch.mean(demo_disc_logit)
 
         self._write_disc_stat(
             loss=loss.detach(),
             pred_loss=pred_loss.detach(),
-            disc_logit_loss=weights_loss.detach(),
+            disc_logit_loss=logit_weights_loss.detach(),
+            disc_mlp_loss=disc_weights_loss.detach(),
             disc_grad_penalty=penalty_loss.detach(),
             disc_agent_acc=agent_acc.detach(),
             disc_demo_acc=demo_acc.detach(),
-            disc_agent_logit=agent_disc.detach(),
-            disc_demo_logit=demo_disc.detach(),
+            disc_agent_logit=agent_disc_logit.detach(),
+            disc_demo_logit=demo_disc_logit.detach(),
             task_reward_mean=self._mean_task_reward,
             disc_reward_mean=self._mean_style_reward,
             task_reward_std=self._std_task_reward,
@@ -112,6 +121,7 @@ class StyleAlgorithm(RlAlgorithm):
 
     def _disc_reward(self, obs):
         with torch.no_grad():
+            obs = self._running_mean_disc_obs(obs)
             disc = self.model.disc(obs)
             prob = 1 / (1 + torch.exp(-disc))
             reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
@@ -141,13 +151,18 @@ class StyleAlgorithm(RlAlgorithm):
         config_disc = config_hparam['style']['disc']
         self._disc_obs_traj_len = config_disc['obs_traj_len']
         self._disc_loss_coef = config_disc['loss_coef']
-        self._disc_weight_reg_scale = config_disc['weight_reg_scale']
+        self._disc_logit_reg_scale = config_disc['logit_reg_scale']
+        self._disc_reg_scale = config_disc['reg_scale']
         self._disc_grad_penalty_scale = config_disc['grad_penalty_scale']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
 
         config_rew = config_hparam['style']
         self._task_rew_scale = config_rew['task_rew_scale']
         self._disc_rew_scale = config_rew['disc_rew_scale']
+
+        config_net_disc = kwargs['params']['network']['disc']
+        self._running_mean_disc_obs = RunningMeanStd((config_net_disc['num_inputs'])).to(self.device)
+        # TODO, implement the loading of the running mean and std
 
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
@@ -251,4 +266,3 @@ def motion_lib_angle_transform(
     num_steps = int(state[0].shape[0] / traj_len)
     obs = local_angle_transform(state, dof_offsets)
     return obs.view(num_steps, -1)
-

@@ -11,7 +11,7 @@ from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase
 from utils.rl_games import rl_games_net_build_param
 
 
-class RlAlgorithm(A2CAgent):
+class BaseAlgorithm(A2CAgent):
     def __init__(self, **kwargs):
         ContinuousA2CBase.__init__(self, **kwargs)
 
@@ -245,7 +245,7 @@ class RlAlgorithm(A2CAgent):
         clean_config = {}
         for k, v in config.items():
             if isinstance(v, dict):
-                clean_config[k] = RlAlgorithm.remove_unserializable(v)
+                clean_config[k] = BaseAlgorithm.remove_unserializable(v)
             elif not isinstance(v, (int, float, str, bool, list)):
                 print(f'[config] Ignoring unserializable value: {k}')
             else:

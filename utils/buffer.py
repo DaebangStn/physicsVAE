@@ -64,8 +64,8 @@ class MotionLibFetcher:
         motion_length = self._dt * (self._traj_len + 1)
         start_time = self._motion_lib.sample_time(motion_ids, truncate_time=motion_length)
         end_time = (start_time + motion_length).unsqueeze(-1)
-        time_steps = self._dt * torch.arange(0, self._traj_len, device=self._device)
-        capture_time = (time_steps + start_time.unsqueeze(-1)).view(-1)
+        time_steps = - self._dt * torch.arange(0, self._traj_len, device=self._device)
+        capture_time = (time_steps + end_time).view(-1)
 
         motion_ids = torch.tile(motion_ids.unsqueeze(-1), [1, self._traj_len]).view(-1)
         # [traj1, traj1, ..., traj2, traj2, ...]

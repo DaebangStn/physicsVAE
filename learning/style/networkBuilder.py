@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from learning.baseNetworkBuilder import BaseNetworkBuilder
+from learning.base.networkBuilder import BaseNetworkBuilder
 
 
 class StyleNetworkBuilder(BaseNetworkBuilder):
@@ -45,11 +45,11 @@ class StyleNetworkBuilder(BaseNetworkBuilder):
             return torch.flatten(self._disc_logistics.weight)
 
         @property
-        def disc_mlp_weights(self):
+        def disc_weights(self):
             weights = []
             for m in self._disc_mlp.modules():
                 if isinstance(m, nn.Linear):
                     weights.append(torch.flatten(m.weight))
 
-            weights.append(torch.flatten(self._disc_mlp.weight))
+            weights.append(torch.flatten(self._disc_logistics.weight))
             return weights

@@ -1,6 +1,4 @@
 import isaacgym
-from isaacgym import gymtorch
-
 from utils.config import load_config, build_args, set_seed
 
 
@@ -13,17 +11,17 @@ def build_runner():
     from env.balanceTask import BalanceTask
     from env.keypointTask import KeypointTask
 
-    from learning.baseModel import BaseModel
-    from learning.baseNetworkBuilder import BaseNetworkBuilder
-    from learning.styleModel import StyleModel
-    from learning.styleNetworkBuilder import StyleNetworkBuilder
+    from learning.base.model import BaseModel
+    from learning.base.networkBuilder import BaseNetworkBuilder
+    from learning.style.model import StyleModel
+    from learning.style.networkBuilder import StyleNetworkBuilder
 
-    from learning.simplePlayer import SimplePlayer
-    from learning.simpleAlgorithm import SimpleAlgorithm
-    from learning.rlPlayer import RlPlayer
-    from learning.rlAlgorithm import RlAlgorithm
-    from learning.stylePlayer import StylePlayer
-    from learning.styleAlgorithm import StyleAlgorithm
+    from learning.simple.player import SimplePlayer
+    from learning.simple.algorithm import SimpleAlgorithm
+    from learning.base.player import BasePlayer
+    from learning.base.algorithm import BaseAlgorithm
+    from learning.style.player import StylePlayer
+    from learning.style.algorithm import StyleAlgorithm
 
     from utils.rl_games import register_env_rl_games, register_algo_n_player, register_net_n_model
 
@@ -37,7 +35,7 @@ def build_runner():
 
     _runner = Runner(algo_observer=IsaacAlgoObserver())
     register_algo_n_player('simpleAlgo', _runner, SimpleAlgorithm, SimplePlayer)
-    register_algo_n_player('rlAlgo', _runner, RlAlgorithm, RlPlayer)
+    register_algo_n_player('rlAlgo', _runner, BaseAlgorithm, BasePlayer)
     register_algo_n_player('styleAlgo', _runner, StyleAlgorithm, StylePlayer)
 
     return _runner

@@ -1,4 +1,4 @@
-from learning.baseModel import BaseModel
+from learning.base.model import BaseModel
 
 
 class StyleModel(BaseModel):
@@ -15,9 +15,9 @@ class StyleModel(BaseModel):
         def forward(self, input_dict):
             output_dict = super().forward(input_dict)
             if input_dict.get('is_train', False):
-                output_dict['rollout_disc'] = self.disc(input_dict['rollout_obs'])
-                output_dict['replay_disc'] = self.a2c_network.disc(input_dict['replay_obs'])
-                output_dict['demo_disc'] = self.disc(input_dict['demo_obs'])
+                output_dict['rollout_disc_logit'] = self.disc(input_dict['rollout_obs'])
+                output_dict['replay_disc_logit'] = self.disc(input_dict['replay_obs'])
+                output_dict['demo_disc_logit'] = self.disc(input_dict['demo_obs'])
             return output_dict
 
         def disc(self, obs):
@@ -28,5 +28,5 @@ class StyleModel(BaseModel):
             return self.a2c_network.disc_logistics_weights
 
         @property
-        def disc_mlp_weights(self):
-            return self.a2c_network.disc_mlp_weights
+        def disc_weights(self):
+            return self.a2c_network.disc_weights
