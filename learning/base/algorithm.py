@@ -70,7 +70,7 @@ class BaseAlgorithm(A2CAgent):
                     - entropy * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
-            loss += self._additional_loss(input_dict, res_dict)
+            loss += self._additional_loss(batch_dict, res_dict)
 
             # 4. Zero the gradients
             if self.multi_gpu:
@@ -229,14 +229,7 @@ class BaseAlgorithm(A2CAgent):
             'is_train': True,
             'prev_actions': actions_batch,
             'obs': obs_batch,
-            'rollout_obs': input_dict.get('rollout_obs'),
-            'replay_obs': input_dict.get('replay_obs'),
-            'demo_obs': input_dict.get('demo_obs'),
         }
-
-        if batch_dict['demo_obs'] is not None:
-            batch_dict['demo_obs'].requires_grad_(True)
-
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
 
@@ -252,7 +245,7 @@ class BaseAlgorithm(A2CAgent):
                 clean_config[k] = v
         return clean_config
 
-    def _additional_loss(self, input_dict, res_dict):
+    def _additional_loss(self, batch_dict, res_dict):
         return torch.zeros(1, device=self.ppo_device)[0]
 
     def _pre_rollout(self):

@@ -1,3 +1,6 @@
+import torch
+from rl_games.algos_torch.running_mean_std import RunningMeanStd
+
 from learning.base.model import BaseModel
 
 
@@ -11,6 +14,12 @@ class StyleModel(BaseModel):
         """
         def __init__(self, net, **kwargs):
             super().__init__(net, **kwargs)
+            if self.normalize_input:
+                self.disc_running_mean_std = RunningMeanStd((kwargs['disc']['num_inputs'],))
+
+        def norm_disc_obs(self, obs):
+            with torch.no_grad():
+                return self.disc_running_mean_std(obs) if self.normalize_input else obs
 
         def forward(self, input_dict):
             output_dict = super().forward(input_dict)

@@ -17,7 +17,6 @@ class StyleAlgorithm(BaseAlgorithm):
         # reward related
         self._task_rew_scale = None
         self._disc_rew_scale = None
-        self._running_mean_disc_obs = None
 
         # env related
         self._key_body_ids = None
@@ -50,26 +49,35 @@ class StyleAlgorithm(BaseAlgorithm):
         obs = super().env_reset()['obs']
         return {'obs': style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)}
 
+    def get_stats_weights(self, model_stats=False):
+        weights = super().get_stats_weights(model_stats)
+        if model_stats:
+            if self.normalize_input:
+                weights['disc_running_mean_std'] = self.model.disc_running_mean_std.state_dict()
+        return weights
+
+    def set_stats_weights(self, weights):
+        super().set_stats_weights(weights)
+        if self.normalize_input and 'disc_running_mean_std' in weights:
+            self.model.disc_running_mean_std.set_weights(weights['disc_running_mean_std'])
+
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
 
-        dataset_dict['rollout_obs'] = self._running_mean_disc_obs(batch_dict['rollout_obs'])
-        dataset_dict['replay_obs'] = (
-            self._running_mean_disc_obs((self._replay_buffer['rollout'].sample(self.batch_size)
-                                         if self._replay_buffer['rollout'].count > 0 else
-                                         batch_dict['rollout_obs'])))
-        dataset_dict['demo_obs'] = self._running_mean_disc_obs(self._replay_buffer['demo'].sample(self.batch_size))
+        dataset_dict['rollout_obs'] = batch_dict['rollout_obs']
+        dataset_dict['replay_obs'] = (self._replay_buffer['rollout'].sample(self.batch_size)
+                                      if self._replay_buffer['rollout'].count > 0 else
+                                      batch_dict['rollout_obs'])
+        dataset_dict['demo_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
         self._update_replay_buffer(batch_dict['rollout_obs'])
 
-    def _additional_loss(self, input_dict, res_dict):
+    def _additional_loss(self, batch_dict, res_dict):
         agent_disc_logit = torch.cat([res_dict['rollout_disc_logit'], res_dict['replay_disc_logit']], dim=0)
-        d_loss = self._disc_loss(agent_disc_logit, res_dict['demo_disc_logit'], input_dict)
+        d_loss = self._disc_loss(agent_disc_logit, res_dict['demo_disc_logit'], batch_dict)
         return d_loss * self._disc_loss_coef
 
-    def _disc_loss(self, agent_disc_logit, demo_disc_logit, input_dict):
-        obs_demo = input_dict['demo_obs']
-
+    def _disc_loss(self, agent_disc_logit, demo_disc_logit, batch_dict):
         # prediction
         bce = torch.nn.BCEWithLogitsLoss()
         agent_loss = bce(agent_disc_logit, torch.zeros_like(agent_disc_logit))
@@ -85,7 +93,7 @@ class StyleAlgorithm(BaseAlgorithm):
         disc_weights_loss = torch.sum(torch.square(disc_weights))
 
         # gradients penalty
-        demo_grad = torch.autograd.grad(demo_disc_logit, obs_demo, create_graph=True,
+        demo_grad = torch.autograd.grad(demo_disc_logit, batch_dict['demo_obs'], create_graph=True,
                                         retain_graph=True, only_inputs=True,
                                         grad_outputs=torch.ones_like(demo_disc_logit))[0]
         penalty_loss = torch.mean(torch.sum(torch.square(demo_grad), dim=-1))
@@ -105,7 +113,7 @@ class StyleAlgorithm(BaseAlgorithm):
             loss=loss.detach(),
             pred_loss=pred_loss.detach(),
             disc_logit_loss=logit_weights_loss.detach(),
-            disc_mlp_loss=disc_weights_loss.detach(),
+            disc_weight_loss=disc_weights_loss.detach(),
             disc_grad_penalty=penalty_loss.detach(),
             disc_agent_acc=agent_acc.detach(),
             disc_demo_acc=demo_acc.detach(),
@@ -121,7 +129,8 @@ class StyleAlgorithm(BaseAlgorithm):
 
     def _disc_reward(self, obs):
         with torch.no_grad():
-            obs = self._running_mean_disc_obs(obs)
+            if self.normalize_input:
+                obs = self.model.norm_disc_obs(obs)
             disc = self.model.disc(obs)
             prob = 1 / (1 + torch.exp(-disc))
             reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
@@ -161,8 +170,6 @@ class StyleAlgorithm(BaseAlgorithm):
         self._disc_rew_scale = config_rew['disc_rew_scale']
 
         config_net_disc = kwargs['params']['network']['disc']
-        self._running_mean_disc_obs = RunningMeanStd((config_net_disc['num_inputs'])).to(self.device)
-        # TODO, implement the loading of the running mean and std
 
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
@@ -204,6 +211,26 @@ class StyleAlgorithm(BaseAlgorithm):
     def _pre_step(self):
         self._disc_obs_buf.push(self.obs['obs'], self.dones)
         self._rollout_obses.append(self._disc_obs_buf.history)
+
+    def _unpack_input(self, input_dict):
+        (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
+         return_batch, value_preds_batch) = super()._unpack_input(input_dict)
+
+        disc_input_size = input_dict['rollout_obs'].shape[0] // 4
+        rollout_obs = input_dict['rollout_obs'][0:disc_input_size]
+        replay_obs = input_dict['replay_obs'][0:disc_input_size]
+        demo_obs = input_dict['demo_obs'][0:disc_input_size]
+        if self.normalize_input:
+            batch_dict['rollout_obs'] = self.model.norm_disc_obs(rollout_obs)
+            batch_dict['replay_obs'] = self.model.norm_disc_obs(replay_obs)
+            batch_dict['demo_obs'] = self.model.norm_disc_obs(demo_obs)
+            batch_dict['demo_obs'].requires_grad_(True)
+        else:
+            batch_dict['rollout_obs'] = rollout_obs
+            batch_dict['replay_obs'] = replay_obs
+            batch_dict['demo_obs'] = demo_obs
+        return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
+                return_batch, value_preds_batch)
 
     def _update_replay_buffer(self, rollout_obs):
         demo_obs = self._demo_fetcher.fetch(self.batch_size // 2048)  # 2048 is a magic number for performance
