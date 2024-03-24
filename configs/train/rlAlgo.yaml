@@ -5,10 +5,10 @@ algo:
   memo: removed_height_reward
 
 model:
-  name: base
+  name: core
 
 network:
-  name: base
+  name: core
   separate: True
 
   space:
@@ -30,7 +30,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/rlTask_rlAlgo_20-19-58-52_removed_height_reward/nn/rlTask.pth
+  runs/rlTask_rlAlgo_22-18-46-34_removed_height_reward/nn/rlTask.pth
 
 
 hparam:

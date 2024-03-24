@@ -1,12 +1,12 @@
 import torch
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 
-from learning.base.algorithm import BaseAlgorithm
+from learning.core.algorithm import CoreAlgorithm
 from utils.angle import *
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
 
-class StyleAlgorithm(BaseAlgorithm):
+class StyleAlgorithm(CoreAlgorithm):
     def __init__(self, **kwargs):
         # discriminator related
         self._disc_obs_buf = None

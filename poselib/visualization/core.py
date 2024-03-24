@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
-The base abstract classes for plotter and the plotting tasks. It describes how the plotter
+The core abstract classes for plotter and the plotting tasks. It describes how the plotter
 deals with the tasks in the general cases
 """
 from typing import List

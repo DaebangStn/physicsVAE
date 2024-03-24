@@ -11,15 +11,15 @@ def build_runner():
     from env.balanceTask import BalanceTask
     from env.keypointTask import KeypointTask
 
-    from learning.base.model import BaseModel
-    from learning.base.networkBuilder import BaseNetworkBuilder
+    from learning.core.model import CoreModel
+    from learning.core.networkBuilder import CoreNetworkBuilder
     from learning.style.model import StyleModel
     from learning.style.networkBuilder import StyleNetworkBuilder
 
     from learning.simple.player import SimplePlayer
     from learning.simple.algorithm import SimpleAlgorithm
-    from learning.base.player import BasePlayer
-    from learning.base.algorithm import BaseAlgorithm
+    from learning.core.player import CorePlayer
+    from learning.core.algorithm import CoreAlgorithm
     from learning.style.player import StylePlayer
     from learning.style.algorithm import StyleAlgorithm
 
@@ -30,12 +30,12 @@ def build_runner():
     register_env_rl_games('balanceTask', BalanceTask)
     register_env_rl_games('keypointTask', KeypointTask)
 
-    register_net_n_model('base', BaseNetworkBuilder, BaseModel)
+    register_net_n_model('core', CoreNetworkBuilder, CoreModel)
     register_net_n_model('style', StyleNetworkBuilder, StyleModel)
 
     _runner = Runner(algo_observer=IsaacAlgoObserver())
     register_algo_n_player('simpleAlgo', _runner, SimpleAlgorithm, SimplePlayer)
-    register_algo_n_player('rlAlgo', _runner, BaseAlgorithm, BasePlayer)
+    register_algo_n_player('rlAlgo', _runner, CoreAlgorithm, CorePlayer)
     register_algo_n_player('styleAlgo', _runner, StyleAlgorithm, StylePlayer)
 
     return _runner

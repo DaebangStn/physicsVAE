@@ -1,7 +1,7 @@
 from rl_games.algos_torch.models import ModelA2CContinuousLogStd
 
 
-class BaseModel(ModelA2CContinuousLogStd):
+class CoreModel(ModelA2CContinuousLogStd):
     def __init__(self, network):
         super().__init__(network)
 

@@ -1,9 +1,7 @@
-import torch
-import torch.nn as nn
 from rl_games.algos_torch.network_builder import A2CBuilder
 
 
-class BaseNetworkBuilder(A2CBuilder):
+class CoreNetworkBuilder(A2CBuilder):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

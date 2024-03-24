@@ -2,7 +2,7 @@ test: False
 
 algo:
   name: styleAlgo
-  memo: max_actor
+  memo: prevent_disc_learn
   style:
     motion_file: assets/motions/amp_humanoid_walk.npy
     joint_information_path: assets/urdf/joint_information.yaml
@@ -39,7 +39,9 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointTask_styleAlgo_23-21-25-49_max_actor/nn/keypointTask.pth
+  runs/keypointTask_styleAlgo_24-11-22-27_prevent_disc_learn/nn/keypointTask.pth
+checkpoint_disc:  # from the project root
+#  runs/keypointTask_styleAlgo_24-00-11-15_max_actor/nn/keypointTask.pth
 
 
 hparam:
@@ -82,7 +84,7 @@ hparam:
     disc:
       num_obs: 125
       obs_traj_len: 4
-      loss_coef: 1
+      loss_coef: 0.0
       logit_reg_scale: 0.01
       reg_scale: 0.0001
       grad_penalty_scale: 5
