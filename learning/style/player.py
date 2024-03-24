@@ -64,7 +64,9 @@ class StylePlayer(CorePlayer):
     def _find_key_body_ids(self, key_body_names):
         return self.env.key_body_ids(key_body_names)
 
+    def _pre_step(self):
+        self._disc_obs_buf.push_on_reset(self.obses['disc_obs'], self.dones)
+
     def _post_step(self):
-        dones = self.dones.unsqueeze(1).to(self.device)
-        self._disc_obs_buf.push(self.obses['disc_obs'], dones)
+        self._disc_obs_buf.push(self.obses['disc_obs'])
         self._disc_debug(self._disc_obs_buf.history)

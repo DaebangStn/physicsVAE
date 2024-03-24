@@ -2,7 +2,7 @@ test: False
 
 algo:
   name: rlAlgo
-  memo: removed_height_reward
+  memo:
 
 model:
   name: core
@@ -30,7 +30,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/rlTask_rlAlgo_22-18-46-34_removed_height_reward/nn/rlTask.pth
+#  runs/noPhyTask_rlAlgo_24-14-35-50_None/nn/last_noPhyTask_ep_40_rew_7218.01.pth
 
 
 hparam:
@@ -39,7 +39,7 @@ hparam:
   normalize_advantage: True
   clip_value: False
   reward_shaper: {}
-  save_frequency: 200
+  save_frequency: 10
 
   # learning hyperparameters
   horizon_length: 32
@@ -48,7 +48,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 1024
+  minibatch_size: 4
   mini_epochs: 6
 
   learning_rate: 5e-4

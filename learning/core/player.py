@@ -86,6 +86,7 @@ class CorePlayer(PpoPlayerContinuous):
                 else:
                     action = self.get_action(self.obses['obs'], is_deterministic)
 
+                self._pre_step()
                 self.obses, r, self.done, info = self.env_step(self.env, action)
                 self._post_step()
                 cr += r
@@ -171,6 +172,9 @@ class CorePlayer(PpoPlayerContinuous):
 
         logdir = 'runs/' + kwargs['params']['config']['full_experiment_name']
         self._writer = SummaryWriter(log_dir=logdir)
+
+    def _pre_step(self):
+        pass
 
     def _post_step(self):
         pass

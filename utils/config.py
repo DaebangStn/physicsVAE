@@ -52,10 +52,6 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     }
     config_env["sim"]["device_id"] = args.compute_device_id
 
-    if config_train["test"]:
-        config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 1
-
     # Overriding config_env to config_train
     config_train["config"] = {}
     config_train["config"]["full_experiment_name"] = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] +
@@ -66,6 +62,11 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     config_train["config"]["num_actors"] = config_env["env"]["num_envs"]
     config_train["config"]["env_config"] = config_env
     config_train["config"].update(config_train["hparam"])
+
+    if config_train["test"]:
+        config_env["sim"]["headless"] = False
+        config_env["env"]["num_envs"] = 1
+        config_train["config"]["full_experiment_name"] = "test_" + config_train["config"]["full_experiment_name"]
 
     # Compute discriminator related values
     if "style" in config_train["algo"]:
@@ -83,6 +84,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
             asset_filename = Path(asset_filename).stem
             assert asset_filename in joint_info, f"Asset {asset_filename} not found in joint information"
             config_train["algo"]["style"]["joint_information"] = joint_info[asset_filename]
+            config_env["env"]["joint_information"] = joint_info[asset_filename]  # TODO: remove this
 
     return config_run, config_train
 

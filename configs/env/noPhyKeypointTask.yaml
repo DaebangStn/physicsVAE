@@ -1,0 +1,17 @@
+env:
+  name: noPhyKeypointTask
+  num_envs: 4096
+  spacing: 4
+
+  humanoid_asset_filename:  # from the project root
+    assets/urdf/amp_humanoid.xml
+  num_obs: 223
+  num_states: 1  # do not use
+  num_act: 40  # number of dof(28) + root_state(12, 3 pos + 3 rot + 3 vel + 3 ang_vel)
+  max_episode_steps: 1200
+
+
+sim:
+  headless: True
+  device_id: 0
+  engine: PHYSX

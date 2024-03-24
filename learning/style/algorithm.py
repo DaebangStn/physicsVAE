@@ -171,8 +171,6 @@ class StyleAlgorithm(CoreAlgorithm):
         self._task_rew_scale = config_rew['task_rew_scale']
         self._disc_rew_scale = config_rew['disc_rew_scale']
 
-        config_net_disc = kwargs['params']['network']['disc']
-
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
         algo_conf = kwargs['params']['algo']["style"]
@@ -190,9 +188,10 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_store_prob = config_buffer['store_prob']
 
+        self.dones = torch.zeros(self.num_actors, device=self.ppo_device)
+
     def _pre_rollout(self):
         self._rollout_obses = []
-        self._disc_obs_buf.push(self.obs['disc_obs'], torch.zeros(self.num_actors, device=self.ppo_device))
 
     def _post_rollout1(self):
         rollout_obs = torch.cat(self._rollout_obses, dim=0)
@@ -211,15 +210,18 @@ class StyleAlgorithm(CoreAlgorithm):
         batch_dict['rollout_obs'] = self._rollout_obs
         return batch_dict
 
+    def _pre_step(self):
+        self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
+
     def _post_step(self):
-        self._disc_obs_buf.push(self.obs['disc_obs'], self.dones.unsqueeze(-1))
+        self._disc_obs_buf.push(self.obs['disc_obs'])
         self._rollout_obses.append(self._disc_obs_buf.history)
 
     def _unpack_input(self, input_dict):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        disc_input_size = input_dict['rollout_obs'].shape[0] // 4
+        disc_input_size = input_dict['rollout_obs'].shape[0] // 2048  # 2048 is a magic number for performance
         rollout_obs = input_dict['rollout_obs'][0:disc_input_size]
         replay_obs = input_dict['replay_obs'][0:disc_input_size]
         demo_obs = input_dict['demo_obs'][0:disc_input_size]
@@ -278,6 +280,7 @@ def disc_obs_transform(
     flatLocalKeyPos = quat_rotate(inv_head_rot_flat, flatKeyPos).view(localKeyPos.shape[0], -1)
     dof = joint_tan_norm(dPos, dof_offsets)
     return torch.cat([hPos, aRot, localVel, localAnVel, dof, dVel, flatLocalKeyPos], dim=-1)
+    # return torch.cat([hPos, aRot, localVel, localAnVel, dof, flatLocalKeyPos], dim=-1)
 
 
 @torch.jit.script
@@ -310,8 +313,8 @@ def obs_transform(body_pos: torch.Tensor, body_rot: torch.Tensor, body_vel: torc
     local_body_rot_obs = flat_local_body_rot_obs.reshape(body_rot.shape[0],
                                                          body_rot.shape[1] * flat_local_body_rot_obs.shape[1])
 
-    root_rot_obs = quat_to_tan_norm(root_rot)
-    local_body_rot_obs[..., 0:6] = root_rot_obs
+    # root_rot_obs = quat_to_tan_norm(root_rot)
+    # local_body_rot_obs[..., 0:6] = root_rot_obs
 
     flat_body_vel = body_vel.reshape(body_vel.shape[0] * body_vel.shape[1], body_vel.shape[2])
     flat_local_body_vel = quat_rotate(flat_heading_rot, flat_body_vel)

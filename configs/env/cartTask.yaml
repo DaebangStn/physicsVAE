@@ -1,0 +1,17 @@
+env:
+  name: cartTask
+  num_envs: 32768
+  spacing: 4
+
+  cart_asset_filename:  # from the project root
+    assets/urdf/cartpole.urdf
+  num_obs: 4
+  num_states: 1  # do not use
+  num_act: 1  # number of dof
+  max_episode_steps: 1200
+
+
+sim:
+  headless: True
+  device_id: 0
+  engine: PHYSX

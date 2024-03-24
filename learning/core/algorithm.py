@@ -61,12 +61,12 @@ class CoreAlgorithm(A2CAgent):
             c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, values)
             b_loss = self._bound_loss(mu)
 
-            losses, _ = torch_ext.apply_masks(  # vestige for RNN
+            losses, _ = torch_ext.apply_masks(  # vestige of RNN
                 [a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)])
             a_loss, c_loss, entropy, b_loss = losses
 
             loss = (a_loss
-                    + 0.5 * c_loss * self.critic_coef
+                    + c_loss * self.critic_coef
                     - entropy * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
@@ -98,10 +98,7 @@ class CoreAlgorithm(A2CAgent):
                              mu.detach(), sigma.detach(), b_loss)
 
     def play_steps(self):
-        update_list = self.update_list
-
         step_time = 0.0
-        self.obs = self.env_reset()
         self._pre_rollout()
 
         for n in range(self.horizon_length):
@@ -112,9 +109,8 @@ class CoreAlgorithm(A2CAgent):
             else:
                 res_dict = self.get_action_values(self.obs)
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
-            self.experience_buffer.update_data('dones', n, self.dones)
 
-            for k in update_list:
+            for k in self.update_list:
                 self.experience_buffer.update_data(k, n, res_dict[k])
 
             self._pre_step()
@@ -131,6 +127,7 @@ class CoreAlgorithm(A2CAgent):
                     1).float()
 
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
+            self.experience_buffer.update_data('dones', n, self.dones)
 
             self.current_rewards += rewards
             self.current_shaped_rewards += shaped_rewards

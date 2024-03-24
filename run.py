@@ -10,6 +10,9 @@ def build_runner():
     from env.rlTask import RlTask
     from env.balanceTask import BalanceTask
     from env.keypointTask import KeypointTask
+    from env.noPhyTask import NoPhyTask
+    from env.noPhyKeypointTask import NoPhyKeypointTask
+    from env.cartTask import CartTask
 
     from learning.core.model import CoreModel
     from learning.core.networkBuilder import CoreNetworkBuilder
@@ -29,6 +32,9 @@ def build_runner():
     register_env_rl_games('rlTask', RlTask)
     register_env_rl_games('balanceTask', BalanceTask)
     register_env_rl_games('keypointTask', KeypointTask)
+    register_env_rl_games('noPhyTask', NoPhyTask)
+    register_env_rl_games('noPhyKeypointTask', NoPhyKeypointTask)
+    register_env_rl_games('cartTask', CartTask)
 
     register_net_n_model('core', CoreNetworkBuilder, CoreModel)
     register_net_n_model('style', StyleNetworkBuilder, StyleModel)
