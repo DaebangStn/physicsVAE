@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 
-from learning.base.networkBuilder import BaseNetworkBuilder
+from learning.core.networkBuilder import CoreNetworkBuilder
 
 
-class StyleNetworkBuilder(BaseNetworkBuilder):
+class StyleNetworkBuilder(CoreNetworkBuilder):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    class Network(BaseNetworkBuilder.Network):
+    class Network(CoreNetworkBuilder.Network):
         """torch.nn.Module which includes actual parameters.
         Forwards returns [mu, logstd, value, states]
         """
@@ -39,6 +39,21 @@ class StyleNetworkBuilder(BaseNetworkBuilder):
             torch.nn.init.zeros_(self._disc_logistics.bias)
 
             self.disc = nn.Sequential(self._disc_mlp, self._disc_logistics)
+
+        def disc_load_state_dict(self, state_dict):
+            for name, param in self._disc_mlp.named_parameters():
+                key = 'a2c_network._disc_mlp.' + name
+                if key in state_dict:
+                    param.data = state_dict[key].data
+                else:
+                    raise KeyError(f'{key} is not found in the disc checkpoint state_dict')
+
+            for name, param in self._disc_logistics.named_parameters():
+                key = 'a2c_network._disc_logistics.' + name
+                if key in state_dict:
+                    param.data = state_dict[key].data
+                else:
+                    raise KeyError(f'{key} is not found in the disc checkpoint state_dict')
 
         @property
         def disc_logistics_weights(self):

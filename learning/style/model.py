@@ -1,14 +1,14 @@
 import torch
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 
-from learning.base.model import BaseModel
+from learning.core.model import CoreModel
 
 
-class StyleModel(BaseModel):
+class StyleModel(CoreModel):
     def __init__(self, network):
         super().__init__(network)
 
-    class NetworkWrapper(BaseModel.NetworkWrapper):
+    class NetworkWrapper(CoreModel.NetworkWrapper):
         """torch.nn.Module which post-processes the network(variable 'net') output
         to compatible with rl-games.
         """
@@ -31,6 +31,17 @@ class StyleModel(BaseModel):
 
         def disc(self, obs):
             return self.a2c_network.disc(obs)
+
+        def disc_load_state_dict(self, state_dict):
+            self.a2c_network.disc_load_state_dict(state_dict)
+
+        def disc_running_mean_load_state_dict(self, state_dict):
+            for name, param in self.disc_running_mean_std.named_parameters():
+                key = 'disc_running_mean_std.' + name
+                if key in state_dict:
+                    param.data = state_dict[key].data
+                else:
+                    raise KeyError(f'{key} is not found in the disc checkpoint state_dict')
 
         @property
         def disc_logistics_weights(self):

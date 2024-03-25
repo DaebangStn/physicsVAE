@@ -74,9 +74,10 @@ class MotionLibFetcher:
 
 class TensorHistoryFIFO:
     def __init__(self, max_size: int):
+        self._max_size = max_size
         self._q = self.TensorFIFO(max_size)
 
-    def push(self, x: torch.Tensor, resets: torch.Tensor):
+    def push_on_reset(self, x: torch.Tensor, resets: torch.Tensor):
         assert x.shape[0] == resets.shape[0], f"[{self.__class__}]shape mismatch: {x.shape[0]} != {resets.shape[0]}"
         if len(self._q) == 0:
             for i in range(self._q.max_len):
@@ -84,6 +85,10 @@ class TensorHistoryFIFO:
         elif torch.any(resets):
             for i in range(self._q.max_len):
                 self._q.set_row(i, x, resets)
+
+    def push(self, x: torch.Tensor):
+        if len(self._q) != self._max_size:
+            raise ValueError(f"[{self.__class__}] FIFO is empty. Cannot push.")
         self._q.push(x)
 
     @property
@@ -104,6 +109,14 @@ class TensorHistoryFIFO:
                 self._q.pop()
 
         def set_row(self, idx: int, item: torch.Tensor, set_flag: torch.Tensor):
+            """Set certain row of the tensor in the FIFO.
+            If not, do anything.
+
+            :param idx: index of the item to be set.
+            :param item: tensor to be set.
+            :param set_flag:
+            :return:
+            """
             assert idx < len(self._q), f"[{self.__class__}] index out of range: {idx} >= {len(self._q)}"
             assert item.shape[0] == set_flag.shape[0], \
                 f"[{self.__class__}] set_flag shape mismatch: {item.shape[0]} != {set_flag.shape[0]}"

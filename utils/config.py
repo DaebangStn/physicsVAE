@@ -47,31 +47,32 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     config_run = {
         "play": config_train["test"],
         "train": not config_train["test"],
-        "checkpoint": config_train["checkpoint"] if "checkpoint" in config_train else None
+        "checkpoint": config_train.get("checkpoint", None),
+        "checkpoint_disc": config_train.get("checkpoint_disc", None),
     }
     config_env["sim"]["device_id"] = args.compute_device_id
-
-    if config_train["test"]:
-        config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 2
 
     # Overriding config_env to config_train
     config_train["config"] = {}
     config_train["config"]["full_experiment_name"] = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] +
-                                                      "_" + datetime.now().strftime("%d-%H-%M-%S"))
-    if "memo" in config_train["algo"].keys() and config_train["algo"]["memo"] is not None:
-        config_train["config"]["full_experiment_name"] += "_" + str(config_train["algo"]["memo"])
+                                                      "_" + datetime.now().strftime("%d-%H-%M-%S") + "_" +
+                                                      str(config_train["algo"].get("memo", "")))
     config_train["config"]["name"] = config_env["env"]["name"]
     config_train["config"]["env_name"] = config_env["env"]["name"]
     config_train["config"]["num_actors"] = config_env["env"]["num_envs"]
     config_train["config"]["env_config"] = config_env
     config_train["config"].update(config_train["hparam"])
 
+    if config_train["test"]:
+        config_env["sim"]["headless"] = False
+        config_env["env"]["num_envs"] = 1
+        config_train["config"]["full_experiment_name"] = "test_" + config_train["config"]["full_experiment_name"]
+
     # Compute discriminator related values
     if "style" in config_train["algo"]:
         assert "disc" in config_train["network"], "Inconsistent config for style"
-        config_train["network"]["disc"]["num_inputs"] = (
-                config_train["hparam"]["style"]["disc"]["obs_traj_len"] * config_env["env"]["num_obs"])
+        config_train["network"]["disc"]["num_inputs"] = (config_train["hparam"]["style"]["disc"]["obs_traj_len"] *
+                                                         config_train["hparam"]["style"]["disc"]["num_obs"])
 
         # Preprocess MotionLib config
         assert "joint_information_path" in config_train["algo"]["style"], "Joint information not found in config"

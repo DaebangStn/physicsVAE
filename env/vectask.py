@@ -162,7 +162,6 @@ class VecTask:
 
         # set z axis to upward
         self._sim_params.up_axis = gymapi.UP_AXIS_Z
-        # self._sim_params.gravity = gymapi.Vec3(0.0, 0.0, 0.0)
         self._sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.81)
 
         return sim_cfg
@@ -187,7 +186,6 @@ class VecTask:
     def _run_physics(self):
         self._gym.simulate(self._sim)
         self._gym.fetch_results(self._sim, None)
-
         self.render()
 
     def _refresh_tensors(self):

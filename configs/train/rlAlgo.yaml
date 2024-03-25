@@ -2,13 +2,13 @@ test: False
 
 algo:
   name: rlAlgo
-  memo: removed_height_reward
+  memo:
 
 model:
-  name: base
+  name: core
 
 network:
-  name: base
+  name: core
   separate: True
 
   space:

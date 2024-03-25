@@ -1,11 +1,12 @@
+import torch
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 
-from learning.base.algorithm import BaseAlgorithm
+from learning.core.algorithm import CoreAlgorithm
 from utils.angle import *
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
 
-class StyleAlgorithm(BaseAlgorithm):
+class StyleAlgorithm(CoreAlgorithm):
     def __init__(self, **kwargs):
         # discriminator related
         self._disc_obs_buf = None
@@ -42,12 +43,13 @@ class StyleAlgorithm(BaseAlgorithm):
 
     def env_step(self, actions):
         obs, rew, done, info = super().env_step(actions)
-        obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
-        return {'obs': obs}, rew, done, info
+        obs, disc_obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+        return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
 
     def env_reset(self):
         obs = super().env_reset()['obs']
-        return {'obs': style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)}
+        obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        return {'obs': obs, 'disc_obs': disc_obs}
 
     def get_stats_weights(self, model_stats=False):
         weights = super().get_stats_weights(model_stats)
@@ -169,8 +171,6 @@ class StyleAlgorithm(BaseAlgorithm):
         self._task_rew_scale = config_rew['task_rew_scale']
         self._disc_rew_scale = config_rew['disc_rew_scale']
 
-        config_net_disc = kwargs['params']['network']['disc']
-
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
         algo_conf = kwargs['params']['algo']["style"]
@@ -209,14 +209,17 @@ class StyleAlgorithm(BaseAlgorithm):
         return batch_dict
 
     def _pre_step(self):
-        self._disc_obs_buf.push(self.obs['obs'], self.dones)
+        self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
+
+    def _post_step(self):
+        self._disc_obs_buf.push(self.obs['disc_obs'])
         self._rollout_obses.append(self._disc_obs_buf.history)
 
     def _unpack_input(self, input_dict):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        disc_input_size = input_dict['rollout_obs'].shape[0] // 4
+        disc_input_size = input_dict['rollout_obs'].shape[0] // 512  # 512 is a magic number for performance
         rollout_obs = input_dict['rollout_obs'][0:disc_input_size]
         replay_obs = input_dict['replay_obs'][0:disc_input_size]
         demo_obs = input_dict['demo_obs'][0:disc_input_size]
@@ -254,7 +257,7 @@ class StyleAlgorithm(BaseAlgorithm):
 
 
 @torch.jit.script
-def local_angle_transform(
+def disc_obs_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int]) -> torch.Tensor:
     aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos = state
@@ -280,10 +283,12 @@ def local_angle_transform(
 @torch.jit.script
 def style_task_obs_angle_transform(
         obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
-        key_idx: List[int], dof_offsets: List[int]) -> torch.Tensor:
+        key_idx: List[int], dof_offsets: List[int]) -> Tuple[torch.Tensor, torch.Tensor]:
     aPos, aRot, aVel, aAnVel, dPos, dVel, rPos = obs
     keyPos = rPos[:, key_idx, :]
-    return local_angle_transform((aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos), dof_offsets)
+    disc_obs = disc_obs_transform((aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos), dof_offsets)
+    obs = torch.cat(obs, dim=0)
+    return obs, disc_obs
 
 
 @torch.jit.script
@@ -291,5 +296,5 @@ def motion_lib_angle_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int], traj_len: int) -> torch.Tensor:
     num_steps = int(state[0].shape[0] / traj_len)
-    obs = local_angle_transform(state, dof_offsets)
+    obs = disc_obs_transform(state, dof_offsets)
     return obs.view(num_steps, -1)

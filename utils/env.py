@@ -19,6 +19,12 @@ def default_asset_option():
     return asset_options
 
 
+def cart_asset_option():
+    asset_options = default_asset_option()
+    asset_options.fix_base_link = True
+    return asset_options
+
+
 def humanoid_asset_option():
     asset_options = default_asset_option()
     asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS

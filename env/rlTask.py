@@ -52,7 +52,6 @@ class RlTask(VecTask):
         dof_state_tensor_reshaped = self._buf["dof"].view(self._num_envs, dof_per_env, 2)
         self._buf["dPos"] = dof_state_tensor_reshaped[..., 0]
         self._buf["dVel"] = dof_state_tensor_reshaped[..., 1]
-        self._buf["dPosInit"] = torch.zeros_like(self._buf["dPos"])
 
         bodies_per_env = self._buf["rBody"].shape[0] // self._num_envs
         rigid_body_state_reshaped = self._buf["rBody"].view(self._num_envs, bodies_per_env, 13)
@@ -174,7 +173,6 @@ class RlTask(VecTask):
 
             self._buf["reset"][env_ids] = False
             self._buf["elapsedStep"][env_ids] = 0
-            self._buf["rew"][env_ids] = 0
 
         self._refresh_tensors()
         self._compute_observations()

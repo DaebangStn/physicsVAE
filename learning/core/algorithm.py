@@ -11,7 +11,7 @@ from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase
 from utils.rl_games import rl_games_net_build_param
 
 
-class BaseAlgorithm(A2CAgent):
+class CoreAlgorithm(A2CAgent):
     def __init__(self, **kwargs):
         ContinuousA2CBase.__init__(self, **kwargs)
 
@@ -61,12 +61,12 @@ class BaseAlgorithm(A2CAgent):
             c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, values)
             b_loss = self._bound_loss(mu)
 
-            losses, _ = torch_ext.apply_masks(  # vestige for RNN
+            losses, _ = torch_ext.apply_masks(  # vestige of RNN
                 [a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)])
             a_loss, c_loss, entropy, b_loss = losses
 
             loss = (a_loss
-                    + 0.5 * c_loss * self.critic_coef
+                    + c_loss * self.critic_coef
                     - entropy * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
@@ -98,8 +98,6 @@ class BaseAlgorithm(A2CAgent):
                              mu.detach(), sigma.detach(), b_loss)
 
     def play_steps(self):
-        update_list = self.update_list
-
         step_time = 0.0
         self._pre_rollout()
 
@@ -111,9 +109,8 @@ class BaseAlgorithm(A2CAgent):
             else:
                 res_dict = self.get_action_values(self.obs)
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
-            self.experience_buffer.update_data('dones', n, self.dones)
 
-            for k in update_list:
+            for k in self.update_list:
                 self.experience_buffer.update_data(k, n, res_dict[k])
 
             self._pre_step()
@@ -130,6 +127,7 @@ class BaseAlgorithm(A2CAgent):
                     1).float()
 
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
+            self.experience_buffer.update_data('dones', n, self.dones)
 
             self.current_rewards += rewards
             self.current_shaped_rewards += shaped_rewards
@@ -200,6 +198,7 @@ class BaseAlgorithm(A2CAgent):
     def _prepare_data(self, **kwargs):
         self.dataset = PPODataset(self.batch_size, self.minibatch_size, self.is_discrete, self.is_rnn,
                                   self.ppo_device, self.seq_length)
+        self.dones = torch.zeros(self.num_actors, device=self.ppo_device)
 
     def _save_config(self, **kwargs):
         algo_config = kwargs['params']
@@ -238,7 +237,7 @@ class BaseAlgorithm(A2CAgent):
         clean_config = {}
         for k, v in config.items():
             if isinstance(v, dict):
-                clean_config[k] = BaseAlgorithm.remove_unserializable(v)
+                clean_config[k] = CoreAlgorithm.remove_unserializable(v)
             elif not isinstance(v, (int, float, str, bool, list)):
                 print(f'[config] Ignoring unserializable value: {k}')
             else:
