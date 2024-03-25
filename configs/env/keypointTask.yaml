@@ -1,13 +1,18 @@
 env:
   name: keypointTask
   num_envs: 4096
-  spacing: 4
+  spacing: 1.5
 
   humanoid_asset_filename:  # from the project root
-    assets/urdf/amp_humanoid.xml
-  num_obs: 125
+    assets/urdf/amp_humanoid_sword_shield.xml
+  joint_information_path:
+    assets/urdf/joint_information.yaml
+
+  num_obs: 140  # sword and shield
+#  num_obs: 125  # naive humanoid
   num_states: 1  # do not use
-  num_act: 28  # number of dof
+  num_act: 31  # dof(#) - sword and shield
+#  num_act: 28  # dof(#) - naive humanoid
   max_episode_steps: 1200
 
 

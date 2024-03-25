@@ -1,11 +1,11 @@
 test: False
+debug: False
 
 algo:
   name: skillAlgo
-  memo: fix_sigma3
-  style:
-    motion_file: assets/motions/amp_humanoid_walk.npy
-    joint_information_path: assets/urdf/joint_information.yaml
+  memo:
+  motion_file:
+    assets/motions/reallusion_sword_shield/dataset_reallusion_sword_shield.yaml
 
 model:
   name: skill
@@ -15,6 +15,8 @@ network:
   separate: True
 
   space:
+    latent_dim: 32
+
     continuous:
       mu_activation: None
       sigma_activation: None
@@ -31,7 +33,7 @@ network:
     initializer:
       name: default
 
-  disc_enc:
+  disc:  # discriminator and encoder shares the network
     units: [1024, 1024, 512]
     activation: relu
     initializer:
@@ -39,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_styleAlgo_22-18-45-01_fix_sigma2/nn/keypointTask.pth
+#  runs/keypointTask_skillAlgo_27-10-25-18_None/nn/keypointTask.pth
 
 
 hparam:
@@ -60,9 +62,9 @@ hparam:
   minibatch_size: 16384
   mini_epochs: 6
 
-  learning_rate: 5e-4
-  lr_schedule: adaptive
-  kl_threshold: 0.008
+  learning_rate: 2e-5
+  lr_schedule: constant
+#  kl_threshold: 0.008
 
 #  bound_loss_type: regularisation
 #  bounds_loss_coef: 0.00001
@@ -71,18 +73,31 @@ hparam:
   critic_coef: 5
   entropy_coef: 0.0
 
-  # style
+  reward:
+    task_scale: 0.0
+    disc_scale: 2.0
+    enc_scale: 2.0
+
   style:
-    task_rew_scale: 0.0
-    disc_rew_scale: 1.0
     replay_buf:
       size: 200000
       store_prob: 0.01
 
     disc:
+      num_obs: 140
       obs_traj_len: 4
-      loss_coef: 1
-      weight_reg_scale: 0.01
+      loss_coef: 5
+      logit_reg_scale: 0.01
+      reg_scale: 0.0001
       grad_penalty_scale: 5
+
+  skill:
+    div_loss_coef: 0.01
+    enc:
+      loss_coef: 5
+
+    latent:
+      update_freq_max: 150
+      update_freq_min: 1
 
 seed: 1

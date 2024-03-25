@@ -15,6 +15,7 @@ class RlTask(VecTask):
         self._action_ofs = None
         self._action_scale = None
         self._max_episode_steps = None
+        self._num_rigid_body = None
         self._num_sensors = None
 
         self._envs = []
@@ -81,7 +82,7 @@ class RlTask(VecTask):
         humanoid_asset = self._gym.load_asset(self._sim, PROJECT_ROOT, self._humanoid_asset_filename,
                                               humanoid_asset_option())
 
-        num_rigid_body = self._gym.get_asset_rigid_body_count(humanoid_asset)
+        self._num_rigid_body = self._gym.get_asset_rigid_body_count(humanoid_asset)
         num_shape = self._gym.get_asset_rigid_shape_count(humanoid_asset)
         self_collision = False
 
@@ -93,7 +94,7 @@ class RlTask(VecTask):
             env = self._gym.create_env(self._sim, *env_create_parameters(self._num_envs, self._env_spacing))
             self._envs.append(env)
 
-            self._gym.begin_aggregate(env, num_rigid_body, num_shape, self_collision)
+            self._gym.begin_aggregate(env, self._num_rigid_body, num_shape, self_collision)
             humanoid = self._gym.create_actor(env, humanoid_asset, drop_transform(0.89), "humanoid", i, 0, 0)
             self._humanoids.append(humanoid)
             self._gym.end_aggregate(env)

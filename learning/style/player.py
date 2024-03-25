@@ -40,7 +40,7 @@ class StylePlayer(CorePlayer):
 
         self._checkpoint_disc = kwargs['params'].get('checkpoint_disc', None)
 
-        algo_conf = kwargs['params']['algo']['style']
+        algo_conf = kwargs['params']['algo']
         self._key_body_ids = self._find_key_body_ids(algo_conf['joint_information']['key_body_names'])
         self._dof_offsets = algo_conf['joint_information']['dof_offsets']
 
@@ -50,6 +50,8 @@ class StylePlayer(CorePlayer):
 
     def _disc_debug(self, disc_obs):
         with torch.no_grad():
+            if self.normalize_input:
+                disc_obs = self.model.norm_disc_obs(disc_obs)
             disc = self.model.disc(disc_obs)
             prob = 1 / (1 + torch.exp(-disc))
             reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.device)))

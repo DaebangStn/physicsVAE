@@ -118,3 +118,11 @@ def set_tensor_like_dof_pose_state(gym, envs, handles, values: np.ndarray):
 
 def to_torch(x, dtype=torch.float, device='cuda:0', requires_grad=False):
     return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
+
+
+def sample_color(n):
+    col_base = np.array([0.4, 0.4, 0.4])
+    col_rand = np.random.uniform(0.0, 1.0, size=3)
+    col_rand = 0.2 * col_rand / np.linalg.norm(col_rand)
+    return col_base + col_rand
+

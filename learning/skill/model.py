@@ -1,3 +1,5 @@
+import torch
+
 from learning.style.model import StyleModel
 
 
@@ -17,6 +19,17 @@ class SkillModel(StyleModel):
             if input_dict.get('is_train', False):
                 output_dict['enc'] = self.enc(input_dict['rollout_obs'])
             return output_dict
+
+        def actor(self, obs):
+            obs = self.norm_obs(obs)
+            mu, logstd, _, _ = self.a2c_network({'obs': obs})
+            return mu, torch.exp(logstd)
+
+        def enc(self, obs):
+            return self.a2c_network.enc(obs)
+
+        def enc_load_state_dict(self, state_dict):
+            self.a2c_network.enc_load_state_dict(state_dict)
 
         @property
         def enc_weights(self):

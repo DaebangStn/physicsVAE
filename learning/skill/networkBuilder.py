@@ -13,17 +13,19 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
         Forwards returns [mu, logstd, value, states]
         """
         def __init__(self, param, **kwargs):
-            super().__init__(param, **kwargs)  # build action/value network
-            self._build_enc(**kwargs)
+            self._latent_dim = int(kwargs['space']['latent_dim'])
+            super().__init__(param, **kwargs)  # build action/value/disc network
+            self._build_enc()
 
-        def _build_enc(self, **kwargs):
+        def _build_enc(self):
             self._enc_mlp = self._disc_mlp
-            self._enc_linear = nn.Linear(self._disc_logistics.out_features, )  # TODO: parse from kwargs, latent_dim
-            self._enc_norm = nn.BatchNorm1d(self._disc_logistics.out_features)
+            self._enc_linear = nn.Linear(self._disc_logistics.in_features, self._latent_dim)
             nn.init.uniform_(self._enc_linear.weight, -0.1, 0.1)
             nn.init.zeros_(self._enc_linear.bias)
+            self._enc = nn.Sequential(self._enc_mlp, self._enc_linear)
 
-            self.enc = nn.Sequential(self._enc_mlp, self._enc_linear, self._enc_norm)
+        def enc(self, obs):
+            return torch.nn.functional.normalize(self._enc(obs), dim=-1)
 
         @property
         def enc_weights(self):
@@ -34,3 +36,7 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
 
             weights.append(torch.flatten(self._enc_linear.weight))
             return weights
+
+        @property
+        def latent_dim(self):
+            return self._latent_dim

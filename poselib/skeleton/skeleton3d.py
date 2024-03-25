@@ -475,21 +475,6 @@ class SkeletonState(Serializable):
         return self._global_translation
 
     @property
-    def global_translation_xy(self):
-        """ global translation in xy """
-        trans_xy_data = self.global_translation.zeros_like()
-        trans_xy_data[..., 0:2] = self.global_translation[..., 0:2]
-        return trans_xy_data
-
-    @property
-    def global_translation_xz(self):
-        """ global translation in xz """
-        trans_xz_data = self.global_translation.zeros_like()
-        trans_xz_data[..., 0:1] = self.global_translation[..., 0:1]
-        trans_xz_data[..., 2:3] = self.global_translation[..., 2:3]
-        return trans_xz_data
-
-    @property
     def local_rotation(self):
         """ the rotation from child frame to parent frame given in the order of child nodes appeared
         in `.skeleton_tree.node_names` """
@@ -542,43 +527,11 @@ class SkeletonState(Serializable):
 
     # Root Properties
     @property
-    def root_translation_xy(self):
-        """ root translation on xy """
-        if not hasattr(self, "_root_translation_xy"):
-            self._root_translation_xy = self.global_translation_xy[..., 0, :]
-        return self._root_translation_xy
-
-    @property
     def global_root_rotation(self):
         """ root rotation """
         if not hasattr(self, "_global_root_rotation"):
             self._global_root_rotation = self.global_rotation[..., 0, :]
         return self._global_root_rotation
-
-    @property
-    def global_root_yaw_rotation(self):
-        """ root yaw rotation """
-        if not hasattr(self, "_global_root_yaw_rotation"):
-            self._global_root_yaw_rotation = self.global_root_rotation.yaw_rotation()
-        return self._global_root_yaw_rotation
-
-    # Properties relative to root
-    @property
-    def local_translation_to_root(self):
-        """ The 3D translation from joint frame to the root frame. """
-        if not hasattr(self, "_local_translation_to_root"):
-            self._local_translation_to_root = (
-                self.global_translation - self.root_translation.unsqueeze(-1)
-            )
-        return self._local_translation_to_root
-
-    @property
-    def local_rotation_to_root(self):
-        """ The 3D rotation from joint frame to the root frame. It is equivalent to 
-        The root_R_world * world_R_node """
-        return (
-            quat_inverse(self.global_root_rotation).unsqueeze(-1) * self.global_rotation
-        )
 
     def compute_forward_vector(
         self,

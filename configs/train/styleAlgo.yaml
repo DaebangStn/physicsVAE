@@ -1,11 +1,10 @@
 test: False
+debug: False
 
 algo:
   name: styleAlgo
-  memo: moving_mean_obs
-  style:
-    motion_file: assets/motions/amp_humanoid_walk.npy
-    joint_information_path: assets/urdf/joint_information.yaml
+  memo:
+  motion_file: assets/motions/amp_humanoid_walk.npy
 
 model:
   name: style
@@ -39,7 +38,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_styleAlgo_25-15-01-44_debug/nn/keypointTask.pth
+#  runs/keypointTask_styleAlgo_25-16-46-40_None/nn/keypointTask.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 
@@ -73,10 +72,11 @@ hparam:
   critic_coef: 5
   entropy_coef: 0.0
 
-  # style
+  reward:
+    task_scale: 0.0
+    disc_scale: 2.0
+
   style:
-    task_rew_scale: 0.0
-    disc_rew_scale: 2.0
     replay_buf:
       size: 200000
       store_prob: 0.01
