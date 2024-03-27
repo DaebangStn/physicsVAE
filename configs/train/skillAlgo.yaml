@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_skillAlgo_27-10-25-18_None/nn/keypointTask.pth
+  runs/keypointTask_skillAlgo_27-14-01-01_None/nn/keypointTask.pth
 
 
 hparam:

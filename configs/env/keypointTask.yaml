@@ -5,12 +5,13 @@ env:
 
   humanoid_asset_filename:  # from the project root
     assets/urdf/amp_humanoid_sword_shield.xml
+#    assets/urdf/amp_humanoid.xml
   joint_information_path:
     assets/urdf/joint_information.yaml
 
+  num_states: 1  # do not use
   num_obs: 140  # sword and shield
 #  num_obs: 125  # naive humanoid
-  num_states: 1  # do not use
   num_act: 31  # dof(#) - sword and shield
 #  num_act: 28  # dof(#) - naive humanoid
   max_episode_steps: 1200

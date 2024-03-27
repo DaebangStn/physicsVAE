@@ -24,6 +24,7 @@ class VecTask:
         self._sim = None
 
         self._parse_sim_param(**kwargs)
+        self._create_sim()
 
         # Environment related variable
         self._num_envs = None
@@ -39,7 +40,7 @@ class VecTask:
         self.action_space = None
         self.state_space = None
 
-        self._create_sim()
+        self._create_env()
 
         self._buf = None
         self._raw_buf = None
@@ -119,6 +120,8 @@ class VecTask:
     def _create_sim(self):
         self._sim = self._gym.create_sim(self._compute_device, self._graphics_device, type=self._sim_engine,
                                          params=self._sim_params)
+
+    def _create_env(self):
         self._create_ground()
         self._create_envs()
         self._gym.prepare_sim(self._sim)

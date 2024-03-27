@@ -1,0 +1,2 @@
+class HighLevelAlgorithm:
+    pass

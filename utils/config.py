@@ -72,7 +72,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     if config_train["test"]:
         assert config_train["checkpoint"] is not None, "Checkpoint path not found in config"
         config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 2
+        config_env["env"]["num_envs"] = 32
         full_experiment_name = "test_" + full_experiment_name
 
     # Overriding debug mode

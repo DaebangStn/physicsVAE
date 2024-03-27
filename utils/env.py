@@ -25,6 +25,10 @@ def cart_asset_option():
     return asset_options
 
 
+def marker_asset_option():
+    return cart_asset_option()
+
+
 def humanoid_asset_option():
     asset_options = default_asset_option()
     asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
@@ -120,9 +124,7 @@ def to_torch(x, dtype=torch.float, device='cuda:0', requires_grad=False):
     return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
 
 
-def sample_color(n):
-    col_base = np.array([0.4, 0.4, 0.4])
-    col_rand = np.random.uniform(0.0, 1.0, size=3)
-    col_rand = 0.2 * col_rand / np.linalg.norm(col_rand)
-    return col_base + col_rand
-
+def sample_color(projector: torch.Tensor, z: torch.Tensor):
+    col_base = torch.tensor([0.4, 0.4, 0.4], device=z.device, dtype=z.dtype)
+    projection = torch.matmul(z, projector)
+    return 0.2 * projection + col_base

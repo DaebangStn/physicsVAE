@@ -6,11 +6,12 @@ def build_runner():
     from rl_games.torch_runner import Runner
     from rl_games.common.algo_observer import IsaacAlgoObserver
 
-    from env.simpleTask import SimpleTask
-    from env.rlTask import RlTask
-    from env.balanceTask import BalanceTask
-    from env.keypointTask import KeypointTask
-    from env.cartTask import CartTask
+    from env.simple import SimpleTask
+    from env.humanoid import HumanoidTask
+    from env.balance import BalanceTask
+    from env.keypoint import KeypointTask
+    from env.keypointLocation import KeypointLocationTask
+    from env.cart import CartTask
 
     from learning.core.model import CoreModel
     from learning.core.networkBuilder import CoreNetworkBuilder
@@ -31,9 +32,10 @@ def build_runner():
     from utils.rl_games import register_env_rl_games, register_algo_n_player, register_net_n_model
 
     register_env_rl_games('simpleTask', SimpleTask)
-    register_env_rl_games('rlTask', RlTask)
+    register_env_rl_games('rlTask', HumanoidTask)
     register_env_rl_games('balanceTask', BalanceTask)
     register_env_rl_games('keypointTask', KeypointTask)
+    register_env_rl_games('keypointLocationTask', KeypointLocationTask)
     register_env_rl_games('cartTask', CartTask)
 
     register_net_n_model('core', CoreNetworkBuilder, CoreModel)

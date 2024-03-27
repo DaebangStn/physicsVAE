@@ -1,8 +1,6 @@
-import torch
-
 from learning.style.algorithm import StyleAlgorithm
 from utils.angle import *
-from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
+from utils.env import sample_color
 
 
 class SkillAlgorithm(StyleAlgorithm):
@@ -23,6 +21,8 @@ class SkillAlgorithm(StyleAlgorithm):
         self._mean_enc_reward = None
         self._std_enc_reward = None
         self._remain_latent_steps = None
+
+        self._color_projector = None
 
         super().__init__(**kwargs)
 
@@ -110,6 +110,8 @@ class SkillAlgorithm(StyleAlgorithm):
         self._latent_dim = config_network['space']['latent_dim']
         self._z = self.sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
+        self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
+
     def _pre_rollout(self):
         super()._pre_rollout()
         self._rollout_zes = []
@@ -160,8 +162,8 @@ class SkillAlgorithm(StyleAlgorithm):
         self._remain_latent_steps[update_env] = torch.randint(self._latent_update_freq_min,
                                                               self._latent_update_freq_max, (len(update_env),),
                                                               dtype=self._remain_latent_steps.dtype)
-        self.vec_env.change_color(update_env)
         self._z[update_env] = SkillAlgorithm.sample_latent(len(update_env), self._latent_dim, self.device)
+        self.vec_env.change_color(update_env, sample_color(self._color_projector, self._z[update_env]))
 
     @staticmethod
     def sample_latent(batch_size, latent_dim, device):

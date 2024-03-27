@@ -1,0 +1,31 @@
+env:
+  name: keypointLocationTask
+  num_envs: 4096
+  spacing: 4
+
+  humanoid_asset_filename:  # from the project root
+#    assets/urdf/amp_humanoid_sword_shield.xml
+    assets/urdf/amp_humanoid.xml
+  joint_information_path:
+    assets/urdf/joint_information.yaml
+
+  num_states: 1  # do not use
+#  num_obs: 140  # sword and shield
+  num_obs: 125  # naive humanoid
+#  num_act: 31  # dof(#) - sword and shield
+  num_act: 28  # dof(#) - naive humanoid
+  max_episode_steps: 1200
+
+  target:
+    away_max: 5.0
+    away_min: 0.5
+    update_freq_max: 250
+    update_freq_min: 150
+
+    asset_filename:
+      assets/urdf/location_marker.urdf
+
+sim:
+  headless: True
+  device_id: 0
+  engine: PHYSX

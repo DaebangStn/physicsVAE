@@ -1,0 +1,2 @@
+class HighLevelPlayer:
+    pass

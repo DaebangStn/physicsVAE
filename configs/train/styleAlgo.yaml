@@ -38,7 +38,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_styleAlgo_25-16-46-40_None/nn/keypointTask.pth
+  runs/keypointTask.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 

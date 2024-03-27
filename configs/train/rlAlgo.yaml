@@ -1,4 +1,5 @@
 test: False
+debug: False
 
 algo:
   name: rlAlgo
@@ -19,7 +20,7 @@ network:
         name: default
       sigma_init:
         name: const_initializer
-        val: 3.0
+        val: -3.0
       fixed_sigma: True
 
   mlp:
@@ -30,7 +31,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/rlTask_rlAlgo_20-19-58-52_removed_height_reward/nn/rlTask.pth
+#  runs/rlTask.pth
 
 
 hparam:
