@@ -46,6 +46,7 @@ class CoreAlgorithm(A2CAgent):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch,
          old_sigma_batch, return_batch, value_preds_batch) = self._unpack_input(input_dict)
 
+        batch_dict_copy = batch_dict.copy()  # since model modifies the dict, make a copy
         with ((torch.cuda.amp.autocast(enabled=self.mixed_precision))):
             # 2. Run the model
             res_dict = self.model(batch_dict)
@@ -70,7 +71,7 @@ class CoreAlgorithm(A2CAgent):
                     - entropy * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
-            loss += self._additional_loss(batch_dict, res_dict)
+            loss += self._additional_loss(batch_dict_copy, res_dict)
 
             # 4. Zero the gradients
             if self.multi_gpu:

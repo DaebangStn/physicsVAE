@@ -5,7 +5,7 @@ algo:
   name: skillAlgo
   memo: drop
   motion_file:
-    assets/motions/reallusion_sword_shield/dataset_reallusion_sword_shield.yaml
+    assets/motions/dataset_humanoid.yaml
 
 model:
   name: skill
@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_skillAlgo_28-18-55-14_None/nn/keypointTask.pth
+#  runs/keypointTask_skillAlgo_28-11-53-00_2G_obs140/nn/keypointTask2.pth
 
 
 hparam:
@@ -80,7 +80,7 @@ hparam:
       store_prob: 0.01
 
     disc:
-      num_obs: 140
+      num_obs: 125
       obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01

@@ -52,6 +52,7 @@ class DroppedHumanoid(HumanoidTask):
     def _parse_env_param(self, **kwargs):
         env_cfg = super()._parse_env_param(**kwargs)
         self._drop_on_reset_prob = env_cfg.get("drop_on_reset_prob", 0.0)
+        return env_cfg
 
     def _build_dropped_state_tensor(self):
         RELAXATION_STEPS = 100

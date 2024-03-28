@@ -48,25 +48,33 @@ class SkillAlgorithm(StyleAlgorithm):
     def _additional_loss(self, batch_dict, res_dict):
         loss = super()._additional_loss(batch_dict, res_dict)
         e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
-
-        obs = batch_dict['obs'][:, :-self._latent_dim]
-        div_loss = self._diversity_loss(obs, res_dict['mus'], batch_dict['rollout_z'])
+        div_loss = self._diversity_loss(batch_dict['obs'], res_dict['mus'])
         return loss + e_loss * self._enc_loss_coef + div_loss * self._div_loss_coef
 
-    def _diversity_loss(self, obs, mu, rollout_z):
-        batch_size = rollout_z.shape[0]
-        mu = mu[:batch_size]  # rollout_z is truncated before so that make mu and obs have the same size
-        obs = obs[:batch_size]
-        sampled_z = self.sample_latent(batch_size, self._latent_dim, self.device)
+    def _diversity_loss(self, obs, mu):
+        rollout_z = obs[:, -self._latent_dim:]
+        obs = obs[:, :-self._latent_dim]
+        sampled_z = self.sample_latent(obs.shape[0], self._latent_dim, self.device)
         sampled_mu, sampled_sigma = self.model.actor(torch.cat([obs, sampled_z], dim=1))
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
         mu = torch.clamp(mu, -1.0, 1.0)
-
-        mu_diff = torch.sum((sampled_mu - mu) ** 2, dim=-1)
         z_diff = (1 - (rollout_z * sampled_z).sum(dim=-1)) / 2
 
-        loss = torch.square(1 - mu_diff / (z_diff + 1e-5)).mean()
+        # TODO, test (a-1), (b-1) and (b-2)
+
+        # Original KL implementation (a)
+        kl = torch.square(sampled_mu - mu).mean(dim=-1)
+
+        # Right KL divergence (b)
+        kl = ((sampled_mu - mu) ** 2 /
+              (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
+
+        # Original loss implementation (1)
+        loss = torch.square(kl / (z_diff + 1e-5) - 1).mean()
+
+        # My loss suggestion (2)
+        loss = (kl / (z_diff + 1e-5)).mean()
 
         self._write_disc_stat(amp_diversity_loss=loss.detach())
         return loss

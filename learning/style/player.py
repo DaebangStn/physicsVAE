@@ -2,7 +2,7 @@ import torch
 from rl_games.algos_torch import torch_ext
 
 from learning.core.player import CorePlayer
-from learning.style.algorithm import style_task_obs_angle_transform
+from learning.style.algorithm import style_task_obs_angle_transform, StyleAlgorithm
 from utils.buffer import TensorHistoryFIFO
 
 
@@ -41,7 +41,8 @@ class StylePlayer(CorePlayer):
         self._checkpoint_disc = kwargs['params'].get('checkpoint_disc', None)
 
         algo_conf = kwargs['params']['algo']
-        self._key_body_ids = self._find_key_body_ids(algo_conf['joint_information']['key_body_names'])
+        self._key_body_ids = StyleAlgorithm.find_key_body_ids(
+            self.env, algo_conf['joint_information']['key_body_names'])
         self._dof_offsets = algo_conf['joint_information']['dof_offsets']
 
         style_conf = kwargs['params']['hparam']['style']
@@ -62,9 +63,6 @@ class StylePlayer(CorePlayer):
         if self._games_played == 0:
             self._writer.add_scalar("player/rollout_disc", disc, self._n_step)
             self._writer.add_scalar("player/reward_disc", reward, self._n_step)
-
-    def _find_key_body_ids(self, key_body_names):
-        return self.env.key_body_ids(key_body_names)
 
     def _pre_step(self):
         self._disc_obs_buf.push_on_reset(self.obses['disc_obs'], self.dones)

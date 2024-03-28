@@ -1,0 +1,66 @@
+test: False
+debug: True
+
+algo:
+  name: highLevelAlgo
+  memo:
+
+model:
+  name: highLevel
+
+network:
+  name: highLevel
+  separate: True
+
+  # config for space is the same as low-level policy
+
+  mlp:
+    units: [1024, 512]
+    activation: relu
+    initializer:
+      name: default
+
+
+checkpoint:  # from the project root
+
+
+hparam:
+  normalize_input: True
+  normalize_value: True
+  normalize_advantage: True
+  clip_value: False
+  reward_shaper: {}
+  save_frequency: 200
+
+  # learning hyperparameters
+  horizon_length: 32
+  gamma: 0.99
+  tau: 0.95
+  e_clip: 0.2
+  grad_norm: 1.0
+
+  minibatch_size: 1024
+  mini_epochs: 6
+
+  learning_rate: 5e-4
+  lr_schedule: adaptive
+  kl_threshold: 0.008
+
+  bound_loss_type: bound
+  bounds_loss_coef: 10
+  critic_coef: 5
+  entropy_coef: 0.0
+
+  reward:
+    task_scale: 0.0
+    disc_scale: 2.0
+
+  llc:
+    steps: 5
+    cfg: runs/keypointTask_skillAlgo_28-11-53-00_2G_obs140/algo_config.yaml
+    ckpt: runs/keypointTask_skillAlgo_28-11-53-00_2G_obs140/nn/keypointTask2.pth
+  hlc:
+    demo_buf_size: 200000
+
+
+seed: 1

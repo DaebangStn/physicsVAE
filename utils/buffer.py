@@ -71,6 +71,21 @@ class MotionLibFetcher:
         # [traj1, traj1, ..., traj2, traj2, ...]
         return self._motion_lib.get_motion_state(motion_ids, capture_time)
 
+    @staticmethod
+    def demo_fetcher_config(cls, algo_conf):
+        return {
+            # Demo dimension
+            'traj_len': cls._disc_obs_traj_len,
+            'dt': cls.vec_env.dt,
+
+            # Motion Lib
+            'motion_file': algo_conf['motion_file'],
+            'dof_body_ids': algo_conf['joint_information']['dof_body_ids'],
+            'dof_offsets': cls._dof_offsets,
+            'key_body_ids': cls._key_body_ids,
+            'device': cls.device
+        }
+
 
 class TensorHistoryFIFO:
     def __init__(self, max_size: int):

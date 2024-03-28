@@ -138,23 +138,6 @@ class StyleAlgorithm(CoreAlgorithm):
             reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
         return reward.view(self.horizon_length, self.num_actors, -1)
 
-    def _demo_fetcher_config(self, algo_conf):
-        return {
-            # Demo dimension
-            'traj_len': self._disc_obs_traj_len,
-            'dt': self.vec_env.dt,
-
-            # Motion Lib
-            'motion_file': algo_conf['motion_file'],
-            'dof_body_ids': algo_conf['joint_information']['dof_body_ids'],
-            'dof_offsets': self._dof_offsets,
-            'key_body_ids': self._key_body_ids,
-            'device': self.device
-        }
-
-    def _find_key_body_ids(self, key_body_names: List[str]) -> List[int]:
-        return self.vec_env.key_body_ids(key_body_names)
-
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
 
@@ -174,16 +157,20 @@ class StyleAlgorithm(CoreAlgorithm):
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
         algo_conf = kwargs['params']['algo']
-        self._key_body_ids = self._find_key_body_ids(algo_conf['joint_information']['key_body_names'])
+        self._key_body_ids = self.find_key_body_ids(self.vec_env, algo_conf['joint_information']['key_body_names'])
         self._dof_offsets = algo_conf['joint_information']['dof_offsets']
-        self._demo_fetcher = MotionLibFetcher(**self._demo_fetcher_config(algo_conf))
 
+        # TODO: very weird loader sorry...
+        self._demo_fetcher = MotionLibFetcher(**MotionLibFetcher.demo_fetcher_config(self, algo_conf))
+
+        # build replay buffer
         config_buffer = self.config['style']['replay_buf']
+        buf_size = config_buffer['size']
         self._replay_buffer = {
-            'demo': SingleTensorBuffer(config_buffer['size'], self.device),
-            'rollout': SingleTensorBuffer(config_buffer['size'], self.device),
+            'demo': SingleTensorBuffer(buf_size, self.device),
+            'rollout': SingleTensorBuffer(buf_size, self.device),
         }
-        demo_obs = self._demo_fetcher.fetch(config_buffer['size'] // self._disc_obs_traj_len)
+        demo_obs = self._demo_fetcher.fetch(buf_size // self._disc_obs_traj_len)
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_store_prob = config_buffer['store_prob']
@@ -254,6 +241,10 @@ class StyleAlgorithm(CoreAlgorithm):
                 self.writer.add_scalar(f'losses/{k}', v, frame)
             else:
                 self.writer.add_scalar(f'info/{k}', v, frame)
+
+    @staticmethod
+    def find_key_body_ids(env, key_body_names: List[str]) -> List[int]:
+        return env.key_body_ids(key_body_names)
 
 
 @torch.jit.script

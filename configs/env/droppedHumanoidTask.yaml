@@ -1,0 +1,20 @@
+env:
+  name: droppedHumanoidTask
+  num_envs: 128
+  spacing: 4
+
+  humanoid_asset_filename:  # from the project root
+    assets/urdf/amp_humanoid.xml
+
+  num_states: 1  # do not use
+  num_obs: 69
+  num_act: 28  # number of dof
+  max_episode_steps: 1200
+
+  drop_on_reset_prob: 0.1
+
+
+sim:
+  headless: True
+  device_id: 0
+  engine: PHYSX
