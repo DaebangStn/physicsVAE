@@ -4,7 +4,7 @@ import torch
 from rl_games.algos_torch import torch_ext
 
 from learning.core.player import CorePlayer
-from learning.style.algorithm import style_task_obs_angle_transform, StyleAlgorithm
+from learning.style.algorithm import style_task_obs_angle_transform, StyleAlgorithm, disc_reward
 from utils.buffer import TensorHistoryFIFO
 
 
@@ -72,18 +72,9 @@ class StylePlayer(CorePlayer):
                   " with index {:s}".format(full_experiment_name))
 
     def _disc_debug(self, disc_obs):
-        with torch.no_grad():
-            if self.normalize_input:
-                disc_obs = self.model.norm_disc_obs(disc_obs)
-            disc = self.model.disc(disc_obs)
-            prob = 1 / (1 + torch.exp(-disc))
-            reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.device)))
-
-            disc = torch.mean(disc).item()
-            reward = torch.mean(reward).item()
-        print(f"rollout_disc {disc:.3f} disc_reward {reward:.3f}")
+        reward = disc_reward(self.model, disc_obs, self.normalize_input, self.device).mean().item()
+        print(f"disc_reward {reward:.3f}")
         if self._games_played == 0:
-            self._writer.add_scalar("player/rollout_disc", disc, self._n_step)
             self._writer.add_scalar("player/reward_disc", reward, self._n_step)
 
     def _log_action(self, action):

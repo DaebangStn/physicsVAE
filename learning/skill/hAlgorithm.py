@@ -1,9 +1,13 @@
+from typing import Optional
+
 import yaml
+import torch
 from rl_games.algos_torch import model_builder
 from rl_games.algos_torch import torch_ext
 
 from learning.core.algorithm import CoreAlgorithm
-from learning.style.algorithm import StyleAlgorithm, motion_lib_angle_transform
+from learning.style.algorithm import (StyleAlgorithm, motion_lib_angle_transform, style_task_obs_angle_transform,
+                                      disc_reward)
 from utils.buffer import TensorHistoryFIFO, MotionLibFetcher, SingleTensorBuffer
 
 
@@ -14,6 +18,10 @@ class HighLevelAlgorithm(CoreAlgorithm):
         # discriminator related
         self._disc_obs_buf = None
         self._disc_obs_traj_len = None
+
+        # env related
+        self._key_body_ids = None
+        self._dof_offsets = None
 
         # low-level controller
         self._llc_actor = None
@@ -34,20 +42,46 @@ class HighLevelAlgorithm(CoreAlgorithm):
         super().__init__(**kwargs)
 
     def env_step(self, actions):
+        # TODO
+        # 1. parameter for env_reset makes hard reset,
+        #    because if the reset is done immediately, idle loop makes error
+        # 2. fix the done flow in the env_step loop
+        # 3. calculate the disc_reward inside the loop
 
-        for _ in range(self._llc_steps):
+        z = torch.nn.functional.normalize(actions, dim=-1)
 
-            # pre step in the style algorithm
+        rew_step = torch.zeros(self.vec_env.num, device=self.device)
+        disc_rew_step = torch.zeros(self.vec_env.num, device=self.device)
+        obs_step = self.obs['obs']
+        for i in range(self._llc_steps):
+            obs_step = self.env_reset(self.dones)
 
-            action = self._llc_action(self.obs)
-            obs, rew, done, info = super().env_step(actions)
+            self._disc_obs_buf.push_on_reset(obs_step['disc_obs'], self.dones)
 
-            # post step in the style algorithm
+            # TODO, check whether this actor averages obs / and train mode
+            llc_action, _ = self.model.actor(torch.cat([obs_step['obs'], z], dim=1))
+            obs, rew, done, info = super().env_step(llc_action)
+            obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+            obs_step = {'obs': obs, 'disc_obs': disc_obs}
 
-        raise NotImplementedError
+            disc_rew = disc_reward(disc_obs, self._llc_disc, self.normalize_input)
 
-    def env_reset(self):
-        raise NotImplementedError
+            rew_step[~done] += rew[~done]
+            disc_rew_step[~done] += disc_rew[~done]
+
+            if i == 0:
+                self.dones = done
+            else:
+                self.dones = self.dones | done
+
+        rew = rew_step * self._rew_task_scale + disc_rew_step * self._rew_disc_scale
+
+        return obs_step, rew, self.dones, {'disc_rew': disc_rew_step}
+
+    def env_reset(self, env_ids: Optional[torch.Tensor] = None):
+        obs = super().env_reset()['obs']
+        obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        return {'obs': obs, 'disc_obs': disc_obs}
 
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
@@ -71,9 +105,6 @@ class HighLevelAlgorithm(CoreAlgorithm):
         config_rew = config_hparam['reward']
         self._rew_task_scale = config_rew['task_scale']
         self._rew_disc_scale = config_rew['disc_scale']
-
-    def _llc_action(self, obs):
-        raise NotImplementedError
 
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)

@@ -65,7 +65,7 @@ class VecTask:
 
         return self._buf['obs'], self._buf['rew'], self._buf['reset'], self._buf['info']
 
-    def reset(self) -> Dict[str, torch.Tensor]:
+    def reset(self, env_ids: Optional[torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Reset environments with the self._buf["reset"]
 
         :return:

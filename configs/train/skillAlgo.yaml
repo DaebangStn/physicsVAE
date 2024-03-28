@@ -41,7 +41,8 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_skillAlgo_02-23-48-45_skill_walk_only_no_enc/nn/keypointMaxObsTask.pth
+  runs/keypointMaxObsTask_skillAlgo_29-23-25-13_div_a1_paper/nn/keypointMaxObsTask.pth
+
 
 hparam:
   normalize_input: True

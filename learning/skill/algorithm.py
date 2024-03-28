@@ -1,6 +1,6 @@
-import time
+from typing import Optional
+
 import torch
-from rl_games.common.a2c_common import swap_and_flatten01
 
 from learning.style.algorithm import StyleAlgorithm
 from utils.angle import *
@@ -54,9 +54,9 @@ class SkillAlgorithm(StyleAlgorithm):
         obs['obs'] = torch.cat([obs['obs'], self._z], dim=1)
         return obs, rew, done, info
 
-    def env_reset(self):
+    def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         self._update_latent()
-        obs = super().env_reset()
+        obs = super().env_reset(env_ids)
         obs['obs'] = torch.cat([obs['obs'], self._z], dim=1)
         return obs
 
@@ -78,12 +78,11 @@ class SkillAlgorithm(StyleAlgorithm):
         e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
         div_loss = self._diversity_loss(batch_dict['obs'], res_dict['mus'])
         return loss + e_loss * self._enc_loss_coef + div_loss * self._div_loss_coef
-        # return loss
 
     def _diversity_loss(self, obs, mu):
         rollout_z = obs[:, -self._latent_dim:]
         obs = obs[:, :-self._latent_dim]
-        sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
+        sampled_z = self.sample_latent(obs.shape[0], self._latent_dim, self.device)
         sampled_mu, sampled_sigma = self.model.actor(torch.cat([obs, sampled_z], dim=1))
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
@@ -93,11 +92,11 @@ class SkillAlgorithm(StyleAlgorithm):
         # TODO, test (a-1), (b-1) and (b-2)
 
         # Original KL implementation (a)
-        kl = torch.square(sampled_mu - mu).mean(dim=-1)
+        # kl = torch.square(sampled_mu - mu).mean(dim=-1)
 
         # Right KL divergence (b)
-        # kl = ((sampled_mu - mu) ** 2 /
-        #       (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
+        kl = ((sampled_mu - mu) ** 2 /
+              (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
 
         # Original loss implementation (1)
         loss = torch.square(kl / (z_diff + 1e-5) - 1).mean()

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 
 from learning.core.algorithm import CoreAlgorithm
@@ -45,8 +47,8 @@ class StyleAlgorithm(CoreAlgorithm):
         obs, disc_obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
 
-    def env_reset(self):
-        obs = super().env_reset()['obs']
+    def env_reset(self, env_ids: Optional[torch.Tensor] = None):
+        obs = super().env_reset(env_ids)['obs']
         obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}
 
@@ -128,15 +130,6 @@ class StyleAlgorithm(CoreAlgorithm):
 
         return loss
 
-    def _disc_reward(self, disc_obs):
-        with torch.no_grad():
-            if self.normalize_input:
-                disc_obs = self.model.norm_disc_obs(disc_obs)
-            disc = self.model.disc(disc_obs)
-            prob = 1 / (1 + torch.exp(-disc))
-            reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
-        return reward.view(self.horizon_length, self.num_actors, -1)
-
     def init_tensors(self):
         super().init_tensors()
         config_hparam = self.config
@@ -185,7 +178,8 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_store_prob = config_buffer['store_prob']
 
     def _post_rollout1(self):
-        style_reward = self._disc_reward(self.experience_buffer.tensor_dict['rollout_obs'])
+        style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'], self.normalize_input,
+                                    self.device).view(self.horizon_length, self.num_actors, -1))
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = self._task_rew_scale * task_reward + self._disc_rew_scale * style_reward
         self.experience_buffer.tensor_dict['rewards'] = combined_reward
@@ -307,9 +301,6 @@ def obs_transform(body_pos: torch.Tensor, body_rot: torch.Tensor, body_vel: torc
     local_body_rot_obs = flat_local_body_rot_obs.reshape(body_rot.shape[0],
                                                          body_rot.shape[1] * flat_local_body_rot_obs.shape[1])
 
-    root_rot_obs = quat_to_tan_norm(root_rot)
-    local_body_rot_obs[..., 0:6] = root_rot_obs
-
     flat_body_vel = body_vel.reshape(body_vel.shape[0] * body_vel.shape[1], body_vel.shape[2])
     flat_local_body_vel = quat_rotate(flat_heading_rot, flat_body_vel)
     local_body_vel = flat_local_body_vel.reshape(body_vel.shape[0], body_vel.shape[1] * body_vel.shape[2])
@@ -342,3 +333,13 @@ def motion_lib_angle_transform(
     num_steps = int(state[0].shape[0] / traj_len)
     obs = disc_obs_transform(state, dof_offsets)
     return obs.view(num_steps, -1)
+
+
+def disc_reward(model, disc_obs, normalize_input, device):
+    with torch.no_grad():
+        if normalize_input:
+            disc_obs = model.norm_disc_obs(disc_obs)
+        disc = model.disc(disc_obs)
+        prob = 1 / (1 + torch.exp(-disc))
+        reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=device)))
+    return reward

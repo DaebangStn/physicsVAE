@@ -1,5 +1,7 @@
 import time
 import yaml
+from typing import Optional
+
 import torch
 from torch.optim import Adam
 from rl_games.common.datasets import PPODataset
@@ -97,6 +99,10 @@ class CoreAlgorithm(A2CAgent):
             kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, True)
         self.train_result = (a_loss, c_loss, entropy, kl_dist, self.last_lr, lr_mul,
                              mu.detach(), sigma.detach(), b_loss)
+
+    def env_reset(self, env_ids: Optional[torch.Tensor] = None):
+        obs = self.vec_env.reset(env_ids)
+        return self.obs_to_tensors(obs)
 
     def play_steps(self):
         step_time = 0.0
