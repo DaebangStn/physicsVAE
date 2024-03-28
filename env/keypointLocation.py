@@ -24,11 +24,10 @@ class KeypointLocationTask(KeypointTask):
     def _build_env(self, env, env_id):
         super()._build_env(env, env_id)
 
-        if not self._headless:
-            target = self._gym.create_actor(env, self._tar_asset, drop_transform(0), "target", env_id, 1, 0)
-            self._gym.set_rigid_body_color(env, target, 0, gymapi.MESH_VISUAL, gymapi.Vec3(1, 0, 0))
-            self._targets_id_env.append(target)
-            self._targets_id_sim.append(self._gym.get_actor_index(env, target, gymapi.DOMAIN_SIM))
+        target = self._gym.create_actor(env, self._tar_asset, drop_transform(0), "target", env_id, 1, 0)
+        self._gym.set_rigid_body_color(env, target, 0, gymapi.MESH_VISUAL, gymapi.Vec3(1, 0, 0))
+        self._targets_id_env.append(target)
+        self._targets_id_sim.append(self._gym.get_actor_index(env, target, gymapi.DOMAIN_SIM))
 
     def _build_tensors(self):
         super()._build_tensors()

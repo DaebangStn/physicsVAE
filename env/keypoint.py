@@ -1,10 +1,10 @@
 from isaacgym import gymapi
 
-from env.humanoid import HumanoidTask
+from env.droppedHumanoid import DroppedHumanoid
 from utils.angle import *
 
 
-class KeypointTask(HumanoidTask):
+class KeypointTask(DroppedHumanoid):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

@@ -16,10 +16,12 @@ def build_args() -> Namespace:
     custom_params = [
         {"name": "--test", "action": "store_true", "default": False,
             "help": "Run trained policy, no training. If not, policy will be trained."},
-        {"name": "--config_train_path", "type": str, "required": True,
+        {"name": "--cfg_train", "type": str, "required": True,
          "help": "Path to the training(like hyperparameter) config file"},
-        {"name": "--config_env_path", "type": str, "required": True,
+        {"name": "--cfg_env", "type": str, "required": True,
          "help": "Path to the environment(like task and physics) config file"},
+        {"name": "--num_envs", "type": int, "required": False,
+         "help": "Number of environments to run in parallel"},
     ]
 
     args = parse_arguments(custom_parameters=custom_params)
@@ -27,12 +29,12 @@ def build_args() -> Namespace:
 
 
 def load_config(args: Namespace) -> Tuple[dict, dict]:
-    config_train_path = Path(args.config_train_path)
+    config_train_path = Path(args.cfg_train)
     assert config_train_path.exists(), f"Config path {config_train_path} does not exist"
     with open(config_train_path.as_posix(), 'r') as f:
         config_train = yaml.load(f, Loader=yaml.SafeLoader)
 
-    config_env_path = Path(args.config_env_path)
+    config_env_path = Path(args.cfg_env)
     assert config_env_path.exists(), f"Config path {config_env_path} does not exist"
     with open(config_env_path.as_posix(), 'r') as f:
         config_env = yaml.load(f, Loader=yaml.SafeLoader)
@@ -62,6 +64,8 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     # Overriding parameters passed on the cli
     if args.test:
         config_train["test"] = args.test
+    if args.num_envs:
+        config_env["env"]["num_envs"] = args.num_envs
 
     full_experiment_name = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] + "_" +
                             datetime.now().strftime("%d-%H-%M-%S") + "_" + str(config_train["algo"].get("memo", "")))
@@ -72,14 +76,14 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     if config_train["test"]:
         assert config_train["checkpoint"] is not None, "Checkpoint path not found in config"
         config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 32
+        config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
         full_experiment_name = "test_" + full_experiment_name
 
     # Overriding debug mode
     if config_train["debug"]:
         config_train["hparam"]["minibatch_size"] = 16
         config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 2
+        config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
         full_experiment_name = "debug_" + full_experiment_name
 
     # Overriding config_env to config_train

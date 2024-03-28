@@ -1,7 +1,7 @@
 env:
   name: keypointLocationTask
   num_envs: 4096
-  spacing: 4
+  spacing: 1
 
   humanoid_asset_filename:  # from the project root
 #    assets/urdf/amp_humanoid_sword_shield.xml

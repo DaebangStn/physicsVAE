@@ -74,16 +74,16 @@ class SkillAlgorithm(StyleAlgorithm):
     def _enc_loss(self, enc, rollout_z):
         # encoding
         similarity = torch.sum(enc * rollout_z, dim=-1, keepdim=True)
-        similarity_loss = -similarity.mean()
+        likelihood_loss = -similarity.mean()
 
         # TODO: original code ignores the gradient penalty and regularization
 
         self._write_disc_stat(
-            enc_loss=similarity_loss.detach(),
+            enc_loss=likelihood_loss.detach(),
             enc_reward_mean=self._mean_enc_reward,
             enc_reward_std=self._std_enc_reward,
         )
-        return similarity_loss
+        return likelihood_loss
 
     def _enc_reward(self, disc_obs, z):
         with torch.no_grad():

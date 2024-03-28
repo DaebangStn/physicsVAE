@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo:
+  memo: drop
   motion_file:
     assets/motions/reallusion_sword_shield/dataset_reallusion_sword_shield.yaml
 
@@ -15,7 +15,7 @@ network:
   separate: True
 
   space:
-    latent_dim: 32
+    latent_dim: 64
 
     continuous:
       mu_activation: None
@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointTask_skillAlgo_27-14-01-01_None/nn/keypointTask.pth
+  runs/keypointTask_skillAlgo_28-18-55-14_None/nn/keypointTask.pth
 
 
 hparam:
@@ -64,10 +64,6 @@ hparam:
 
   learning_rate: 2e-5
   lr_schedule: constant
-#  kl_threshold: 0.008
-
-#  bound_loss_type: regularisation
-#  bounds_loss_coef: 0.00001
   bound_loss_type: bound
   bounds_loss_coef: 10
   critic_coef: 5

@@ -1,7 +1,7 @@
 env:
   name: keypointTask
   num_envs: 4096
-  spacing: 1.5
+  spacing: 1
 
   humanoid_asset_filename:  # from the project root
     assets/urdf/amp_humanoid_sword_shield.xml
@@ -16,6 +16,7 @@ env:
 #  num_act: 28  # dof(#) - naive humanoid
   max_episode_steps: 1200
 
+  drop_on_reset_prob: 0.1
 
 sim:
   headless: True
