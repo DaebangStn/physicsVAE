@@ -3,9 +3,9 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: drop
+  memo: run_ase_as_amp
   motion_file:
-    assets/motions/dataset_humanoid.yaml
+    assets/motions/amp_humanoid_walk.npy
 
 model:
   name: skill
@@ -15,7 +15,7 @@ network:
   separate: True
 
   space:
-    latent_dim: 64
+    latent_dim: 0
 
     continuous:
       mu_activation: None
@@ -28,13 +28,13 @@ network:
       fixed_sigma: True
 
   mlp:
-    units: [1024, 1024, 512]
+    units: [1024, 512]
     activation: relu
     initializer:
       name: default
 
   disc:  # discriminator and encoder shares the network
-    units: [1024, 1024, 512]
+    units: [1024, 512]
     activation: relu
     initializer:
       name: default

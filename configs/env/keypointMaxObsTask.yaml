@@ -16,7 +16,7 @@ env:
   num_act: 28  # dof(#) - naive humanoid
   max_episode_steps: 1200
 
-  drop_on_reset_prob: 0.1
+  drop_on_reset_prob: 0.0
 
 sim:
   headless: True
