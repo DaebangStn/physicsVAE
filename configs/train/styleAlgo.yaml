@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo:
+  memo: try_naive_action
   motion_file: assets/motions/amp_humanoid_walk.npy
 
 model:
@@ -38,7 +38,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointTask.pth
+#  runs/keypointMaxObsTask_styleAlgo_01-13-57-11_try_reset_code/nn/last_keypointMaxObsTask_ep_200_rew_-58.959698.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 

@@ -69,6 +69,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
 
     full_experiment_name = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] + "_" +
                             datetime.now().strftime("%d-%H-%M-%S") + "_" + str(config_train["algo"].get("memo", "")))
+    config_env["env"]["joint_information"] = joint_info[asset_filename]  # TODO: remove this
 
     config_train["config"] = {}
 

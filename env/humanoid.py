@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 from isaacgym import gymtorch
 
 
@@ -9,6 +9,8 @@ from utils.env import *
 
 class HumanoidTask(VecTask):
     def __init__(self, **kwargs):
+        self._joint_info = kwargs["env"]["joint_information"]  # TODO: remove this
+
         self._env_spacing = None
         self._humanoid_asset = None
         self._humanoid_head_rBody_id = None
@@ -25,6 +27,7 @@ class HumanoidTask(VecTask):
 
         super().__init__(**kwargs)
 
+        self._dof_per_env = None
         self._build_tensors()
 
     def render(self):
@@ -49,11 +52,12 @@ class HumanoidTask(VecTask):
         self._buf["contact"] = gymtorch.wrap_tensor(contact_force_tensor)
 
         # Since there could be other actor in the environment, we need to truncate tensors to match the humanoid size
-        self._buf["dofInit"] = torch.zeros_like(self._buf["dof"])
         self._buf["actorInit"] = self._buf["actor"].clone()
 
-        dof_per_env = self._buf["dof"].shape[0] // self._num_envs
-        dof_state_tensor_reshaped = self._buf["dof"].view(self._num_envs, dof_per_env, 2)[:, :self._num_humanoid_dof]
+        self._dof_per_env = self._buf["dof"].shape[0] // self._num_envs
+        dof_state_tensor_reshaped = ((self._buf["dof"].view(self._num_envs, self._dof_per_env, 2))
+                                     [:, :self._num_humanoid_dof])
+        self._buf["dofInit"] = torch.zeros_like(dof_state_tensor_reshaped)  # Caution! shape (num_envs, num_humanoid_dof, 2)
         self._buf["dPos"] = dof_state_tensor_reshaped[..., 0]
         self._buf["dVel"] = dof_state_tensor_reshaped[..., 1]
 
@@ -105,16 +109,68 @@ class HumanoidTask(VecTask):
             self._gym.find_actor_rigid_body_index(self._envs[0], self._humanoids_id_env[0], "head", gymapi.DOMAIN_ENV))
 
         dof_prop = self._gym.get_actor_dof_properties(self._envs[0], self._humanoids_id_env[0])
-        self._action_ofs = to_torch(0.5 * (dof_prop['upper'] + dof_prop['lower']), device=self._compute_device)
-        self._action_scale = to_torch(0.5 * (dof_prop['upper'] - dof_prop['lower']), device=self._compute_device)
+
+        self.num_dof = self._gym.get_asset_dof_count(self._humanoid_asset)
+        self.dof_limits_lower = []
+        self.dof_limits_upper = []
+        self._dof_offsets = self._joint_info["dof_offsets"]
+        for j in range(self.num_dof):
+            if dof_prop['lower'][j] > dof_prop['upper'][j]:
+                self.dof_limits_lower.append(dof_prop['upper'][j])
+                self.dof_limits_upper.append(dof_prop['lower'][j])
+            else:
+                self.dof_limits_lower.append(dof_prop['lower'][j])
+                self.dof_limits_upper.append(dof_prop['upper'][j])
+        self.dof_limits_lower = to_torch(self.dof_limits_lower, device=self._compute_device)
+        self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self._compute_device)
+
+        lim_low = self.dof_limits_lower.cpu().numpy()
+        lim_high = self.dof_limits_upper.cpu().numpy()
+        num_joints = len(self._dof_offsets) - 1
+
+        for j in range(num_joints):
+            dof_offset = self._dof_offsets[j]
+            dof_size = self._dof_offsets[j + 1] - self._dof_offsets[j]
+
+            if (dof_size == 3):
+                curr_low = lim_low[dof_offset:(dof_offset + dof_size)]
+                curr_high = lim_high[dof_offset:(dof_offset + dof_size)]
+                curr_low = np.max(np.abs(curr_low))
+                curr_high = np.max(np.abs(curr_high))
+                curr_scale = max([curr_low, curr_high])
+                curr_scale = 1.2 * curr_scale
+                curr_scale = min([curr_scale, np.pi])
+
+                lim_low[dof_offset:(dof_offset + dof_size)] = -curr_scale
+                lim_high[dof_offset:(dof_offset + dof_size)] = curr_scale
+               # lim_low[dof_offset:(dof_offset + dof_size)] = -np.pi
+                # lim_high[dof_offset:(dof_offset + dof_size)] = np.pi
+
+
+            elif (dof_size == 1):
+                curr_low = lim_low[dof_offset]
+                curr_high = lim_high[dof_offset]
+                curr_mid = 0.5 * (curr_high + curr_low)
+
+                # extend the action range to be a bit beyond the joint limits so that the motors
+                # don't lose their strength as they approach the joint limits
+                curr_scale = 0.7 * (curr_high - curr_low)
+                curr_low = curr_mid - curr_scale
+                curr_high = curr_mid + curr_scale
+
+                lim_low[dof_offset] = curr_low
+                lim_high[dof_offset] = curr_high
+
+        self._action_ofs = to_torch(0.5 * (lim_high + lim_low), device=self._compute_device)
+        self._action_scale = to_torch(0.5 * (lim_high - lim_low), device=self._compute_device)
+
+    def _compute_aggregate_option(self) -> Tuple[int, int]:
+        return self._num_humanoid_rigid_body, self._gym.get_asset_rigid_shape_count(self._humanoid_asset)
 
     def _build_env(self, env, env_id):
         humanoid = self._gym.create_actor(env, self._humanoid_asset, drop_transform(0.89), "humanoid", env_id, 0, 0)
         self._humanoids_id_env.append(humanoid)
         self._humanoids_id_sim.append(self._gym.get_actor_index(env, humanoid, gymapi.DOMAIN_SIM))
-
-    def _compute_aggregate_option(self) -> Tuple[int, int]:
-        return self._num_humanoid_rigid_body, self._gym.get_asset_rigid_shape_count(self._humanoid_asset)
 
     def _compute_observations(self):
         #  dof and actor root state is used for observation
@@ -133,7 +189,7 @@ class HumanoidTask(VecTask):
 
     def _compute_reward(self):
         reset_reward = -100.0
-        actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
+        # actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
         self._buf["rew"] = torch.where(self._buf["terminate"],
                                        reset_reward,
                                        self._buf["elapsedStep"] * 0.01)
@@ -168,27 +224,34 @@ class HumanoidTask(VecTask):
         self._compute_reset()
         self._compute_reward()
 
-    def reset(self) -> Dict[str, torch.Tensor]:
-        env_ids = torch.nonzero(self._buf["reset"]).long()
+    def reset(self, env_ids: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
+        if env_ids is None:
+            env_ids = torch.nonzero(self._buf["reset"]).long()
 
         if len(env_ids) > 0:
-            # to prevent gc, this line is required
-            _id = self._humanoids_id_sim[env_ids]
-            id_gym = gymtorch.unwrap_tensor(_id)
-            # reset actors
-            self._gym.set_actor_root_state_tensor_indexed(
-                self._sim, gymtorch.unwrap_tensor(self._buf["actorInit"]), id_gym, len(env_ids))
-            self._gym.set_dof_state_tensor_indexed(
-                self._sim, gymtorch.unwrap_tensor(self._buf["dofInit"]), id_gym, len(env_ids))
-
+            self._assign_reset_state(env_ids)
+            self._apply_reset_state(env_ids)
             self._buf["reset"][env_ids] = False
             self._buf["elapsedStep"][env_ids] = 0
-            self._reset_surroundings(env_ids)
 
         self._refresh_tensors()
         self._compute_observations()
 
         return self._buf['obs']
+
+    def _assign_reset_state(self, env_ids: torch.Tensor):
+        self._buf["dof"].view(self.num, self._dof_per_env, 2)[env_ids] = self._buf["dofInit"][env_ids].clone()
+        self._buf["actor"][env_ids] = self._buf["actorInit"][env_ids].clone()
+
+    def _apply_reset_state(self, env_ids: torch.Tensor):
+        # to prevent gc, this line is required
+        _id = self._humanoids_id_sim[env_ids]
+        id_gym = gymtorch.unwrap_tensor(_id)
+        # reset actors
+        self._gym.set_actor_root_state_tensor_indexed(
+            self._sim, gymtorch.unwrap_tensor(self._buf["actor"]), id_gym, len(env_ids))
+        self._gym.set_dof_state_tensor_indexed(
+            self._sim, gymtorch.unwrap_tensor(self._buf["dof"]), id_gym, len(env_ids))
 
     def _reset_surroundings(self, env_ids: torch.Tensor):
         pass
