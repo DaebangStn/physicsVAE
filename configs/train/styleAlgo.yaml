@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: try_naive_action
+  memo: fixed_swap_error_not_swapped
   motion_file: assets/motions/amp_humanoid_walk.npy
 
 model:
@@ -38,7 +38,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_styleAlgo_01-13-57-11_try_reset_code/nn/last_keypointMaxObsTask_ep_200_rew_-58.959698.pth
+  runs/keypointMaxObsTask_styleAlgo_02-07-50-56_fixed_swap_error_not_swapped/nn/keypointMaxObsTask.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 
@@ -63,10 +63,6 @@ hparam:
 
   learning_rate: 2e-5
   lr_schedule: constant
-#  kl_threshold: 0.008
-
-#  bound_loss_type: regularisation
-#  bounds_loss_coef: 0.00001
   bound_loss_type: bound
   bounds_loss_coef: 10
   critic_coef: 5

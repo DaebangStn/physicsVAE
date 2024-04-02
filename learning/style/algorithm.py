@@ -1,5 +1,5 @@
 import torch
-from rl_games.algos_torch.running_mean_std import RunningMeanStd
+from rl_games.common.a2c_common import swap_and_flatten01
 
 from learning.core.algorithm import CoreAlgorithm
 from utils.angle import *
@@ -15,6 +15,8 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_logit_reg_scale = None
         self._disc_reg_scale = None
         self._disc_grad_penalty_scale = None
+        self._disc_obs_size = None
+
         # reward related
         self._task_rew_scale = None
         self._disc_rew_scale = None
@@ -28,8 +30,6 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_store_prob = None
 
         # placeholders for the current episode
-        self._rollout_obs = None
-        self._rollout_obses = None
         self._mean_task_reward = None
         self._mean_style_reward = None
         self._std_task_reward = None
@@ -138,6 +138,16 @@ class StyleAlgorithm(CoreAlgorithm):
             reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
         return reward.view(self.horizon_length, self.num_actors, -1)
 
+    def init_tensors(self):
+        super().init_tensors()
+        config_hparam = self.config
+        self._disc_obs_size = config_hparam['style']['disc']['num_obs'] * self._disc_obs_traj_len
+
+        # append experience buffer
+        batch_shape = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['rollout_obs'] = torch.empty(batch_shape + (self._disc_obs_size,),
+                                                                        device=self.device)
+
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
 
@@ -175,13 +185,8 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_store_prob = config_buffer['store_prob']
 
-    def _pre_rollout(self):
-        self._rollout_obses = []
-
     def _post_rollout1(self):
-        self._rollout_obs = torch.cat(self._rollout_obses, dim=0)
-
-        style_reward = self._disc_reward(self._rollout_obs)
+        style_reward = self._disc_reward(self.experience_buffer.tensor_dict['rollout_obs'])
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = self._task_rew_scale * task_reward + self._disc_rew_scale * style_reward
         self.experience_buffer.tensor_dict['rewards'] = combined_reward
@@ -192,15 +197,17 @@ class StyleAlgorithm(CoreAlgorithm):
         self._std_style_reward = style_reward.std()
 
     def _post_rollout2(self, batch_dict):
-        batch_dict['rollout_obs'] = self._rollout_obs
+        # Since demo_obs and replay_obs has a order with (order, env)
+        # Rollout_obs is not applied swap_and_flatten01
+        batch_dict['rollout_obs'] = self.experience_buffer.tensor_dict['rollout_obs'].view(-1, self._disc_obs_size)
         return batch_dict
 
-    def _pre_step(self):
+    def _pre_step(self, n: int):
         self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
 
-    def _post_step(self):
+    def _post_step(self, n: int):
         self._disc_obs_buf.push(self.obs['disc_obs'])
-        self._rollout_obses.append(self._disc_obs_buf.history)
+        self.experience_buffer.update_data('rollout_obs', n, self._disc_obs_buf.history)
 
     def _unpack_input(self, input_dict):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,

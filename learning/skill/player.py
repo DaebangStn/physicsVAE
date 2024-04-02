@@ -1,7 +1,7 @@
 import torch
 
 from learning.style.player import StylePlayer
-from learning.skill.algorithm import SkillAlgorithm
+from learning.skill.algorithm import SkillAlgorithm, sample_latent
 from utils.env import sample_color
 
 
@@ -40,7 +40,7 @@ class SkillPlayer(StylePlayer):
 
         config_network = kwargs['params']['network']
         self._latent_dim = config_network['space']['latent_dim']
-        self._z = SkillAlgorithm.sample_latent(self.env.num, self._latent_dim, self.device)
+        self._z = sample_latent(self.env.num, self._latent_dim, self.device)
 
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
 
@@ -67,5 +67,5 @@ class SkillPlayer(StylePlayer):
         self._remain_latent_steps[update_env] = torch.randint(self._latent_update_freq_min,
                                                               self._latent_update_freq_max, (len(update_env),),
                                                               dtype=self._remain_latent_steps.dtype)
-        self._z[update_env] = SkillAlgorithm.sample_latent(len(update_env), self._latent_dim, self.device)
+        self._z[update_env] = sample_latent(len(update_env), self._latent_dim, self.device)
         self.env.change_color(update_env, sample_color(self._color_projector, self._z[update_env]))

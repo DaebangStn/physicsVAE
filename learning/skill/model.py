@@ -22,8 +22,23 @@ class SkillModel(StyleModel):
 
         def actor(self, obs):
             obs = self.norm_obs(obs)
-            mu, logstd, _, _ = self.a2c_network({'obs': obs})
+            # TODO, since network is separated, action and value could evaluate separately
+            with torch.no_grad():
+                mu, logstd, _, _ = self.a2c_network({
+                    'obs': obs,
+                    'is_train': False
+                })
             return mu, torch.exp(logstd)
+
+        def critic(self, obs):
+            obs = self.norm_obs(obs)
+            # TODO, since network is separated, action and value could evaluate separately
+            with torch.no_grad():
+                _, _, value, _ = self.a2c_network({
+                    'obs': obs,
+                    'is_train': False
+                })
+            return value
 
         def enc(self, obs):
             return self.a2c_network.enc(obs)

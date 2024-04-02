@@ -114,11 +114,11 @@ class CoreAlgorithm(A2CAgent):
             for k in self.update_list:
                 self.experience_buffer.update_data(k, n, res_dict[k])
 
-            self._pre_step()
+            self._pre_step(n)
             step_time_start = time.time()
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
             step_time_end = time.time()
-            self._post_step()
+            self._post_step(n)
 
             step_time += (step_time_end - step_time_start)
 
@@ -257,8 +257,8 @@ class CoreAlgorithm(A2CAgent):
     def _post_rollout2(self, batch_dict):
         return batch_dict
 
-    def _pre_step(self):
+    def _pre_step(self, n: int):
         pass
 
-    def _post_step(self):
+    def _post_step(self, n: int):
         pass

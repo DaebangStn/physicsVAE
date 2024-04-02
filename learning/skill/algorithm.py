@@ -1,3 +1,7 @@
+import time
+import torch
+from rl_games.common.a2c_common import swap_and_flatten01
+
 from learning.style.algorithm import StyleAlgorithm
 from utils.angle import *
 from utils.env import sample_color
@@ -26,6 +30,22 @@ class SkillAlgorithm(StyleAlgorithm):
 
         super().__init__(**kwargs)
 
+    def discount_values(self, fdones, last_extrinsic_values, mb_fdones, mb_extrinsic_values, mb_rewards):
+        mb_next_values = self.experience_buffer.tensor_dict['next_values']
+        lastgaelam = 0
+        mb_advs = torch.zeros_like(mb_rewards)
+
+        for t in reversed(range(self.horizon_length)):
+            if t == self.horizon_length - 1:
+                nextnonterminal = 1.0 - fdones
+            else:
+                nextnonterminal = 1.0 - mb_fdones[t+1]
+            nextnonterminal = nextnonterminal.unsqueeze(1)
+
+            delta = mb_rewards[t] + self.gamma * nextnonterminal * mb_next_values[t] - mb_extrinsic_values[t]
+            mb_advs[t] = lastgaelam = delta + self.gamma * self.tau * nextnonterminal * lastgaelam
+        return mb_advs
+
     """ keypointTask returns the Tuple of tensors so that we should post-process the observation.
     env_step and env_reset are overridden to post-process the observation.
     """
@@ -39,6 +59,14 @@ class SkillAlgorithm(StyleAlgorithm):
         obs = super().env_reset()
         obs['obs'] = torch.cat([obs['obs'], self._z], dim=1)
         return obs
+
+    def init_tensors(self):
+        super().init_tensors()
+        batch_size = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['rollout_z'] = torch.empty(batch_size + (self._latent_dim,),
+                                                                      device=self.device)
+        self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size, ),
+                                                                        device=self.device)
 
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
@@ -55,7 +83,7 @@ class SkillAlgorithm(StyleAlgorithm):
     def _diversity_loss(self, obs, mu):
         rollout_z = obs[:, -self._latent_dim:]
         obs = obs[:, :-self._latent_dim]
-        sampled_z = self.sample_latent(obs.shape[0], self._latent_dim, self.device)
+        sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
         sampled_mu, sampled_sigma = self.model.actor(torch.cat([obs, sampled_z], dim=1))
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
@@ -117,20 +145,16 @@ class SkillAlgorithm(StyleAlgorithm):
 
         config_network = kwargs['params']['network']
         self._latent_dim = config_network['space']['latent_dim']
-        self._z = self.sample_latent(self.vec_env.num, self._latent_dim, self.device)
-
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
 
-    def _pre_rollout(self):
-        super()._pre_rollout()
-        self._rollout_zes = []
+        self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
     def _post_rollout1(self):
-        self._rollout_obs = torch.cat(self._rollout_obses, dim=0)
-        self._rollout_z = torch.cat(self._rollout_zes, dim=0)
+        rollout_obs = self.experience_buffer.tensor_dict['rollout_obs']
+        self._rollout_z = self.experience_buffer.tensor_dict['rollout_z']
 
-        # skill_reward = self._enc_reward(self._rollout_obs, self._rollout_z)
-        style_reward = self._disc_reward(self._rollout_obs)
+        skill_reward = self._enc_reward(rollout_obs, self._rollout_z)
+        style_reward = self._disc_reward(rollout_obs)
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = (self._task_rew_scale * task_reward +
                            self._disc_rew_scale * style_reward) # +
@@ -146,12 +170,13 @@ class SkillAlgorithm(StyleAlgorithm):
 
     def _post_rollout2(self, batch_dict):
         batch_dict = super()._post_rollout2(batch_dict)
-        batch_dict['rollout_z'] = self._rollout_z
+        batch_dict['rollout_z'] = self._rollout_z.view(-1, self._latent_dim)
         return batch_dict
 
-    def _post_step(self):
-        super()._post_step()
-        self._rollout_zes.append(self._z)
+    def _post_step(self, n):
+        super()._post_step(n)
+        self.experience_buffer.update_data('rollout_z', n, self._z)
+        self.experience_buffer.update_data('next_values', n, self.get_values(self.obs))
         self._remain_latent_steps -= 1
 
     def _unpack_input(self, input_dict):
@@ -171,11 +196,12 @@ class SkillAlgorithm(StyleAlgorithm):
         self._remain_latent_steps[update_env] = torch.randint(self._latent_update_freq_min,
                                                               self._latent_update_freq_max, (len(update_env),),
                                                               dtype=self._remain_latent_steps.dtype)
-        self._z[update_env] = SkillAlgorithm.sample_latent(len(update_env), self._latent_dim, self.device)
+        self._z[update_env] = sample_latent(len(update_env), self._latent_dim, self.device)
         self.vec_env.change_color(update_env, sample_color(self._color_projector, self._z[update_env]))
 
-    @staticmethod
-    def sample_latent(batch_size, latent_dim, device):
-        z = torch.normal(mean=0.0, std=1.0, size=(batch_size, latent_dim), device=device)
-        z = torch.nn.functional.normalize(z, dim=1)
-        return z
+
+@torch.jit.script
+def sample_latent(batch_size: int, latent_dim: int, device: torch.device) -> torch.Tensor:
+    z = torch.normal(mean=0.0, std=1.0, size=(batch_size, latent_dim), device=device)
+    z = torch.nn.functional.normalize(z, dim=1)
+    return z

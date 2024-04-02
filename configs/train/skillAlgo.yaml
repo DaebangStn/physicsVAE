@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: run_ase_as_amp
+  memo: skill_walk_only_no_enc
   motion_file:
     assets/motions/amp_humanoid_walk.npy
 
@@ -15,7 +15,7 @@ network:
   separate: True
 
   space:
-    latent_dim: 0
+    latent_dim: 1
 
     continuous:
       mu_activation: None
@@ -41,8 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointTask_skillAlgo_28-11-53-00_2G_obs140/nn/keypointTask2.pth
-
+#  runs/keypointMaxObsTask_skillAlgo_02-12-34-58_skill_walk_only/nn/keypointMaxObsTask.pth
 
 hparam:
   normalize_input: True
@@ -72,7 +71,7 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 2.0
+    enc_scale: 0.0
 
   style:
     replay_buf:
@@ -88,9 +87,9 @@ hparam:
       grad_penalty_scale: 5
 
   skill:
-    div_loss_coef: 0.01
+    div_loss_coef: 0.00
     enc:
-      loss_coef: 5
+      loss_coef: 0
 
     latent:
       update_freq_max: 150
