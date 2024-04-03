@@ -161,6 +161,8 @@ class HumanoidTask(VecTask):
                 lim_low[dof_offset] = curr_low
                 lim_high[dof_offset] = curr_high
 
+        lim_low = self.dof_limits_lower.cpu().numpy()
+        lim_high = self.dof_limits_upper.cpu().numpy()
         self._action_ofs = to_torch(0.5 * (lim_high + lim_low), device=self._compute_device)
         self._action_scale = to_torch(0.5 * (lim_high - lim_low), device=self._compute_device)
 

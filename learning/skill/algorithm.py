@@ -75,10 +75,10 @@ class SkillAlgorithm(StyleAlgorithm):
 
     def _additional_loss(self, batch_dict, res_dict):
         loss = super()._additional_loss(batch_dict, res_dict)
-        # e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
-        # div_loss = self._diversity_loss(batch_dict['obs'], res_dict['mus'])
-        # return loss + e_loss * self._enc_loss_coef + div_loss * self._div_loss_coef
-        return loss
+        e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
+        div_loss = self._diversity_loss(batch_dict['obs'], res_dict['mus'])
+        return loss + e_loss * self._enc_loss_coef + div_loss * self._div_loss_coef
+        # return loss
 
     def _diversity_loss(self, obs, mu):
         rollout_z = obs[:, -self._latent_dim:]
@@ -157,16 +157,16 @@ class SkillAlgorithm(StyleAlgorithm):
         style_reward = self._disc_reward(rollout_obs)
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = (self._task_rew_scale * task_reward +
-                           self._disc_rew_scale * style_reward) # +
-                           # self._enc_rew_scale * skill_reward)
+                           self._disc_rew_scale * style_reward +
+                           self._enc_rew_scale * skill_reward)
         self.experience_buffer.tensor_dict['rewards'] = combined_reward
 
         self._mean_task_reward = task_reward.mean()
         self._mean_style_reward = style_reward.mean()
-        # self._mean_enc_reward = skill_reward.mean()
+        self._mean_enc_reward = skill_reward.mean()
         self._std_task_reward = task_reward.std()
         self._std_style_reward = style_reward.std()
-        # self._std_enc_reward = skill_reward.std()
+        self._std_enc_reward = skill_reward.std()
 
     def _post_rollout2(self, batch_dict):
         batch_dict = super()._post_rollout2(batch_dict)
