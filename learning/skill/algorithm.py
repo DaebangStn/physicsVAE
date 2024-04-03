@@ -2,7 +2,7 @@ from typing import Optional
 
 import torch
 
-from learning.style.algorithm import StyleAlgorithm
+from learning.style.algorithm import StyleAlgorithm, disc_reward
 from utils.angle import *
 from utils.env import sample_color
 
@@ -82,7 +82,7 @@ class SkillAlgorithm(StyleAlgorithm):
     def _diversity_loss(self, obs, mu):
         rollout_z = obs[:, -self._latent_dim:]
         obs = obs[:, :-self._latent_dim]
-        sampled_z = self.sample_latent(obs.shape[0], self._latent_dim, self.device)
+        sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
         sampled_mu, sampled_sigma = self.model.actor(torch.cat([obs, sampled_z], dim=1))
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
@@ -153,7 +153,7 @@ class SkillAlgorithm(StyleAlgorithm):
         self._rollout_z = self.experience_buffer.tensor_dict['rollout_z']
 
         skill_reward = self._enc_reward(rollout_obs, self._rollout_z)
-        style_reward = self._disc_reward(rollout_obs)
+        style_reward = disc_reward(self.model, rollout_obs, self.normalize_input, self.device)
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = (self._task_rew_scale * task_reward +
                            self._disc_rew_scale * style_reward +

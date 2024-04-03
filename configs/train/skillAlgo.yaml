@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: skill_walk_only_no_enc
+  memo: walk
   motion_file:
     assets/motions/dataset_humanoid.yaml
 
@@ -28,20 +28,20 @@ network:
       fixed_sigma: True
 
   mlp:
-    units: [1024, 512]
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
 
   disc:  # discriminator and encoder shares the network
-    units: [1024, 512]
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_skillAlgo_29-23-25-13_div_a1_paper/nn/keypointMaxObsTask.pth
+#  runs/keypointMaxObsTask_skillAlgo_29-23-25-13_div_a1_paper/nn/keypointMaxObsTask.pth
 
 
 hparam:
@@ -59,7 +59,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 16384
+  minibatch_size: 32768
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -72,12 +72,12 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 2.0
+    enc_scale: 0.2
 
   style:
     replay_buf:
       size: 200000
-      store_prob: 0.01
+      store_prob: 0.001
 
     disc:
       num_obs: 125
