@@ -1,5 +1,4 @@
 import torch
-from rl_games.common.a2c_common import swap_and_flatten01
 
 from learning.core.algorithm import CoreAlgorithm
 from utils.angle import *

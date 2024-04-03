@@ -1,3 +1,5 @@
+import h5py
+import numpy as np
 import torch
 from rl_games.algos_torch import torch_ext
 
@@ -14,10 +16,14 @@ class StylePlayer(CorePlayer):
         self._disc_obs_buf = None
         self._disc_obs_traj_len = None
 
+        self._log_file = None
+
         self._checkpoint_disc = None
         super().__init__(**kwargs)
 
     def env_step(self, env, actions):
+        if self._log_file is not None:
+            self._log_action(actions)
         obs, rew, done, info = super().env_step(env, actions)
         obs, disc_obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
@@ -48,6 +54,22 @@ class StylePlayer(CorePlayer):
         style_conf = kwargs['params']['hparam']['style']
         self._disc_obs_traj_len = style_conf['disc']['obs_traj_len']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+        collect_action = self.config.get('collect_action', None)
+
+        if collect_action is not None:
+            collect_filename = collect_action.get('filename')
+            full_experiment_name = kwargs['params']['config']['full_experiment_name']
+            self._log_file = h5py.File(collect_filename, 'a')
+
+            if full_experiment_name in self._log_file:
+                self._log_file = self._log_file[full_experiment_name]
+            else:
+                self._log_file = self._log_file.create_dataset(
+                    full_experiment_name, shape=(0, self.actions_num), maxshape=(None, self.actions_num),
+                    data=np.array([]), dtype='f4', chunks=True)
+
+            print("==> Action log file: {:s}".format(collect_filename) +
+                  " with index {:s}".format(full_experiment_name))
 
     def _disc_debug(self, disc_obs):
         with torch.no_grad():
@@ -63,6 +85,12 @@ class StylePlayer(CorePlayer):
         if self._games_played == 0:
             self._writer.add_scalar("player/rollout_disc", disc, self._n_step)
             self._writer.add_scalar("player/reward_disc", reward, self._n_step)
+
+    def _log_action(self, action):
+        action = action.cpu().numpy()
+        new_size = self._log_file.shape[0] + action.shape[0]
+        self._log_file.resize(new_size, axis=0)
+        self._log_file[-action.shape[0]:] = action
 
     def _pre_step(self):
         self._disc_obs_buf.push_on_reset(self.obses['disc_obs'], self.dones)

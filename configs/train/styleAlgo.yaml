@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: fixed_swap_error_not_swapped
+  memo: scaled2
   motion_file: assets/motions/amp_humanoid_walk.npy
 
 model:
@@ -38,7 +38,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_styleAlgo_02-07-50-56_fixed_swap_error_not_swapped/nn/keypointMaxObsTask.pth
+#  runs/keypointMaxObsTask_styleAlgo_03-14-17-22_scaled/nn/keypointMaxObsTask.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 
@@ -50,6 +50,8 @@ hparam:
   clip_value: False
   reward_shaper: {}
   save_frequency: 200
+  collect_action:
+    filename: action_collection.hdf5
 
   # learning hyperparameters
   horizon_length: 32
