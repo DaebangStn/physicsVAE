@@ -7,7 +7,7 @@ def build_runner():
     from rl_games.common.algo_observer import IsaacAlgoObserver
 
     from env.simpleTask import SimpleTask
-    from env.rlTask import RlTask
+    from env.humanoid import HumanoidTask
     from env.balanceTask import BalanceTask
     from env.keypointTask import KeypointTask
     from env.noPhyTask import NoPhyTask
@@ -29,7 +29,7 @@ def build_runner():
     from utils.rl_games import register_env_rl_games, register_algo_n_player, register_net_n_model
 
     register_env_rl_games('simpleTask', SimpleTask)
-    register_env_rl_games('rlTask', RlTask)
+    register_env_rl_games('rlTask', HumanoidTask)
     register_env_rl_games('balanceTask', BalanceTask)
     register_env_rl_games('keypointTask', KeypointTask)
     register_env_rl_games('noPhyTask', NoPhyTask)

@@ -2,7 +2,7 @@ import torch
 from isaacgym import gymapi, gymtorch
 from isaacgym.torch_utils import quat_from_euler_xyz
 
-from env.rlTask import RlTask
+from env.humanoid import HumanoidTask as RlTask
 
 
 class NoPhyTask(RlTask):

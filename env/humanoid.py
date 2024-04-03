@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional, Tuple
 from isaacgym import gymtorch
 
 
@@ -7,12 +7,12 @@ from utils import PROJECT_ROOT
 from utils.env import *
 
 
-class RlTask(VecTask):
+class HumanoidTask(VecTask):
     def __init__(self, **kwargs):
         self._joint_info = kwargs["env"]["joint_information"]  # TODO: remove this
 
         self._env_spacing = None
-        self._humanoid_asset_filename = None
+        self._humanoid_asset = None
         self._humanoid_head_rBody_id = None
         self._action_ofs = None
         self._action_scale = None
@@ -20,10 +20,14 @@ class RlTask(VecTask):
         self._num_sensors = None
 
         self._envs = []
-        self._humanoids = []
+        self._humanoids_id_env = []
+        self._humanoids_id_sim = []
+        self._num_humanoid_dof = None
+        self._num_humanoid_rigid_body = None
 
         super().__init__(**kwargs)
 
+        self._dof_per_env = None
         self._build_tensors()
 
     def render(self):
@@ -47,26 +51,30 @@ class RlTask(VecTask):
             self._buf["sensor"] = gymtorch.wrap_tensor(sensor_tensor).view(self._num_envs, 6 * self._num_sensors)
         self._buf["contact"] = gymtorch.wrap_tensor(contact_force_tensor)
 
-        self._buf["dofInit"] = torch.zeros_like(self._buf["dof"])
+        # Since there could be other actor in the environment, we need to truncate tensors to match the humanoid size
         self._buf["actorInit"] = self._buf["actor"].clone()
 
-        dof_per_env = self._buf["dof"].shape[0] // self._num_envs
-        dof_state_tensor_reshaped = self._buf["dof"].view(self._num_envs, dof_per_env, 2)
+        self._dof_per_env = self._buf["dof"].shape[0] // self._num_envs
+        dof_state_tensor_reshaped = ((self._buf["dof"].view(self._num_envs, self._dof_per_env, 2))
+                                     [:, :self._num_humanoid_dof])
+        self._buf["dofInit"] = torch.zeros_like(dof_state_tensor_reshaped)  # Caution! shape (num_envs, num_humanoid_dof, 2)
         self._buf["dPos"] = dof_state_tensor_reshaped[..., 0]
         self._buf["dVel"] = dof_state_tensor_reshaped[..., 1]
 
         bodies_per_env = self._buf["rBody"].shape[0] // self._num_envs
-        rigid_body_state_reshaped = self._buf["rBody"].view(self._num_envs, bodies_per_env, 13)
-
+        rigid_body_state_reshaped = (self._buf["rBody"].view(self._num_envs, bodies_per_env, 13)
+                                     [:, :self._num_humanoid_rigid_body])
         self._buf["rPos"] = rigid_body_state_reshaped[..., 0:3]
         self._buf["rRot"] = rigid_body_state_reshaped[..., 3:7]
         self._buf["rVel"] = rigid_body_state_reshaped[..., 7:10]
         self._buf["rAnVel"] = rigid_body_state_reshaped[..., 10:13]
 
-        self._buf["aPos"] = self._buf["actor"][..., 0:3]
-        self._buf["aRot"] = self._buf["actor"][..., 3:7]
-        self._buf["aVel"] = self._buf["actor"][..., 7:10]
-        self._buf["aAnVel"] = self._buf["actor"][..., 10:13]
+        actors_per_env = self._buf["actor"].shape[0] // self._num_envs
+        actor_root_reshaped = self._buf["actor"].view(self._num_envs, actors_per_env, 13)[:, 0]
+        self._buf["aPos"] = actor_root_reshaped[..., 0:3]
+        self._buf["aRot"] = actor_root_reshaped[..., 3:7]
+        self._buf["aVel"] = actor_root_reshaped[..., 7:10]
+        self._buf["aAnVel"] = actor_root_reshaped[..., 10:13]
 
         self._buf["elapsedStep"] = torch.zeros(self._num_envs, dtype=torch.int16, device=self._compute_device)
         # stands for reset by constraints (height, foot contact off...)
@@ -80,15 +88,11 @@ class RlTask(VecTask):
         :return:
             None
         """
-        humanoid_asset = self._gym.load_asset(self._sim, PROJECT_ROOT, self._humanoid_asset_filename,
-                                              humanoid_asset_option())
-
-        num_rigid_body = self._gym.get_asset_rigid_body_count(humanoid_asset)
-        num_shape = self._gym.get_asset_rigid_shape_count(humanoid_asset)
-        self_collision = False
+        num_rigid_body, num_shape = self._compute_aggregate_option()
+        self_collision = True
 
         sensor_install_sight = ["right_foot", "left_foot"]
-        create_sensors(self._gym, humanoid_asset, sensor_install_sight)
+        create_sensors(self._gym, self._humanoid_asset, sensor_install_sight)
         self._num_sensors = len(sensor_install_sight)
 
         for i in range(self._num_envs):
@@ -96,18 +100,17 @@ class RlTask(VecTask):
             self._envs.append(env)
 
             self._gym.begin_aggregate(env, num_rigid_body, num_shape, self_collision)
-            humanoid = self._gym.create_actor(env, humanoid_asset, drop_transform(0.89), "humanoid", i, 0, 0)
-            self._humanoids.append(humanoid)
+            self._build_env(env, i)
             self._gym.end_aggregate(env)
 
+        self._humanoids_id_env = torch.tensor(self._humanoids_id_env, device=self._compute_device, dtype=torch.int32)
+        self._humanoids_id_sim = torch.tensor(self._humanoids_id_sim, device=self._compute_device, dtype=torch.int32)
         self._humanoid_head_rBody_id = (
-            self._gym.find_actor_rigid_body_index(self._envs[0], self._humanoids[0], "head", gymapi.DOMAIN_ENV))
+            self._gym.find_actor_rigid_body_index(self._envs[0], self._humanoids_id_env[0], "head", gymapi.DOMAIN_ENV))
 
-        dof_prop = self._gym.get_actor_dof_properties(self._envs[0], self._humanoids[0])
-        # self._action_ofs = to_torch(0.5 * (dof_prop['upper'] + dof_prop['lower']), device=self._compute_device)
-        # self._action_scale = to_torch(0.5 * (dof_prop['upper'] - dof_prop['lower']), device=self._compute_device)
+        dof_prop = self._gym.get_actor_dof_properties(self._envs[0], self._humanoids_id_env[0])
 
-        self.num_dof = self._gym.get_asset_dof_count(humanoid_asset)
+        self.num_dof = self._gym.get_asset_dof_count(self._humanoid_asset)
         self.dof_limits_lower = []
         self.dof_limits_upper = []
         self._dof_offsets = self._joint_info["dof_offsets"]
@@ -140,8 +143,7 @@ class RlTask(VecTask):
 
                 lim_low[dof_offset:(dof_offset + dof_size)] = -curr_scale
                 lim_high[dof_offset:(dof_offset + dof_size)] = curr_scale
-
-                # lim_low[dof_offset:(dof_offset + dof_size)] = -np.pi
+               # lim_low[dof_offset:(dof_offset + dof_size)] = -np.pi
                 # lim_high[dof_offset:(dof_offset + dof_size)] = np.pi
 
 
@@ -162,6 +164,14 @@ class RlTask(VecTask):
         self._action_ofs = to_torch(0.5 * (lim_high + lim_low), device=self._compute_device)
         self._action_scale = to_torch(0.5 * (lim_high - lim_low), device=self._compute_device)
 
+    def _compute_aggregate_option(self) -> Tuple[int, int]:
+        return self._num_humanoid_rigid_body, self._gym.get_asset_rigid_shape_count(self._humanoid_asset)
+
+    def _build_env(self, env, env_id):
+        humanoid = self._gym.create_actor(env, self._humanoid_asset, drop_transform(0.89), "humanoid", env_id, 0, 0)
+        self._humanoids_id_env.append(humanoid)
+        self._humanoids_id_sim.append(self._gym.get_actor_index(env, humanoid, gymapi.DOMAIN_SIM))
+
     def _compute_observations(self):
         #  dof and actor root state is used for observation
         self._buf["obs"] = torch.cat([self._buf["dPos"], self._buf["dVel"], self._buf["actor"]], dim=-1)
@@ -179,7 +189,7 @@ class RlTask(VecTask):
 
     def _compute_reward(self):
         reset_reward = -100.0
-        actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
+        # actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
         self._buf["rew"] = torch.where(self._buf["terminate"],
                                        reset_reward,
                                        self._buf["elapsedStep"] * 0.01)
@@ -188,8 +198,11 @@ class RlTask(VecTask):
         env_cfg = super()._parse_env_param(**kwargs)
 
         self._env_spacing = env_cfg['spacing']
-        self._humanoid_asset_filename = env_cfg['humanoid_asset_filename']
         self._max_episode_steps = env_cfg['max_episode_steps']
+        self._humanoid_asset = self._gym.load_asset(self._sim, PROJECT_ROOT, env_cfg['humanoid_asset_filename'],
+                                                    humanoid_asset_option())
+        self._num_humanoid_rigid_body = self._gym.get_asset_rigid_body_count(self._humanoid_asset)
+        self._num_humanoid_dof = self._gym.get_asset_dof_count(self._humanoid_asset)
 
         return env_cfg
 
@@ -211,23 +224,13 @@ class RlTask(VecTask):
         self._compute_reset()
         self._compute_reward()
 
-    def reset(self) -> Dict[str, torch.Tensor]:
-        """Reset environments having the provided indices. If env_ids is None, then reset all environments.
-
-        :return:
-            Observation dictionary
-        """
-
-        env_ids = torch.nonzero(self._buf["reset"])
+    def reset(self, env_ids: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
+        if env_ids is None:
+            env_ids = torch.nonzero(self._buf["reset"]).long()
 
         if len(env_ids) > 0:
-            indices_gym = gymtorch.unwrap_tensor(env_ids.to(torch.int32))  # to prevent gc, this line is required
-            # reset actors
-            self._gym.set_actor_root_state_tensor_indexed(
-                self._sim, gymtorch.unwrap_tensor(self._buf["actorInit"]), indices_gym, len(env_ids))
-            self._gym.set_dof_state_tensor_indexed(
-                self._sim, gymtorch.unwrap_tensor(self._buf["dofInit"]), indices_gym, len(env_ids))
-
+            self._assign_reset_state(env_ids)
+            self._apply_reset_state(env_ids)
             self._buf["reset"][env_ids] = False
             self._buf["elapsedStep"][env_ids] = 0
 
@@ -235,3 +238,20 @@ class RlTask(VecTask):
         self._compute_observations()
 
         return self._buf['obs']
+
+    def _assign_reset_state(self, env_ids: torch.Tensor):
+        self._buf["dof"].view(self.num, self._dof_per_env, 2)[env_ids] = self._buf["dofInit"][env_ids].clone()
+        self._buf["actor"][env_ids] = self._buf["actorInit"][env_ids].clone()
+
+    def _apply_reset_state(self, env_ids: torch.Tensor):
+        # to prevent gc, this line is required
+        _id = self._humanoids_id_sim[env_ids]
+        id_gym = gymtorch.unwrap_tensor(_id)
+        # reset actors
+        self._gym.set_actor_root_state_tensor_indexed(
+            self._sim, gymtorch.unwrap_tensor(self._buf["actor"]), id_gym, len(env_ids))
+        self._gym.set_dof_state_tensor_indexed(
+            self._sim, gymtorch.unwrap_tensor(self._buf["dof"]), id_gym, len(env_ids))
+
+    def _reset_surroundings(self, env_ids: torch.Tensor):
+        pass
