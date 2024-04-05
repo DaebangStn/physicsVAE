@@ -2,7 +2,7 @@ test: False
 
 algo:
   name: styleAlgo
-  memo: debug_coef
+  memo: baseline
   style:
     motion_file: assets/motions/amp_humanoid_walk.npy
     joint_information_path: assets/urdf/joint_information.yaml
@@ -39,7 +39,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
+#  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 
@@ -64,10 +64,6 @@ hparam:
 
   learning_rate: 2e-5
   lr_schedule: constant
-#  kl_threshold: 0.008
-
-#  bound_loss_type: regularisation
-#  bounds_loss_coef: 0.00001
   bound_loss_type: bound
   bounds_loss_coef: 10
   critic_coef: 5
@@ -82,7 +78,6 @@ hparam:
       store_prob: 0.01
 
     disc:
-#      num_obs: 97  # noPhy
       num_obs: 125
       obs_traj_len: 4
       loss_coef: 5

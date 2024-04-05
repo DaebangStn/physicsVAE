@@ -243,7 +243,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_buffer['demo'].store(demo_obs)
 
         rollout_buf = self._replay_buffer['rollout']
-        if rollout_buf.count < rollout_buf.size:
+        if rollout_buf.count == rollout_buf.size:
             mask = torch.rand(rollout_obs.shape[0]) < self._replay_store_prob
             rollout_obs = rollout_obs[mask]
 
