@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: scaled
+  memo:
   motion_file: assets/motions/amp_humanoid_walk.npy
 
 model:
@@ -50,8 +50,8 @@ hparam:
   clip_value: False
   reward_shaper: {}
   save_frequency: 200
-  collect_action:
-    filename: action_collection.hdf5
+#  collect_action:
+#    filename: action_collection.hdf5
 
   # learning hyperparameters
   horizon_length: 32

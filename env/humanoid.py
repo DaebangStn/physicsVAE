@@ -9,8 +9,7 @@ from utils.env import *
 
 class HumanoidTask(VecTask):
     def __init__(self, **kwargs):
-        self._joint_info = kwargs["env"]["joint_information"]  # TODO: remove this
-
+        self._joint_info = None
         self._env_spacing = None
         self._humanoid_asset = None
         self._humanoid_head_rBody_id = None
@@ -18,6 +17,7 @@ class HumanoidTask(VecTask):
         self._action_scale = None
         self._max_episode_steps = None
         self._num_sensors = None
+        self._recovery_limit = None
 
         self._envs = []
         self._humanoids_id_env = []
@@ -77,8 +77,9 @@ class HumanoidTask(VecTask):
         self._buf["aAnVel"] = actor_root_reshaped[..., 10:13]
 
         self._buf["elapsedStep"] = torch.zeros(self._num_envs, dtype=torch.int16, device=self._compute_device)
+        self._buf["recoveryCounter"] = torch.zeros(self._num_envs, dtype=torch.int16, device=self._compute_device)
         # stands for reset by constraints (height, foot contact off...)
-        self._buf["terminated"] = torch.zeros(self._num_envs, dtype=torch.bool, device=self._compute_device)
+        self._buf["terminate"] = torch.zeros(self._num_envs, dtype=torch.bool, device=self._compute_device)
 
     def _create_envs(self):
         """VecTask didn't create any environments (just created ground in _parse_sim_param)
@@ -89,7 +90,7 @@ class HumanoidTask(VecTask):
             None
         """
         num_rigid_body, num_shape = self._compute_aggregate_option()
-        self_collision = True
+        self_collision = False
 
         sensor_install_sight = ["right_foot", "left_foot"]
         create_sensors(self._gym, self._humanoid_asset, sensor_install_sight)
@@ -132,7 +133,7 @@ class HumanoidTask(VecTask):
             dof_offset = self._dof_offsets[j]
             dof_size = self._dof_offsets[j + 1] - self._dof_offsets[j]
 
-            if (dof_size == 3):
+            if dof_size == 3:
                 curr_low = lim_low[dof_offset:(dof_offset + dof_size)]
                 curr_high = lim_high[dof_offset:(dof_offset + dof_size)]
                 curr_low = np.max(np.abs(curr_low))
@@ -143,11 +144,8 @@ class HumanoidTask(VecTask):
 
                 lim_low[dof_offset:(dof_offset + dof_size)] = -curr_scale
                 lim_high[dof_offset:(dof_offset + dof_size)] = curr_scale
-               # lim_low[dof_offset:(dof_offset + dof_size)] = -np.pi
-                # lim_high[dof_offset:(dof_offset + dof_size)] = np.pi
 
-
-            elif (dof_size == 1):
+            elif dof_size == 1:
                 curr_low = lim_low[dof_offset]
                 curr_high = lim_high[dof_offset]
                 curr_mid = 0.5 * (curr_high + curr_low)
@@ -182,8 +180,10 @@ class HumanoidTask(VecTask):
 
         actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
         actor_down = actor_height < height_criteria
+        self._buf["recoveryCounter"] = torch.where(actor_down, self._buf["recoveryCounter"] + 1, 0)
+        self._buf["terminate"] = self._buf["recoveryCounter"] > self._recovery_limit
         # contact_off = (self._buf["sensor"] ** 2).sum(dim=1) < force_criteria
-        self._buf["terminate"] = actor_down  # & contact_off
+        # self._buf["terminate"] = actor_down  # & contact_off
         tooLongEpisode = self._buf["elapsedStep"] > self._max_episode_steps
         self._buf["reset"] = tooLongEpisode | self._buf["terminate"]
 
@@ -203,6 +203,8 @@ class HumanoidTask(VecTask):
                                                     humanoid_asset_option())
         self._num_humanoid_rigid_body = self._gym.get_asset_rigid_body_count(self._humanoid_asset)
         self._num_humanoid_dof = self._gym.get_asset_dof_count(self._humanoid_asset)
+        self._joint_info = env_cfg["joint_information"]
+        self._recovery_limit = env_cfg.get("recovery_limit", 0)
 
         return env_cfg
 
@@ -228,11 +230,12 @@ class HumanoidTask(VecTask):
         if env_ids is None:
             env_ids = torch.nonzero(self._buf["reset"]).long()
 
-        if len(env_ids) > 0:
+        if env_ids.ndim > 0 and len(env_ids) > 0:
             self._assign_reset_state(env_ids)
             self._apply_reset_state(env_ids)
             self._buf["reset"][env_ids] = False
             self._buf["elapsedStep"][env_ids] = 0
+            self._buf["recoveryCounter"][env_ids] = 0
 
         self._refresh_tensors()
         self._compute_observations()

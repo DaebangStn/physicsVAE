@@ -158,12 +158,16 @@ class StyleAlgorithm(CoreAlgorithm):
 
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
+
         algo_conf = kwargs['params']['algo']
         self._key_body_ids = self.find_key_body_ids(self.vec_env, algo_conf['joint_information']['key_body_names'])
         self._dof_offsets = algo_conf['joint_information']['dof_offsets']
-
-        # TODO: very weird loader sorry...
-        self._demo_fetcher = MotionLibFetcher(**MotionLibFetcher.demo_fetcher_config(self, algo_conf))
+        self._demo_fetcher = MotionLibFetcher(self._disc_obs_traj_len, self.vec_env.dt, self.device,
+                                              algo_conf['motion_file'], algo_conf['joint_information']['dof_body_ids'],
+                                              self._dof_offsets, self._key_body_ids)
+        env_conf = kwargs['params']['config']['env_config']['env']
+        if "reference_state_init_prob" in env_conf:
+            self.vec_env.set_motion_fetcher(self._demo_fetcher)
 
         # build replay buffer
         config_buffer = self.config['style']['replay_buf']
@@ -172,7 +176,7 @@ class StyleAlgorithm(CoreAlgorithm):
             'demo': SingleTensorBuffer(buf_size, self.device),
             'rollout': SingleTensorBuffer(buf_size, self.device),
         }
-        demo_obs = self._demo_fetcher.fetch(buf_size // self._disc_obs_traj_len)
+        demo_obs = self._demo_fetcher.fetch_traj(buf_size // self._disc_obs_traj_len)
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_store_prob = config_buffer['store_prob']
@@ -223,7 +227,7 @@ class StyleAlgorithm(CoreAlgorithm):
                 return_batch, value_preds_batch)
 
     def _update_replay_buffer(self, rollout_obs):
-        demo_obs = self._demo_fetcher.fetch(max(self.batch_size // 2048, 1))  # 2048 is a magic number for performance
+        demo_obs = self._demo_fetcher.fetch_traj(max(self.batch_size // 2048, 1))  # 2048 is a magic number for performance
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
 

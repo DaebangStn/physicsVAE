@@ -109,20 +109,23 @@ class HighLevelAlgorithm(CoreAlgorithm):
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
         algo_conf = kwargs['params']['algo']
-        self._key_body_ids = StyleAlgorithm.find_key_body_ids(algo_conf['joint_information']['key_body_names'])
+        self._key_body_ids = StyleAlgorithm.find_key_body_ids(self.vec_env,
+                                                              algo_conf['joint_information']['key_body_names'])
         self._dof_offsets = algo_conf['joint_information']['dof_offsets']
-        # TODO: very weird loader sorry...
-        self._demo_fetcher = MotionLibFetcher(**MotionLibFetcher.demo_fetcher_config(self, algo_conf))
+        self._demo_fetcher = MotionLibFetcher(self._disc_obs_traj_len, self.vec_env.dt, self.device,
+                                              algo_conf['motion_file'], algo_conf['joint_information']['dof_body_ids'],
+                                              self._dof_offsets, self._key_body_ids)
 
         # build replay buffer only for demo
         buf_size = self.config['hlc']['demo_buf_size']
         self._demo_replay_buffer = SingleTensorBuffer(buf_size, self.device)
-        demo_obs = self._demo_fetcher.fetch(buf_size // self._disc_obs_traj_len)
+        demo_obs = self._demo_fetcher.fetch_traj(buf_size // self._disc_obs_traj_len)
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._demo_replay_buffer.store(demo_obs)
 
     def _update_demo_buffer(self):
-        demo_obs = self._demo_fetcher.fetch(max(self.batch_size // 2048, 1))  # 2048 is a magic number for performance
+        demo_obs = self._demo_fetcher.fetch_traj(
+            max(self.batch_size // 2048, 1))  # 2048 is a magic number for performance
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._demo_replay_buffer.store(demo_obs)
 

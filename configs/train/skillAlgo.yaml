@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: walk
+  memo:
   motion_file:
     assets/motions/dataset_humanoid.yaml
 
@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_29-23-25-13_div_a1_paper/nn/keypointMaxObsTask.pth
+  runs/keypointMaxObsTask_skillAlgo_03-09-24-14_large_net/nn/last_keypointMaxObsTask_ep_1600_rew_7214.9087.pth
 
 
 hparam:

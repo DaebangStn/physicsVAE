@@ -13,24 +13,22 @@ class DroppedHumanoidTask(HumanoidTask):
         super().__init__(**kwargs)
         self._build_dropped_state_tensor()
 
-        self._drop_ids = None
-        self._normal_reset_ids = None
-
     def _assign_reset_state(self, env_ids: torch.Tensor):
         num_reset = len(env_ids)
 
         rand_indices = torch.randperm(num_reset)
         num_drop = ceil(num_reset * self._drop_on_reset_prob)
 
-        self._drop_ids = env_ids[rand_indices[:num_drop]]
-        self._normal_reset_ids = env_ids[rand_indices[num_drop:]]
+        drop_ids = env_ids[rand_indices[:num_drop]]
+        normal_reset_ids = env_ids[rand_indices[num_drop:]]
 
-        if len(drop_ids) > 0:
+        if drop_ids.ndim > 0 and len(drop_ids) > 0:
             self._buf["actor"][drop_ids] = self._buf["actorDropped"][drop_ids]
-            self._buf["dof"][drop_ids] = self._buf["dofDropped"][drop_ids]
-        if len(normal_reset_ids) > 0:
+            self._buf["dof"].view(self.num, self._dof_per_env, 2)[drop_ids] = self._buf["dofDropped"][drop_ids].clone()
+        if normal_reset_ids.ndim > 0 and len(normal_reset_ids) > 0:
             self._buf["actor"][normal_reset_ids] = self._buf["actorInit"][normal_reset_ids]
-            self._buf["dof"][normal_reset_ids] = self._buf["dofInit"][normal_reset_ids]
+            self._buf["dof"].view(self.num, self._dof_per_env, 2)[normal_reset_ids] = (
+                self._buf["dofInit"][normal_reset_ids].clone())
 
     def _parse_env_param(self, **kwargs):
         env_cfg = super()._parse_env_param(**kwargs)
@@ -38,7 +36,7 @@ class DroppedHumanoidTask(HumanoidTask):
         return env_cfg
 
     def _build_dropped_state_tensor(self):
-        RELAXATION_STEPS = 100
+        RELAXATION_STEPS = 150
 
         self._buf["aPos"][..., 2] += torch.rand(self.num, device=self._compute_device)
         self._buf["aRot"] = torch.rand_like(self._buf["aRot"]) * 0.2
@@ -59,5 +57,5 @@ class DroppedHumanoidTask(HumanoidTask):
 
         self._buf["actorDropped"] = self._buf["actor"].clone()
         self._buf["actorDropped"][:, 7:] = 0
-        self._buf["dofDropped"] = self._buf["dof"].clone()
-        self._buf["dofDropped"][:, 1:] = 0
+        self._buf["dofDropped"] = self._buf["dof"].clone().view(self.num, self._dof_per_env, 2)
+        self._buf["dofDropped"][:, :, 1:] = 0

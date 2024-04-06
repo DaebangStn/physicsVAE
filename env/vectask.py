@@ -128,7 +128,7 @@ class VecTask:
 
     def _install_viewer(self):
         self._viewer = self._gym.create_viewer(self._sim, gymapi.CameraProperties())
-        self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_Q, "QUIT")
+        self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_ESCAPE, "QUIT")
 
         # Suppose Z axis upward
         cam_pos = gymapi.Vec3(3.0, 3.0, 3.0)

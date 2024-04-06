@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 
 from poselib.motion_lib import MotionLib
@@ -52,13 +54,22 @@ class SingleTensorBuffer:
 
 
 class MotionLibFetcher:
-    def __init__(self, **kwargs):
-        self._traj_len = kwargs.pop('traj_len')
-        self._dt = kwargs.pop('dt')
-        self._device = kwargs.get('device')
-        self._motion_lib = MotionLib(**kwargs)
+    def __init__(self, traj_len: int, dt: float, device: torch.device, motion_file: str, dof_body_ids: List[float],
+                 dof_offsets: List[float], key_body_ids: List[int]):
+        self._traj_len = traj_len
+        self._dt = dt
+        self._device = device
 
-    def fetch(self, n: int = 1):
+        config = {
+            'motion_file': motion_file,
+            'dof_body_ids': dof_body_ids,
+            'dof_offsets': dof_offsets,
+            'key_body_ids': key_body_ids,
+            'device': device
+        }
+        self._motion_lib = MotionLib(**config)
+
+    def fetch_traj(self, n: int = 1):
         motion_ids = self._motion_lib.sample_motions(n)
 
         motion_length = self._dt * (self._traj_len + 1)
@@ -70,6 +81,11 @@ class MotionLibFetcher:
         motion_ids = torch.tile(motion_ids.unsqueeze(-1), [1, self._traj_len]).view(-1)
         # [traj1, traj1, ..., traj2, traj2, ...]
         return self._motion_lib.get_motion_state(motion_ids, capture_time)
+
+    def fetch_snapshot(self, n: int = 1):
+        motion_ids = self._motion_lib.sample_motions(n)
+        motion_times = self._motion_lib.sample_time(motion_ids)
+        return self._motion_lib.get_motion_state(motion_ids, motion_times)
 
     @staticmethod
     def demo_fetcher_config(cls, algo_conf):

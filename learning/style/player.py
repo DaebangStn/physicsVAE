@@ -5,7 +5,7 @@ from rl_games.algos_torch import torch_ext
 
 from learning.core.player import CorePlayer
 from learning.style.algorithm import style_task_obs_angle_transform, StyleAlgorithm, disc_reward
-from utils.buffer import TensorHistoryFIFO
+from utils.buffer import TensorHistoryFIFO, MotionLibFetcher
 
 
 class StylePlayer(CorePlayer):
@@ -51,25 +51,35 @@ class StylePlayer(CorePlayer):
             self.env, algo_conf['joint_information']['key_body_names'])
         self._dof_offsets = algo_conf['joint_information']['dof_offsets']
 
+        env_conf = kwargs['params']['config']['env_config']['env']
+        if "reference_state_init_prob" in env_conf:
+            demo_fetcher = MotionLibFetcher(self._disc_obs_traj_len, self.env.dt, self.device, algo_conf['motion_file'],
+                                            algo_conf['joint_information']['dof_body_ids'],
+                                            self._dof_offsets, self._key_body_ids)
+            self.env.set_motion_fetcher(demo_fetcher)
+
         style_conf = kwargs['params']['hparam']['style']
         self._disc_obs_traj_len = style_conf['disc']['obs_traj_len']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+
         collect_action = self.config.get('collect_action', None)
-
         if collect_action is not None:
-            collect_filename = collect_action.get('filename')
             full_experiment_name = kwargs['params']['config']['full_experiment_name']
-            self._log_file = h5py.File(collect_filename, 'a')
+            self._init_action_collection(collect_action, full_experiment_name)
 
-            if full_experiment_name in self._log_file:
-                self._log_file = self._log_file[full_experiment_name]
-            else:
-                self._log_file = self._log_file.create_dataset(
-                    full_experiment_name, shape=(0, self.actions_num), maxshape=(None, self.actions_num),
-                    data=np.array([]), dtype='f4', chunks=True)
+    def _init_action_collection(self, config, fullname):
+        collect_filename = config.get('filename')
+        self._log_file = h5py.File(collect_filename, 'a')
 
-            print("==> Action log file: {:s}".format(collect_filename) +
-                  " with index {:s}".format(full_experiment_name))
+        if fullname in self._log_file:
+            self._log_file = self._log_file[fullname]
+        else:
+            self._log_file = self._log_file.create_dataset(
+                fullname, shape=(0, self.actions_num), maxshape=(None, self.actions_num),
+                data=np.array([]), dtype='f4', chunks=True)
+
+        print("==> Action log file: {:s}".format(collect_filename) +
+              " with index {:s}".format(fullname))
 
     def _disc_debug(self, disc_obs):
         reward = disc_reward(self.model, disc_obs, self.normalize_input, self.device).mean().item()
