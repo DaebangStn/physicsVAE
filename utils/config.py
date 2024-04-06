@@ -22,6 +22,8 @@ def build_args() -> Namespace:
          "help": "Path to the environment(like task and physics) config file"},
         {"name": "--num_envs", "type": int, "required": False,
          "help": "Number of environments to run in parallel"},
+        {"name": "--wandb_proj", "type": str, "required": False,
+         "help": "Wandb project name. If this flag is set, wandb will be enabled."},
     ]
 
     args = parse_arguments(custom_parameters=custom_params)

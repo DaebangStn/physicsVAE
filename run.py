@@ -61,5 +61,14 @@ if __name__ == '__main__':
     runner = build_runner()
     runner.load({'params': cfg_train})
 
-    runner.reset()
-    runner.run(cfg_run)
+    try:
+        if args.wandb_proj:
+            import wandb
+            wandb.init(project=args.wandb_proj, config={'cfg_train': cfg_train, 'cfg_run': cfg_run},
+                       sync_tensorboard=True, monitor_gym=True, save_code=True)
+
+        runner.reset()
+        runner.run(cfg_run)
+    except SystemExit:
+        if args.wandb_proj:
+            wandb.finish()

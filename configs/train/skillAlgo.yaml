@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo:
+  memo: rsi
   motion_file:
     assets/motions/dataset_humanoid.yaml
 
@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_skillAlgo_03-09-24-14_large_net/nn/last_keypointMaxObsTask_ep_1600_rew_7214.9087.pth
+#  runs/keypointMaxObsTask_skillAlgo_06-11-46-17_walk/nn/last_keypointMaxObsTask_ep_5400_rew_7191.0205.pth
 
 
 hparam:
@@ -72,7 +72,7 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 0.2
+    enc_scale: 2.0
 
   style:
     replay_buf:
