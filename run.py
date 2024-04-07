@@ -62,7 +62,7 @@ if __name__ == '__main__':
     runner.load({'params': cfg_train})
 
     try:
-        if args.wandb_proj:
+        if args.wandb_proj is not None:
             import wandb
             wandb.init(project=args.wandb_proj, config={'cfg_train': cfg_train, 'cfg_run': cfg_run},
                        sync_tensorboard=True, monitor_gym=True, save_code=True)

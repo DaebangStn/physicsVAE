@@ -42,7 +42,6 @@ class HighLevelAlgorithm(CoreAlgorithm):
         super().__init__(**kwargs)
 
     def env_step(self, actions):
-        # TODO
         # 1. parameter for env_reset makes hard reset,
         #    because if the reset is done immediately, idle loop makes error
         # 2. fix the done flow in the env_step loop

@@ -3,9 +3,9 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: rsi
+  memo: drop
   motion_file:
-    assets/motions/dataset_humanoid.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: skill
@@ -41,7 +41,6 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_skillAlgo_07-06-16-43_rsi/nn/keypointMaxObsTask.pth
 
 
 hparam:
@@ -80,7 +79,7 @@ hparam:
       store_prob: 0.001
 
     disc:
-      num_obs: 125
+      num_obs: 140
       obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01

@@ -22,7 +22,7 @@ def build_args() -> Namespace:
          "help": "Path to the environment(like task and physics) config file"},
         {"name": "--num_envs", "type": int, "required": False,
          "help": "Number of environments to run in parallel"},
-        {"name": "--wandb_proj", "type": str, "required": False,
+        {"name": "--wandb_proj", "type": str, "required": False, "default": None,
          "help": "Wandb project name. If this flag is set, wandb will be enabled."},
     ]
 
@@ -82,6 +82,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
         config_env["env"]["spacing"] = 1
         full_experiment_name = "test_" + full_experiment_name
+        args.wandb_proj = None
 
     # Overriding debug mode
     if config_train["debug"]:
@@ -89,6 +90,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_env["sim"]["headless"] = False
         config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
         full_experiment_name = "debug_" + full_experiment_name
+        args.wandb_proj = None
 
     # Overriding config_env to config_train
     config_train["config"]["full_experiment_name"] = full_experiment_name
