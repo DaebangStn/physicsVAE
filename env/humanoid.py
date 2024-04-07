@@ -1,5 +1,5 @@
 from typing import Dict, Optional, Tuple
-from isaacgym import gymtorch
+from isaacgym import gymtorch, gymapi
 
 
 from env.vectask import VecTask
@@ -18,6 +18,7 @@ class HumanoidTask(VecTask):
         self._max_episode_steps = None
         self._num_sensors = None
         self._recovery_limit = None
+        self._viewer_follow_env0 = None
 
         self._envs = []
         self._humanoids_id_env = []
@@ -31,6 +32,8 @@ class HumanoidTask(VecTask):
         self._build_tensors()
 
     def render(self):
+        if self._viewer_follow_env0:
+            self._update_viewer_env0()
         super().render()
 
     def _build_tensors(self):
@@ -205,6 +208,7 @@ class HumanoidTask(VecTask):
         self._num_humanoid_dof = self._gym.get_asset_dof_count(self._humanoid_asset)
         self._joint_info = env_cfg["joint_information"]
         self._recovery_limit = env_cfg.get("recovery_limit", 0)
+        self._viewer_follow_env0 = env_cfg.get("viewer_follow_env0", False)
 
         return env_cfg
 
@@ -258,3 +262,15 @@ class HumanoidTask(VecTask):
 
     def _reset_surroundings(self, env_ids: torch.Tensor):
         pass
+
+    def _update_viewer_env0(self):
+        if self._viewer is None:
+            return
+
+        cam_trans = self._gym.get_viewer_camera_transform(self._viewer, None)
+        env0_root_pos = self._buf["aPos"][0, 0:3]
+        cam_target = gymapi.Vec3(env0_root_pos[0], env0_root_pos[1], env0_root_pos[2])
+        displace = cam_trans.transform_vector(gymapi.Vec3(0, 0, 5))
+        displace = gymapi.Vec3(abs(displace.x), abs(displace.y), abs(displace.z))
+        cam_pos = cam_target + displace
+        self._gym.viewer_camera_look_at(self._viewer, None, cam_pos, cam_target)
