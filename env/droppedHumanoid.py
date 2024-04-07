@@ -1,34 +1,28 @@
-from math import ceil
-from typing import Dict
-
 import torch
 from isaacgym import gymtorch
 
-from env.humanoid import HumanoidTask
+from env.rsiHumanoid import RSIHumanoidTask
 
 
-class DroppedHumanoidTask(HumanoidTask):
+class DroppedHumanoidTask(RSIHumanoidTask):
     def __init__(self, **kwargs):
         self._drop_on_reset_prob = None
         super().__init__(**kwargs)
         self._build_dropped_state_tensor()
 
     def _assign_reset_state(self, env_ids: torch.Tensor):
+        super()._assign_reset_state(env_ids)
+
         num_reset = len(env_ids)
 
         rand_indices = torch.randperm(num_reset)
-        num_drop = ceil(num_reset * self._drop_on_reset_prob)
+        num_drop = round(num_reset * self._drop_on_reset_prob)
 
         drop_ids = env_ids[rand_indices[:num_drop]]
-        normal_reset_ids = env_ids[rand_indices[num_drop:]]
 
         if drop_ids.ndim > 0 and len(drop_ids) > 0:
             self._buf["actor"][drop_ids] = self._buf["actorDropped"][drop_ids]
             self._buf["dof"].view(self.num, self._dof_per_env, 2)[drop_ids] = self._buf["dofDropped"][drop_ids].clone()
-        if normal_reset_ids.ndim > 0 and len(normal_reset_ids) > 0:
-            self._buf["actor"][normal_reset_ids] = self._buf["actorInit"][normal_reset_ids]
-            self._buf["dof"].view(self.num, self._dof_per_env, 2)[normal_reset_ids] = (
-                self._buf["dofInit"][normal_reset_ids].clone())
 
     def _parse_env_param(self, **kwargs):
         env_cfg = super()._parse_env_param(**kwargs)

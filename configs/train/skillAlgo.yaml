@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_06-11-46-17_walk/nn/last_keypointMaxObsTask_ep_5400_rew_7191.0205.pth
+  runs/keypointMaxObsTask_skillAlgo_07-06-16-43_rsi/nn/keypointMaxObsTask.pth
 
 
 hparam:

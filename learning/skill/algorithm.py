@@ -89,14 +89,12 @@ class SkillAlgorithm(StyleAlgorithm):
         mu = torch.clamp(mu, -1.0, 1.0)
         z_diff = (1 - (rollout_z * sampled_z).sum(dim=-1)) / 2
 
-        # TODO, test (a-1), (b-1) and (b-2)
-
         # Original KL implementation (a)
-        # kl = torch.square(sampled_mu - mu).mean(dim=-1)
+        kl = torch.square(sampled_mu - mu).mean(dim=-1)
 
         # Right KL divergence (b)
-        kl = ((sampled_mu - mu) ** 2 /
-              (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
+        # kl = ((sampled_mu - mu) ** 2 /
+        #       (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
 
         # Original loss implementation (1)
         loss = torch.square(kl / (z_diff + 1e-5) - 1).mean()
