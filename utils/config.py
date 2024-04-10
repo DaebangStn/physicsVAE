@@ -1,9 +1,12 @@
 import os
 import random
+import sys
+
 import yaml
 from typing import Tuple
 from datetime import datetime
 
+import wandb
 from pathlib import Path
 import torch
 import numpy as np
@@ -41,6 +44,11 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     with open(config_env_path.as_posix(), 'r') as f:
         config_env = yaml.load(f, Loader=yaml.SafeLoader)
 
+    # Overriding wandb config
+    if wandb.config is not None:
+        if "max_frames" in wandb.config:
+            config_train["hparam"]["max_frames"] = wandb.config.max_frames
+
     # Compute discriminator related values
     if config_train["algo"]["name"] in ["styleAlgo", "skillAlgo"]:
         assert "disc" in config_train["network"], "Inconsistent config"
@@ -48,6 +56,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
                                                          config_train["hparam"]["style"]["disc"]["num_obs"])
 
         # Preprocess MotionLib config
+    if config_train["algo"]["name"] in ["styleAlgo", "skillAlgo", "highLevelAlgo"]:
         assert "joint_information_path" in config_env["env"], "Joint information not found in config"
         joint_info_path = Path(config_env["env"]['joint_information_path'])
         assert joint_info_path.exists(), f"Config path {joint_info_path} does not exist"
@@ -57,6 +66,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
             asset_filename = Path(asset_filename).stem
             assert asset_filename in joint_info, f"Asset {asset_filename} not found in joint information"
             config_train["algo"]["joint_information"] = joint_info[asset_filename]
+        config_env["env"]["joint_information"] = joint_info[asset_filename]
 
     # Compute latent related values
     if config_train["algo"]["name"] in ["skillAlgo"]:
@@ -79,7 +89,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     if config_train["test"]:
         assert config_train["checkpoint"] is not None, "Checkpoint path not found in config"
         config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
+        config_env["env"]["num_envs"] = 128 if args.num_envs is None else args.num_envs
         config_env["env"]["spacing"] = 1
         full_experiment_name = "test_" + full_experiment_name
         args.wandb_proj = None

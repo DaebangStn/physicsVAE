@@ -29,6 +29,8 @@ def build_runner():
     from learning.style.algorithm import StyleAlgorithm
     from learning.skill.player import SkillPlayer
     from learning.skill.algorithm import SkillAlgorithm
+    from learning.skill.hPlayer import HighLevelPlayer
+    from learning.skill.hAlgorithm import HighLevelAlgorithm
 
     from utils.rl_games import register_env_rl_games, register_algo_n_player, register_net_n_model
 
@@ -49,12 +51,17 @@ def build_runner():
     register_algo_n_player('rlAlgo', _runner, CoreAlgorithm, CorePlayer)
     register_algo_n_player('styleAlgo', _runner, StyleAlgorithm, StylePlayer)
     register_algo_n_player('skillAlgo', _runner, SkillAlgorithm, SkillPlayer)
+    register_algo_n_player('highLevelAlgo', _runner, HighLevelAlgorithm, HighLevelPlayer)
 
     return _runner
 
 
-if __name__ == '__main__':
+def main():
     args = build_args()
+    if args.wandb_proj is not None:
+        import wandb
+        wandb.init(project=args.wandb_proj, sync_tensorboard=True, monitor_gym=True, save_code=True)
+
     cfg_run, cfg_train = load_config(args)
     set_seed(cfg_train['seed'])
 
@@ -62,13 +69,12 @@ if __name__ == '__main__':
     runner.load({'params': cfg_train})
 
     try:
-        if args.wandb_proj is not None:
-            import wandb
-            wandb.init(project=args.wandb_proj, config={'cfg_train': cfg_train, 'cfg_run': cfg_run},
-                       sync_tensorboard=True, monitor_gym=True, save_code=True)
-
         runner.reset()
         runner.run(cfg_run)
     except SystemExit:
         if args.wandb_proj:
             wandb.finish()
+
+
+if __name__ == '__main__':
+    main()

@@ -6,10 +6,10 @@ algo:
   memo:
 
 model:
-  name: highLevel
+  name: core
 
 network:
-  name: highLevel
+  name: core
   separate: True
 
   # config for space is the same as low-level policy
@@ -39,7 +39,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 1024
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 5e-4
@@ -57,8 +57,8 @@ hparam:
 
   llc:
     steps: 5
-    cfg: runs/keypointTask_skillAlgo_28-11-53-00_2G_obs140/algo_config.yaml
-    ckpt: runs/keypointTask_skillAlgo_28-11-53-00_2G_obs140/nn/keypointTask2.pth
+    cfg: runs/keypointMaxObsTask_skillAlgo_07-06-04-58_rsi/algo_config.yaml
+    ckpt: runs/keypointMaxObsTask_skillAlgo_07-06-04-58_rsi/nn/last_keypointMaxObsTask_ep_11800_rew_7218.0073.pth
   hlc:
     demo_buf_size: 200000
 

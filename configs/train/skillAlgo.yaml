@@ -3,8 +3,9 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: drop
+  memo: sword_full_rsi
   motion_file:
+#    assets/motions/dataset_humanoid.yaml
     assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
@@ -15,6 +16,7 @@ network:
   separate: True
 
   space:
+#    latent_dim: 64
     latent_dim: 32
 
     continuous:
@@ -41,7 +43,7 @@ network:
 
 
 checkpoint:  # from the project root
-
+  runs/keypointMaxObsTask_skillAlgo_09-11-55-45_sword_full_rsi/nn/last_keypointMaxObsTask_ep_3800_rew_7214.5605.pth
 
 hparam:
   normalize_input: True
@@ -58,7 +60,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 32768
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -80,6 +82,7 @@ hparam:
 
     disc:
       num_obs: 140
+#      num_obs: 125
       obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01

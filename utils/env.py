@@ -55,12 +55,15 @@ def env_create_parameters(num_envs: int, spacing: float):
     return lower, upper, num_per_row
 
 
-def create_sensors(gym, asset, names: List[str], pose=None):
+def create_sensors(gym, asset, names: List[str], pose=None) -> List[int]:
     if pose is None:
         pose = gymapi.Transform()
+    indices = []
     for name in names:
         idx = gym.find_asset_rigid_body_index(asset, name)
         gym.create_asset_force_sensor(asset, idx, pose)
+        indices.append(idx)
+    return indices
 
 
 def get_tensor_like_r_body_state(gym, sim, num_envs=None):

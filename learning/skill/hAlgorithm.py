@@ -27,6 +27,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
         self._llc_actor = None
         self._llc_disc = None
         self._llc_steps = None
+        self._config_llc = None
 
         # reward
         self._rew_task_scale = None
@@ -63,7 +64,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
             obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
             obs_step = {'obs': obs, 'disc_obs': disc_obs}
 
-            disc_rew = disc_reward(disc_obs, self._llc_disc, self.normalize_input)
+            disc_rew = disc_reward(disc_obs, self._llc_disc, self.normalize_input, self.device)
 
             rew_step[~done] += rew[~done]
             disc_rew_step[~done] += disc_rew[~done]
@@ -91,13 +92,14 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
     def _init_learning_variables(self, **kwargs):
         config_hparam = self.config
-        self._llc_actor, self._llc_disc, self._latent_dim = self.build_llc(config_hparam, self.device)
+        self._llc_actor, self._llc_disc, self._config_llc = self.build_llc(config_hparam, self.device)
         self._llc_steps = config_hparam['llc']['steps']
 
+        self._latent_dim = self._config_llc['network']['space']['latent_dim']
         kwargs['params']['config']['env_config']['env']['num_act'] = self._latent_dim
         super()._init_learning_variables(**kwargs)
 
-        config_disc = config_hparam['style']['disc']
+        config_disc = self._config_llc['hparam']['style']['disc']
         self._disc_obs_traj_len = config_disc['obs_traj_len']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
 
@@ -107,13 +109,17 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
     def _prepare_data(self, **kwargs):
         super()._prepare_data(**kwargs)
-        algo_conf = kwargs['params']['algo']
-        self._key_body_ids = StyleAlgorithm.find_key_body_ids(self.vec_env,
-                                                              algo_conf['joint_information']['key_body_names'])
-        self._dof_offsets = algo_conf['joint_information']['dof_offsets']
-        self._demo_fetcher = MotionLibFetcher(self._disc_obs_traj_len, self.vec_env.dt, self.device,
-                                              algo_conf['motion_file'], algo_conf['joint_information']['dof_body_ids'],
-                                              self._dof_offsets, self._key_body_ids)
+
+        llc_algo_conf = self._config_llc['algo']
+        self._key_body_ids = StyleAlgorithm.find_key_body_ids(
+            self.vec_env, llc_algo_conf['joint_information']['key_body_names'])
+        self._dof_offsets = llc_algo_conf['joint_information']['dof_offsets']
+        self._demo_fetcher = MotionLibFetcher(
+            self._disc_obs_traj_len, self.vec_env.dt, self.device, llc_algo_conf['motion_file'],
+            llc_algo_conf['joint_information']['dof_body_ids'], self._dof_offsets, self._key_body_ids)
+        env_conf = kwargs['params']['config']['env_config']['env']
+        if "reference_state_init_prob" in env_conf:
+            self.vec_env.set_motion_fetcher(self._demo_fetcher)
 
         # build replay buffer only for demo
         buf_size = self.config['hlc']['demo_buf_size']
@@ -124,7 +130,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
     def _update_demo_buffer(self):
         demo_obs = self._demo_fetcher.fetch_traj(
-            max(self.batch_size // 2048, 1))  # 2048 is a magic number for performance
+            max(self.batch_size // 2048, 2))  # 2048 is a magic number for performance
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._demo_replay_buffer.store(demo_obs)
 
@@ -167,4 +173,4 @@ class HighLevelAlgorithm(CoreAlgorithm):
             model.running_mean_std.load_state_dict(ckpt['running_mean_std'])
 
         model.eval()
-        return model.actor, model.disc, latent_dim
+        return model.actor, model.disc, config_llc

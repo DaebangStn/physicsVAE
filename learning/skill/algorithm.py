@@ -102,7 +102,7 @@ class SkillAlgorithm(StyleAlgorithm):
         # My loss suggestion (2)
         # loss = (kl / (z_diff + 1e-5)).mean()
 
-        self._write_disc_stat(amp_diversity_loss=loss.detach())
+        self._write_stat(amp_diversity_loss=loss.detach())
         return loss
 
     def _enc_loss(self, enc, rollout_z):
@@ -112,7 +112,7 @@ class SkillAlgorithm(StyleAlgorithm):
 
         # TODO: original code ignores the gradient penalty and regularization
 
-        self._write_disc_stat(
+        self._write_stat(
             enc_loss=likelihood_loss.detach(),
             enc_reward_mean=self._mean_enc_reward,
             enc_reward_std=self._std_enc_reward,

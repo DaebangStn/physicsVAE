@@ -3,12 +3,12 @@ from typing import Dict, Optional, Tuple
 import torch
 from isaacgym import gymtorch, gymapi
 
-from env.keypoint import KeypointTask
+from env.keypointMaxObs import KeypointMaxObsTask
 from utils import *
 from utils.env import *
 
 
-class KeypointLocationTask(KeypointTask):
+class KeypointLocationTask(KeypointMaxObsTask):
     def __init__(self, **kwargs):
         self._tar_away_max = None
         self._tar_away_min = None

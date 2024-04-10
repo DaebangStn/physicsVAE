@@ -126,6 +126,11 @@ class VecTask:
         self._create_envs()
         self._gym.prepare_sim(self._sim)
 
+    def cleanup(self):
+        if self._viewer is not None:
+            self._gym.destroy_viewer(self._viewer)
+        self._gym.destroy_sim(self._sim)
+
     def _install_viewer(self):
         self._viewer = self._gym.create_viewer(self._sim, gymapi.CameraProperties())
         self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_ESCAPE, "QUIT")

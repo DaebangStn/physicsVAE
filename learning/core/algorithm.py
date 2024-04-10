@@ -1,14 +1,17 @@
+import os
 import time
 import yaml
 from typing import Optional
 
+import numpy as np
 import torch
 from torch.optim import Adam
+import torch.distributed as dist
 from rl_games.common.datasets import PPODataset
 from rl_games.common import common_losses
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.a2c_continuous import A2CAgent
-from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase
+from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase, print_statistics
 
 from utils.rl_games import rl_games_net_build_param
 
@@ -59,8 +62,7 @@ class CoreAlgorithm(A2CAgent):
             sigma = res_dict['sigmas']
 
             # 3. Calculate the loss
-            a_loss = self.actor_loss_func(old_action_log_probs_batch, action_log_probs,
-                                          advantage, self.ppo, curr_e_clip)
+            a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
             c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, values)
             b_loss = self._bound_loss(mu)
 
@@ -103,6 +105,107 @@ class CoreAlgorithm(A2CAgent):
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         obs = self.vec_env.reset(env_ids)
         return self.obs_to_tensors(obs)
+
+    def train(self):
+        self.init_tensors()
+        self.last_mean_rewards = -100500
+        total_time = 0
+        self.obs = self.env_reset()
+        self.curr_frames = self.batch_size_envs
+
+        while True:
+            epoch_num = self.update_epoch()
+            step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
+            total_time += sum_time
+            frame = self.frame // self.num_agents
+
+            # cleaning memory to optimize space
+            self.dataset.update_values_dict(None)
+            should_exit = False
+
+            if self.global_rank == 0:
+                self.diagnostics.epoch(self, current_epoch=epoch_num)
+                # do we need scaled_time?
+                scaled_time = self.num_agents * sum_time
+                scaled_play_time = self.num_agents * play_time
+                curr_frames = self.curr_frames * self.world_size if self.multi_gpu else self.curr_frames
+                self.frame += curr_frames
+
+                print_statistics(self.print_stats, curr_frames, step_time, scaled_play_time, scaled_time,
+                                 epoch_num, self.max_epochs, frame, self.max_frames)
+
+                self.write_stats(total_time, epoch_num, step_time, play_time, update_time,
+                                 a_losses, c_losses, entropies, kls, last_lr, lr_mul, frame,
+                                 scaled_time, scaled_play_time, curr_frames)
+
+                if len(b_losses) > 0:
+                    self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(b_losses).item(), frame)
+
+                if self.game_rewards.current_size > 0:
+                    mean_rewards = self.game_rewards.get_mean()
+                    mean_shaped_rewards = self.game_shaped_rewards.get_mean()
+                    mean_lengths = self.game_lengths.get_mean()
+                    self.mean_rewards = mean_rewards[0]
+
+                    for i in range(self.value_size):
+                        rewards_name = 'rewards' if i == 0 else 'rewards{0}'.format(i)
+                        self.writer.add_scalar(rewards_name + '/step'.format(i), mean_rewards[i], frame)
+                        self.writer.add_scalar(rewards_name + '/iter'.format(i), mean_rewards[i], epoch_num)
+                        self.writer.add_scalar(rewards_name + '/time'.format(i), mean_rewards[i], total_time)
+                        self.writer.add_scalar('shaped_' + rewards_name + '/step'.format(i), mean_shaped_rewards[i],
+                                               frame)
+                        self.writer.add_scalar('shaped_' + rewards_name + '/iter'.format(i), mean_shaped_rewards[i],
+                                               epoch_num)
+                        self.writer.add_scalar('shaped_' + rewards_name + '/time'.format(i), mean_shaped_rewards[i],
+                                               total_time)
+
+                    self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
+                    self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
+                    self.writer.add_scalar('episode_lengths/time', mean_lengths, total_time)
+
+                    if self.has_self_play_config:
+                        self.self_play_manager.update(self)
+
+                    checkpoint_name = self.config['name'] + '_ep_' + str(epoch_num) + '_rew_' + str(mean_rewards[0])
+
+                    if self.save_freq > 0:
+                        if epoch_num % self.save_freq == 0:
+                            self.save(os.path.join(self.nn_dir, 'last_' + checkpoint_name))
+
+                    if mean_rewards[0] > self.last_mean_rewards and epoch_num >= self.save_best_after:
+                        print('saving next best rewards: ', mean_rewards)
+                        self.last_mean_rewards = mean_rewards[0]
+                        self.save(os.path.join(self.nn_dir, self.config['name']))
+
+                        if 'score_to_win' in self.config:
+                            if self.last_mean_rewards > self.config['score_to_win']:
+                                print('Maximum reward achieved. Network won!')
+                                self.save(os.path.join(self.nn_dir, checkpoint_name))
+                                should_exit = True
+
+                if epoch_num >= self.max_epochs != -1:
+                    if self.game_rewards.current_size == 0:
+                        print('WARNING: Max epochs reached before any env terminated at least once')
+                        mean_rewards = -np.inf
+
+                    self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_ep_' + str(epoch_num)
+                                           + '_rew_' + str(mean_rewards).replace('[', '_').replace(']', '_')))
+                    print('MAX EPOCHS NUM!')
+                    should_exit = True
+
+                if self.frame >= self.max_frames != -1:
+                    if self.game_rewards.current_size == 0:
+                        print('WARNING: Max frames reached before any env terminated at least once')
+                        mean_rewards = -np.inf
+
+                    self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_frame_' + str(self.frame)
+                                           + '_rew_' + str(mean_rewards).replace('[', '_').replace(']', '_')))
+                    print('MAX FRAMES NUM!')
+                    should_exit = True
+
+            if should_exit:
+                self._cleanup()
+                return self.last_mean_rewards, epoch_num
 
     def play_steps(self):
         step_time = 0.0
@@ -171,6 +274,17 @@ class CoreAlgorithm(A2CAgent):
 
         return self._post_rollout2(batch_dict)
 
+    def _actor_loss(self, old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip):
+        ratio = torch.exp(old_action_log_probs_batch - action_log_probs)
+        surr1 = advantage * ratio
+        surr2 = advantage * torch.clamp(ratio, 1.0 - curr_e_clip, 1.0 + curr_e_clip)
+        a_loss = torch.max(-surr1, -surr2)
+
+        clipped = (torch.abs(ratio - 1.0) > curr_e_clip).detach()
+        self._write_stat(clip_frac=clipped.float().mean().item())
+
+        return a_loss
+
     def _bound_loss(self, mu):
         if self.bound_loss_type == 'regularisation':
             b_loss = self.reg_loss(mu)
@@ -187,6 +301,10 @@ class CoreAlgorithm(A2CAgent):
         else:
             c_loss = torch.zeros(1, device=self.ppo_device)
         return c_loss
+
+    def _cleanup(self):
+        print('Cleaning up Isaacs')
+        self.vec_env.cleanup()
 
     def _init_learning_variables(self, **kwargs):
         self.model = self.network.build(**kwargs['params']['network'], **rl_games_net_build_param(self))
@@ -238,6 +356,14 @@ class CoreAlgorithm(A2CAgent):
         }
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
+
+    def _write_stat(self, **kwargs):
+        frame = self.frame // self.num_agents
+        for k, v in kwargs.items():
+            if k.endswith("loss"):
+                self.writer.add_scalar(f'losses/{k}', v, frame)
+            else:
+                self.writer.add_scalar(f'info/{k}', v, frame)
 
     @staticmethod
     def remove_unserializable(config):

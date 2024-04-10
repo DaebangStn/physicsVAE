@@ -5,6 +5,7 @@ import torch
 from learning.core.algorithm import CoreAlgorithm
 from utils.angle import *
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
+from matplotlib import pyplot
 
 
 class StyleAlgorithm(CoreAlgorithm):
@@ -17,6 +18,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_reg_scale = None
         self._disc_grad_penalty_scale = None
         self._disc_obs_size = None
+        self._disc_input_divisor = None
 
         # reward related
         self._task_rew_scale = None
@@ -29,6 +31,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._demo_fetcher = None
         self._replay_buffer = None
         self._replay_store_prob = None
+        self._replay_num_demo_update = None
 
         # placeholders for the current episode
         self._mean_task_reward = None
@@ -112,7 +115,7 @@ class StyleAlgorithm(CoreAlgorithm):
         agent_disc_logit = torch.mean(agent_disc_logit)
         demo_disc_logit = torch.mean(demo_disc_logit)
 
-        self._write_disc_stat(
+        self._write_stat(
             disc_loss=loss.detach(),
             pred_loss=pred_loss.detach(),
             disc_logit_loss=logit_weights_loss.detach(),
@@ -151,6 +154,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_reg_scale = config_disc['reg_scale']
         self._disc_grad_penalty_scale = config_disc['grad_penalty_scale']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+        self._disc_input_divisor = int(config_disc['input_divisor'])
 
         config_rew = config_hparam['reward']
         self._task_rew_scale = config_rew['task_scale']
@@ -180,10 +184,11 @@ class StyleAlgorithm(CoreAlgorithm):
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_store_prob = config_buffer['store_prob']
+        self._replay_num_demo_update = int(config_buffer['num_demo_update'])
 
     def _post_rollout1(self):
         style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'], self.normalize_input,
-                                    self.device).view(self.horizon_length, self.num_actors, -1))
+                                    self.device, self.writer, self.frame).view(self.horizon_length, self.num_actors, -1))
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = self._task_rew_scale * task_reward + self._disc_rew_scale * style_reward
         self.experience_buffer.tensor_dict['rewards'] = combined_reward
@@ -210,7 +215,7 @@ class StyleAlgorithm(CoreAlgorithm):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        disc_input_size = max(input_dict['rollout_obs'].shape[0] // 512, 2)  # 512 is a magic number for performance
+        disc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
         rollout_obs = input_dict['rollout_obs'][0:disc_input_size]
         replay_obs = input_dict['replay_obs'][0:disc_input_size]
         demo_obs = input_dict['demo_obs'][0:disc_input_size]
@@ -227,7 +232,7 @@ class StyleAlgorithm(CoreAlgorithm):
                 return_batch, value_preds_batch)
 
     def _update_replay_buffer(self, rollout_obs):
-        demo_obs = self._demo_fetcher.fetch_traj(max(self.batch_size // 2048, 1))  # 2048 is a magic number for performance
+        demo_obs = self._demo_fetcher.fetch_traj(self._replay_num_demo_update)
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
 
@@ -239,14 +244,6 @@ class StyleAlgorithm(CoreAlgorithm):
             rollout_obs = rollout_obs[-rollout_buf.size:]
 
         rollout_buf.store(rollout_obs)
-
-    def _write_disc_stat(self, **kwargs):
-        frame = self.frame // self.num_agents
-        for k, v in kwargs.items():
-            if k.endswith("loss"):
-                self.writer.add_scalar(f'losses/{k}', v, frame)
-            else:
-                self.writer.add_scalar(f'info/{k}', v, frame)
 
     @staticmethod
     def find_key_body_ids(env, key_body_names: List[str]) -> List[int]:
@@ -341,11 +338,16 @@ def motion_lib_angle_transform(
     return obs.view(num_steps, -1)
 
 
-def disc_reward(model, disc_obs, normalize_input, device):
+def disc_reward(model, disc_obs, normalize_input, device, writer=None, step=None):
     with torch.no_grad():
         if normalize_input:
             disc_obs = model.norm_disc_obs(disc_obs)
         disc = model.disc(disc_obs)
         prob = 1 / (1 + torch.exp(-disc))
         reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=device)))
+
+        if writer is not None:
+            writer.add_histogram('disc', disc.flatten(), step)
+            writer.add_histogram('disc_rew', reward.flatten(), step)
+
     return reward

@@ -53,3 +53,5 @@ class DroppedHumanoidTask(RSIHumanoidTask):
         self._buf["actorDropped"][:, 7:] = 0
         self._buf["dofDropped"] = self._buf["dof"].clone().view(self.num, self._dof_per_env, 2)
         self._buf["dofDropped"][:, :, 1:] = 0
+
+        self.reset(torch.arange(self.num, device=self._compute_device))

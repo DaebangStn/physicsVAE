@@ -12,7 +12,7 @@ class RSIHumanoidTask(HumanoidTask):
 
     def _assign_reset_state(self, env_ids: torch.Tensor):
         assert self._motion_fetcher is not None, ("Motion library is not set by algorithm. "
-                                                  "Call set_motion_lib() in the algorithm routine first.")
+                                                  "Call set_motion_fetcher() in the algorithm routine first.")
         super()._assign_reset_state(env_ids)
 
         num_reset = len(env_ids)

@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Tuple
-from isaacgym import gymtorch, gymapi
 
+import torch
+from isaacgym import gymtorch, gymapi
 
 from env.vectask import VecTask
 from utils import PROJECT_ROOT
@@ -19,6 +20,7 @@ class HumanoidTask(VecTask):
         self._num_sensors = None
         self._recovery_limit = None
         self._viewer_follow_env0 = None
+        self._contact_body_ids = None
 
         self._envs = []
         self._humanoids_id_env = []
@@ -59,18 +61,20 @@ class HumanoidTask(VecTask):
 
         self._dof_per_env = self._buf["dof"].shape[0] // self._num_envs
         dof_state_tensor_reshaped = ((self._buf["dof"].view(self._num_envs, self._dof_per_env, 2))
-                                     [:, :self._num_humanoid_dof])
-        self._buf["dofInit"] = torch.zeros_like(dof_state_tensor_reshaped)  # Caution! shape (num_envs, num_humanoid_dof, 2)
+        [:, :self._num_humanoid_dof])
+        # Caution! shape (num_envs, num_humanoid_dof, 2)
+        self._buf["dofInit"] = torch.zeros_like(dof_state_tensor_reshaped)
         self._buf["dPos"] = dof_state_tensor_reshaped[..., 0]
         self._buf["dVel"] = dof_state_tensor_reshaped[..., 1]
 
         bodies_per_env = self._buf["rBody"].shape[0] // self._num_envs
         rigid_body_state_reshaped = (self._buf["rBody"].view(self._num_envs, bodies_per_env, 13)
-                                     [:, :self._num_humanoid_rigid_body])
+        [:, :self._num_humanoid_rigid_body])
         self._buf["rPos"] = rigid_body_state_reshaped[..., 0:3]
         self._buf["rRot"] = rigid_body_state_reshaped[..., 3:7]
         self._buf["rVel"] = rigid_body_state_reshaped[..., 7:10]
         self._buf["rAnVel"] = rigid_body_state_reshaped[..., 10:13]
+        self._buf["contact"] = self._buf["contact"].view(self.num, bodies_per_env, 3)[:, :self._num_humanoid_rigid_body]
 
         actors_per_env = self._buf["actor"].shape[0] // self._num_envs
         actor_root_reshaped = self._buf["actor"].view(self._num_envs, actors_per_env, 13)[:, 0]
@@ -96,7 +100,8 @@ class HumanoidTask(VecTask):
         self_collision = False
 
         sensor_install_sight = ["right_foot", "left_foot"]
-        create_sensors(self._gym, self._humanoid_asset, sensor_install_sight)
+        self._contact_body_ids = torch.tensor(create_sensors(self._gym, self._humanoid_asset, sensor_install_sight),
+                                              device=self._compute_device)
         self._num_sensors = len(sensor_install_sight)
 
         for i in range(self._num_envs):
@@ -178,7 +183,7 @@ class HumanoidTask(VecTask):
         self._buf["obs"] = torch.cat([self._buf["dPos"], self._buf["dVel"], self._buf["actor"]], dim=-1)
 
     def _compute_reset(self):
-        height_criteria = 0.5
+        height_criteria = 0.8
         force_criteria = 1.0
 
         actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
@@ -189,6 +194,12 @@ class HumanoidTask(VecTask):
         # self._buf["terminate"] = actor_down  # & contact_off
         tooLongEpisode = self._buf["elapsedStep"] > self._max_episode_steps
         self._buf["reset"] = tooLongEpisode | self._buf["terminate"]
+
+    # AMP version reset
+    # def _compute_reset(self):
+    #     self._buf["reset"][:], self._buf["terminate"][:] = \
+    #         compute_amp_humanoid_reset(self._buf["reset"], self._buf["elapsedStep"], self._buf["contact"],
+    #                                    self._contact_body_ids, self._buf["rPos"], self._max_episode_steps, 0.15)
 
     def _compute_reward(self):
         reset_reward = -100.0
@@ -274,3 +285,31 @@ class HumanoidTask(VecTask):
         displace = gymapi.Vec3(abs(displace.x), abs(displace.y), abs(displace.z))
         cam_pos = cam_target + displace
         self._gym.viewer_camera_look_at(self._viewer, None, cam_pos, cam_target)
+
+
+@torch.jit.script
+def compute_amp_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos,
+                               max_episode_length, termination_heights):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, int, float) -> Tuple[Tensor, Tensor]
+    terminated = torch.zeros_like(reset_buf)
+
+    masked_contact_buf = contact_buf.clone()
+    masked_contact_buf[:, contact_body_ids, :] = 0
+    fall_contact = torch.any(torch.abs(masked_contact_buf) > 0.1, dim=-1)
+    fall_contact = torch.any(fall_contact, dim=-1)
+
+    body_height = rigid_body_pos[..., 2]
+    fall_height = body_height < termination_heights
+    fall_height[:, contact_body_ids] = False
+    fall_height = torch.any(fall_height, dim=-1)
+
+    has_fallen = torch.logical_and(fall_contact, fall_height)
+
+    # first timestep can sometimes still have nonzero contact forces
+    # so only check after first couple of steps
+    has_fallen *= (progress_buf > 1)
+    terminated = torch.where(has_fallen, torch.ones_like(reset_buf), terminated)
+
+    reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
+
+    return reset, terminated
