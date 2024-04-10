@@ -91,5 +91,6 @@ hparam:
       logit_reg_scale: 0.01
       reg_scale: 0.0001
       grad_penalty_scale: 5
+      log_hist: False
 
 seed: 1

@@ -19,6 +19,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_grad_penalty_scale = None
         self._disc_obs_size = None
         self._disc_input_divisor = None
+        self._disc_log_hist = None
 
         # reward related
         self._task_rew_scale = None
@@ -155,6 +156,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_grad_penalty_scale = config_disc['grad_penalty_scale']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
         self._disc_input_divisor = int(config_disc['input_divisor'])
+        self._disc_log_hist = config_disc['log_hist']
 
         config_rew = config_hparam['reward']
         self._task_rew_scale = config_rew['task_scale']
@@ -187,8 +189,15 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_num_demo_update = int(config_buffer['num_demo_update'])
 
     def _post_rollout1(self):
-        style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'], self.normalize_input,
-                                    self.device, self.writer, self.frame).view(self.horizon_length, self.num_actors, -1))
+        if self._disc_log_hist:
+            style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'],
+                                        self.normalize_input, self.device, self.writer, self.frame
+                                        ).view(self.horizon_length, self.num_actors, -1))
+        else:
+            style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'],
+                                        self.normalize_input, self.device
+                                        ).view(self.horizon_length, self.num_actors, -1))
+
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = self._task_rew_scale * task_reward + self._disc_rew_scale * style_reward
         self.experience_buffer.tensor_dict['rewards'] = combined_reward
