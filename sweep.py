@@ -21,7 +21,10 @@ sweep_config = {
     "method": "grid",
     "parameters": {
         "max_frames": {
-            "values": [100000, 200000, 300000]
+            "values": [200000]
+        },
+        "input_divisor": {
+            1, 4, 16, 64, 256
         }
     }
 }
