@@ -9,6 +9,8 @@ from utils.env import sample_color
 
 class SkillAlgorithm(StyleAlgorithm):
     def __init__(self, **kwargs):
+        self._disc_input_divisor = None
+
         # encoder related
         self._enc_loss_coef = None
         self._latent_update_freq_max = None
@@ -131,6 +133,8 @@ class SkillAlgorithm(StyleAlgorithm):
         super()._init_learning_variables(**kwargs)
 
         config_hparam = self.config
+        config_disc = config_hparam['style']['disc']
+        self._disc_input_divisor = int(config_disc['input_divisor'])
         config_skill = config_hparam['skill']
         self._div_loss_coef = config_skill['div_loss_coef']
         self._enc_loss_coef = config_skill['enc']['loss_coef']
@@ -180,7 +184,7 @@ class SkillAlgorithm(StyleAlgorithm):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        disc_input_size = max(input_dict['rollout_obs'].shape[0] // 512, 2)  # 512 is a magic number for performance
+        disc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
         batch_dict['rollout_z'] = input_dict['rollout_z'][0:disc_input_size]
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,

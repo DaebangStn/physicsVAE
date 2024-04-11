@@ -3,10 +3,10 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: sword_full_rsi
+  memo: humanoid_walk_latent64
   motion_file:
-#    assets/motions/dataset_humanoid.yaml
-    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/dataset_humanoid.yaml
+#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: skill
@@ -16,8 +16,8 @@ network:
   separate: True
 
   space:
-#    latent_dim: 64
-    latent_dim: 32
+    latent_dim: 64
+#    latent_dim: 32
 
     continuous:
       mu_activation: None
@@ -43,7 +43,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_skillAlgo_09-11-55-45_sword_full_rsi/nn/last_keypointMaxObsTask_ep_3800_rew_7214.5605.pth
+  runs/keypointMaxObsTask_skillAlgo_11-12-00-35_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_8800_rew_7111.5767.pth
 
 hparam:
   normalize_input: True
@@ -51,7 +51,7 @@ hparam:
   normalize_advantage: True
   clip_value: False
   reward_shaper: {}
-  save_frequency: 200
+  save_frequency: 100
 
   # learning hyperparameters
   horizon_length: 32
@@ -73,21 +73,24 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 2.0
+    enc_scale: 0.5
 
   style:
     replay_buf:
       size: 200000
-      store_prob: 0.001
+      store_prob: 0.01
+      num_demo_update: 128
 
     disc:
-      num_obs: 140
-#      num_obs: 125
+      input_divisor: 16
+#      num_obs: 140
+      num_obs: 125
       obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
       grad_penalty_scale: 5
+      log_hist: False
 
   skill:
     div_loss_coef: 0.01

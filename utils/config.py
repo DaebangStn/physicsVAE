@@ -45,7 +45,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_env = yaml.load(f, Loader=yaml.SafeLoader)
 
     # Overriding wandb config
-    if wandb.config is not None:
+    if wandb.run is not None:
         if "max_frames" in wandb.config:
             config_train["hparam"]["max_frames"] = wandb.config.max_frames
         if "input_divisor" in wandb.config:
