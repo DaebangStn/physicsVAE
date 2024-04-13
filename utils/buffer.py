@@ -87,6 +87,10 @@ class MotionLibFetcher:
         motion_times = self._motion_lib.sample_time(motion_ids)
         return self._motion_lib.get_motion_state(motion_ids, motion_times)
 
+    @property
+    def motion_lib(self):
+        return self._motion_lib
+
     @staticmethod
     def demo_fetcher_config(cls, algo_conf):
         return {
@@ -103,13 +107,57 @@ class MotionLibFetcher:
         }
 
 
+@torch.jit.script
+class TensorFIFO:
+    def __init__(self, max_size: int):
+        self._q = []
+        self._max_size = max_size
+
+    def push(self, item: torch.Tensor):
+        self._q.insert(0, item)
+        if len(self._q) > self._max_size:
+            self._q.pop()
+
+    def set_row(self, idx: int, item: torch.Tensor, set_flag: torch.Tensor):
+        """Set certain row of the tensor in the FIFO.
+        If not, do anything.
+
+        :param idx: index of the item to be set.
+        :param item: tensor to be set.
+        :param set_flag:
+        :return:
+        """
+        assert idx < len(self._q), f"[TensorFIFO] index out of range: {idx} >= {len(self._q)}"
+        assert item.shape[0] == set_flag.shape[0], \
+            f"[TensorFIFO] set_flag shape mismatch: {item.shape[0]} != {set_flag.shape[0]}"
+        assert item.shape == self._q[0].shape, \
+            f"[TensorFIFO] item shape mismatch: {item.shape} != {self._q[0].shape}"
+
+        self._q[idx] = torch.where(set_flag, item, self._q[idx])
+
+    @property
+    def max_len(self):
+        return self._max_size
+
+    @property
+    def list(self):
+        return self._q
+
+    def __getitem__(self, idx):
+        return self._q[idx]
+
+    def __len__(self):
+        return len(self._q)
+
+
+@torch.jit.script
 class TensorHistoryFIFO:
     def __init__(self, max_size: int):
         self._max_size = max_size
-        self._q = self.TensorFIFO(max_size)
+        self._q = TensorFIFO(max_size)
 
     def push_on_reset(self, x: torch.Tensor, resets: torch.Tensor):
-        assert x.shape[0] == resets.shape[0], f"[{self.__class__}]shape mismatch: {x.shape[0]} != {resets.shape[0]}"
+        assert x.shape[0] == resets.shape[0], f"[TensorHistoryFIFO] shape mismatch: {x.shape[0]} != {resets.shape[0]}"
         if len(self._q) == 0:
             for i in range(self._q.max_len):
                 self._q.push(x)
@@ -118,9 +166,13 @@ class TensorHistoryFIFO:
                 self._q.set_row(i, x, resets)
 
     def push(self, x: torch.Tensor):
-        if len(self._q) != self._max_size:
-            raise ValueError(f"[{self.__class__}] FIFO is empty. Cannot push.")
-        self._q.push(x)
+        if len(self._q) == 0:
+            for i in range(self._q.max_len):
+                self._q.push(x)
+        else:
+            if len(self._q) != self._max_size:
+                raise ValueError(f"[TensorHistoryFIFO] FIFO is empty. Cannot push.")
+            self._q.push(x)
 
     @property
     def history(self):
@@ -128,47 +180,3 @@ class TensorHistoryFIFO:
 
     def __len__(self):
         return len(self._q)
-
-    class TensorFIFO:
-        def __init__(self, max_size: int):
-            self._q = []
-            self._max_size = max_size
-
-        def push(self, item: torch.Tensor):
-            self._q.insert(0, item)
-            if len(self._q) > self._max_size:
-                self._q.pop()
-
-        def set_row(self, idx: int, item: torch.Tensor, set_flag: torch.Tensor):
-            """Set certain row of the tensor in the FIFO.
-            If not, do anything.
-
-            :param idx: index of the item to be set.
-            :param item: tensor to be set.
-            :param set_flag:
-            :return:
-            """
-            assert idx < len(self._q), f"[{self.__class__}] index out of range: {idx} >= {len(self._q)}"
-            assert item.shape[0] == set_flag.shape[0], \
-                f"[{self.__class__}] set_flag shape mismatch: {item.shape[0]} != {set_flag.shape[0]}"
-            assert item.shape == self._q[0].shape, \
-                f"[{self.__class__}] item shape mismatch: {item.shape} != {self._q[0].shape}"
-
-            self._q[idx] = torch.where(set_flag, item, self._q[idx])
-
-        @property
-        def max_len(self):
-            return self._max_size
-
-        @property
-        def list(self):
-            return self._q
-
-        def __getitem__(self, idx):
-            return self._q[idx]
-
-        def __repr__(self):
-            return repr(self._q)
-
-        def __len__(self):
-            return len(self._q)

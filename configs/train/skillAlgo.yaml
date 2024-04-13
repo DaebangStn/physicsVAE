@@ -1,5 +1,6 @@
 test: False
 debug: False
+matcher: True
 
 algo:
   name: skillAlgo
@@ -43,7 +44,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_skillAlgo_11-12-00-35_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_8800_rew_7111.5767.pth
+  runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
 
 hparam:
   normalize_input: True
@@ -86,6 +87,7 @@ hparam:
 #      num_obs: 140
       num_obs: 125
       obs_traj_len: 4
+#      obs_traj_len: 10
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001

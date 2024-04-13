@@ -3,8 +3,10 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: 2048_compare_amp
-  motion_file: assets/motions/amp_humanoid_walk.npy
+  memo: Atk_Jump
+  motion_file:
+#    assets/motions/amp_humanoid_walk.npy
+    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
 
 model:
   name: style
@@ -38,13 +40,13 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_styleAlgo_10-16-49-39_2048_compare_amp/nn/keypointMaxObsTask.pth
+#  runs/keypointMaxObsTask_styleAlgo_12-22-30-54_Atk_Jump/nn/last_keypointMaxObsTask_ep_26500_rew_7213.5254.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 
 
 hparam:
-  max_frames: 100000
+#  max_frames: 100000
 
   normalize_input: True
   normalize_value: True
@@ -85,8 +87,9 @@ hparam:
     disc:
       # denominator for collected data within the rollout
       input_divisor: 16
-      num_obs: 125
-      obs_traj_len: 4
+      num_obs: 140
+#      num_obs: 125
+      obs_traj_len: 10
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001

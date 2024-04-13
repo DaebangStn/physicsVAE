@@ -4,7 +4,7 @@ import torch
 from rl_games.algos_torch import torch_ext
 
 from learning.core.player import CorePlayer
-from learning.style.algorithm import style_task_obs_angle_transform, StyleAlgorithm, disc_reward
+from learning.style.algorithm import keyp_task_obs_angle_transform, StyleAlgorithm, disc_reward
 from utils.buffer import TensorHistoryFIFO, MotionLibFetcher
 
 
@@ -25,12 +25,12 @@ class StylePlayer(CorePlayer):
         if self._log_file is not None:
             self._log_action(actions)
         obs, rew, done, info = super().env_step(env, actions)
-        obs, disc_obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
 
     def env_reset(self, env):
         obs = super().env_reset(env)
-        obs, disc_obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}
 
     def restore(self, fn):
@@ -53,10 +53,11 @@ class StylePlayer(CorePlayer):
 
         env_conf = kwargs['params']['config']['env_config']['env']
         if "reference_state_init_prob" in env_conf:
-            demo_fetcher = MotionLibFetcher(self._disc_obs_traj_len, self.env.dt, self.device, algo_conf['motion_file'],
-                                            algo_conf['joint_information']['dof_body_ids'],
-                                            self._dof_offsets, self._key_body_ids)
-            self.env.set_motion_fetcher(demo_fetcher)
+            self._demo_fetcher = MotionLibFetcher(self._disc_obs_traj_len, self.env.dt, self.device,
+                                                  algo_conf['motion_file'],
+                                                  algo_conf['joint_information']['dof_body_ids'],
+                                                  self._dof_offsets, self._key_body_ids)
+            self.env.set_motion_fetcher(self._demo_fetcher)
 
         style_conf = kwargs['params']['hparam']['style']
         self._disc_obs_traj_len = style_conf['disc']['obs_traj_len']

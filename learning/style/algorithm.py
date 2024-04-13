@@ -48,12 +48,12 @@ class StyleAlgorithm(CoreAlgorithm):
 
     def env_step(self, actions):
         obs, rew, done, info = super().env_step(actions)
-        obs, disc_obs = style_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         obs = super().env_reset(env_ids)['obs']
-        obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}
 
     def get_stats_weights(self, model_stats=False):
@@ -327,7 +327,7 @@ def obs_transform(body_pos: torch.Tensor, body_rot: torch.Tensor, body_vel: torc
 
 
 @torch.jit.script
-def style_task_obs_angle_transform(
+def keyp_task_obs_angle_transform(
         obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
                    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         key_idx: List[int], dof_offsets: List[int]):

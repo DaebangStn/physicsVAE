@@ -6,7 +6,7 @@ from rl_games.algos_torch import model_builder
 from rl_games.algos_torch import torch_ext
 
 from learning.core.algorithm import CoreAlgorithm
-from learning.style.algorithm import (StyleAlgorithm, motion_lib_angle_transform, style_task_obs_angle_transform,
+from learning.style.algorithm import (StyleAlgorithm, motion_lib_angle_transform, keyp_task_obs_angle_transform,
                                       disc_reward)
 from utils.buffer import TensorHistoryFIFO, MotionLibFetcher, SingleTensorBuffer
 
@@ -61,7 +61,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
             # TODO, check whether this actor averages obs / and train mode
             llc_action, _ = self.model.actor(torch.cat([obs_step['obs'], z], dim=1))
             obs, rew, done, info = super().env_step(llc_action)
-            obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+            obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
             obs_step = {'obs': obs, 'disc_obs': disc_obs}
 
             disc_rew = disc_reward(disc_obs, self._llc_disc, self.normalize_input, self.device)
@@ -80,7 +80,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         obs = super().env_reset()['obs']
-        obs, disc_obs = style_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}
 
     def prepare_dataset(self, batch_dict):

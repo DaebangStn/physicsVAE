@@ -16,9 +16,9 @@ env:
   num_act: 28  # dof(#) - naive humanoid
   max_episode_steps: 1200
 
-  recovery_limit: 0
+  recovery_limit: 60
   drop_on_reset_prob: 0
-  reference_state_init_prob: 0.5
+  reference_state_init_prob: 1
   viewer_follow_env0: False
 
 sim:
