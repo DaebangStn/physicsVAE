@@ -60,25 +60,27 @@ class Matcher:
             self._motion_start_idx.append(motion_start_idx)
             motion_start_idx += length
 
-        self._stacked_motion_traj = torch.cat(frames, dim=0)
+        self._stacked_motion_traj = torch.cat(frames, dim=0).unsqueeze(0)  # dim0: 1, dim1: frame, dim2: feature
         self._motion_start_idx = torch.tensor(self._motion_start_idx, device=self._device)
 
-    def match(self, obs: torch.Tensor):
-        assert len(obs.shape) == 1, f"Only the one observation is allowed. But the shape is {obs.shape}."
-        assert obs.shape[0] == self._stacked_motion_traj.shape[1], \
-            f"disc_obs size({obs.shape[0]}) != motion_traj size({self._stacked_motion_traj.shape[1]})"
+    def match(self, obs: torch.Tensor) -> torch.Tensor:
+        # dim0: num_env, dim1: feature
+        assert len(obs.shape) == 2, f"Only the two observation is allowed. But the shape is {obs.shape}."
+        assert (obs.shape[1] == self._stacked_motion_traj.shape[1],
+                f"matcher obs size({obs.shape[1]}) != motion_traj size({self._stacked_motion_traj.shape[1]})")
 
         min_dist_stack_idx = self._min_dist_stack_idx(obs)
         motion_idx = self._frame_idx_to_motion_idx(min_dist_stack_idx)
-        frame_idx = min_dist_stack_idx - self._motion_start_idx[motion_idx]
-        self._update_plotter(motion_idx, frame_idx)
+        frame_idx = min_dist_stack_idx[0] - self._motion_start_idx[motion_idx[0]]
+        self._update_plotter(motion_idx[0], frame_idx)
+        return motion_idx
 
-    def _min_dist_stack_idx(self, disc_obs: torch.Tensor):
-        disc_obs = disc_obs.unsqueeze(0)
-        distance = torch.sum((self._stacked_motion_traj - disc_obs) ** 2, dim=-1)
-        return torch.argmin(distance).item()
+    def _min_dist_stack_idx(self, obs: torch.Tensor) -> torch.Tensor:
+        obs = obs.unsqueeze(1)  # dim0: num_env, dim1: 1, dim2: feature
+        distance = torch.sum((self._stacked_motion_traj - obs) ** 2, dim=-1)  # dim0: num_env, dim1: frame
+        return torch.argmin(distance, dim=-1)
 
-    def _frame_idx_to_motion_idx(self, frame_idx: int):
+    def _frame_idx_to_motion_idx(self, frame_idx: torch.Tensor) -> torch.Tensor:
         return torch.searchsorted(self._motion_start_idx, frame_idx, right=True) - 1
 
     def _update_plotter(self, motion_idx, frame_idx):

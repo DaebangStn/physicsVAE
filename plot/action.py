@@ -1,23 +1,13 @@
 import h5py
-import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-def build_args():
-    parameters = [
-        {"name": "--hdf", "type": str, "default": "",
-         "help": "Path to the HDF file containing the latent vectors."},
-    ]
-    parser = argparse.ArgumentParser(description="Visualize Latent Space")
-    for param in parameters:
-        kwargs = {k: v for k, v in param.items() if k != "name"}
-        parser.add_argument(param["name"], **kwargs)
-    return parser.parse_args()
+from utils.plot import *
 
 
-def plot_distribution(label: str, data: np.ndarray):
-    print(f"Dataset: {label}")
+def plot_action(f, exp_name):
+    data = np.array(f[exp_name]["ActionLogger"]['action'])
+    print(f"Dataset: {exp_name}")
     print(f"Mean: {np.mean(data):.4f}")
     print(f"Median: {np.median(data):.4f}")
     print(f"Standard Deviation: {np.std(data):.4f}")
@@ -25,8 +15,10 @@ def plot_distribution(label: str, data: np.ndarray):
     print(f"Maximum: {np.max(data):.4f}")
 
     flattened_data = data.flatten()
-    plt.hist(flattened_data, bins=100, alpha=0.5, label=label, density=True)
-    plt.title(f"{label}")
+
+    exp_name = shorten_middle(exp_name, 25)
+    plt.hist(flattened_data, bins=100, alpha=0.5, label=exp_name, density=True)
+    plt.title(f"{exp_name}\n(actions)")
     plt.xlabel("Action")
     plt.ylabel("Probability")
     plt.xlim(-1, 1)
@@ -37,10 +29,15 @@ def plot_distribution(label: str, data: np.ndarray):
 
 if __name__ == '__main__':
     args = build_args()
+    # plt.switch_backend('TkAgg')  # Since pycharm IDE embeds matplotlib, it is necessary to switch backend
 
     if not args.hdf:
         raise ValueError("Please provide the path to the HDF5 file containing the latent vectors.")
 
     with h5py.File(args.hdf, 'r') as f:
-        for dataset in f:
-            plot_distribution(dataset, np.array(f[dataset]))
+        for exp_name in f:
+            try:
+                plot_action(f, exp_name)
+            except Exception as e:
+                print(f"Error occurred while plotting {exp_name}: {e}")
+                continue

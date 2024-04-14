@@ -40,7 +40,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_styleAlgo_12-22-30-54_Atk_Jump/nn/last_keypointMaxObsTask_ep_26500_rew_7213.5254.pth
+  runs/keypointMaxObsTask_styleAlgo_12-22-30-54_Atk_Jump/nn/last_keypointMaxObsTask_ep_29000_rew_7217.8936.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 
@@ -54,8 +54,10 @@ hparam:
   clip_value: False
   reward_shaper: {}
   save_frequency: 100
-#  collect_action:
-#    filename: action_collection.hdf5
+
+  logger:
+    log_action: True
+    filename: plot
 
   # learning hyperparameters
   horizon_length: 32

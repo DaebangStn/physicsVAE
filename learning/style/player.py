@@ -1,10 +1,13 @@
+from typing import Tuple, List
+
 import h5py
 import numpy as np
 import torch
 from rl_games.algos_torch import torch_ext
 
 from learning.core.player import CorePlayer
-from learning.style.algorithm import keyp_task_obs_angle_transform, StyleAlgorithm, disc_reward
+from learning.style.algorithm import keyp_task_obs_angle_transform, StyleAlgorithm, disc_reward, obs_transform
+from learning.logger.action import ActionLogger
 from utils.buffer import TensorHistoryFIFO, MotionLibFetcher
 
 
@@ -16,22 +19,29 @@ class StylePlayer(CorePlayer):
         self._disc_obs_buf = None
         self._disc_obs_traj_len = None
 
-        self._log_file = None
+        self._action_logger = None
+        self._show_reward = None
 
         self._checkpoint_disc = None
         super().__init__(**kwargs)
 
     def env_step(self, env, actions):
-        if self._log_file is not None:
-            self._log_action(actions)
+        if self._action_logger is not None:
+            self._action_logger.log(actions)
         obs, rew, done, info = super().env_step(env, actions)
-        obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
-        return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
+        if self._show_reward:
+            obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+            return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
+        else:
+            return {'obs': keyp_task_concat_obs(obs)}, rew, done, info
 
     def env_reset(self, env):
         obs = super().env_reset(env)
-        obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
-        return {'obs': obs, 'disc_obs': disc_obs}
+        if self._show_reward:
+            obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+            return {'obs': obs, 'disc_obs': disc_obs}
+        else:
+            return {'obs': keyp_task_concat_obs(obs)}
 
     def restore(self, fn):
         super().restore(fn)
@@ -59,28 +69,19 @@ class StylePlayer(CorePlayer):
                                                   self._dof_offsets, self._key_body_ids)
             self.env.set_motion_fetcher(self._demo_fetcher)
 
-        style_conf = kwargs['params']['hparam']['style']
+        self._show_reward = self.config.get('show_reward', False)
+
+        style_conf = self.config['style']
         self._disc_obs_traj_len = style_conf['disc']['obs_traj_len']
-        self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+        if self._show_reward:
+            self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
 
-        collect_action = self.config.get('collect_action', None)
-        if collect_action is not None:
-            full_experiment_name = kwargs['params']['config']['full_experiment_name']
-            self._init_action_collection(collect_action, full_experiment_name)
-
-    def _init_action_collection(self, config, fullname):
-        collect_filename = config.get('filename')
-        self._log_file = h5py.File(collect_filename, 'a')
-
-        if fullname in self._log_file:
-            self._log_file = self._log_file[fullname]
-        else:
-            self._log_file = self._log_file.create_dataset(
-                fullname, shape=(0, self.actions_num), maxshape=(None, self.actions_num),
-                data=np.array([]), dtype='f4', chunks=True)
-
-        print("==> Action log file: {:s}".format(collect_filename) +
-              " with index {:s}".format(fullname))
+        logger_config = self.config.get('logger', None)
+        if logger_config is not None:
+            log_action = logger_config.get('log_action', False)
+            if log_action:
+                full_experiment_name = kwargs['params']['config']['full_experiment_name']
+                self._action_logger = ActionLogger(logger_config['filename'], full_experiment_name, self.actions_num)
 
     def _disc_debug(self, disc_obs):
         reward = disc_reward(self.model, disc_obs, self.normalize_input, self.device).mean().item()
@@ -88,15 +89,20 @@ class StylePlayer(CorePlayer):
         if self._games_played == 0:
             self._writer.add_scalar("player/reward_disc", reward, self._n_step)
 
-    def _log_action(self, action):
-        action = action.cpu().numpy()
-        new_size = self._log_file.shape[0] + action.shape[0]
-        self._log_file.resize(new_size, axis=0)
-        self._log_file[-action.shape[0]:] = action
-
     def _pre_step(self):
-        self._disc_obs_buf.push_on_reset(self.obses['disc_obs'], self.dones)
+        if self._show_reward:
+            self._disc_obs_buf.push_on_reset(self.obses['disc_obs'], self.dones)
 
     def _post_step(self):
-        self._disc_obs_buf.push(self.obses['disc_obs'])
-        self._disc_debug(self._disc_obs_buf.history)
+        if self._show_reward:
+            self._disc_obs_buf.push(self.obses['disc_obs'])
+            self._disc_debug(self._disc_obs_buf.history)
+
+
+@torch.jit.script
+def keyp_task_concat_obs(
+        obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+                   torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]) -> torch.Tensor:
+    aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
+    obs = obs_transform(rPos, rRot, rVel, rAnVel)
+    return obs

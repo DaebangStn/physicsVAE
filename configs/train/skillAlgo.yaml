@@ -1,12 +1,12 @@
 test: False
 debug: False
-matcher: True
 
 algo:
   name: skillAlgo
   memo: humanoid_walk_latent64
   motion_file:
     assets/motions/dataset_humanoid.yaml
+#    assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
@@ -47,12 +47,19 @@ checkpoint:  # from the project root
   runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
 
 hparam:
+  max_frames: 1500
+
   normalize_input: True
   normalize_value: True
   normalize_advantage: True
   clip_value: False
   reward_shaper: {}
   save_frequency: 100
+
+  logger:
+    log_action: False
+    log_latent_motion_id: True
+    filename: plot
 
   # learning hyperparameters
   horizon_length: 32
@@ -75,6 +82,8 @@ hparam:
     task_scale: 0.0
     disc_scale: 2.0
     enc_scale: 0.5
+
+    show_on_player: False
 
   style:
     replay_buf:
@@ -101,6 +110,6 @@ hparam:
 
     latent:
       update_freq_max: 150
-      update_freq_min: 1
+      update_freq_min: 140
 
 seed: 1

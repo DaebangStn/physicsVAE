@@ -27,7 +27,6 @@ class CorePlayer(PpoPlayerContinuous):
         self.normalize_value = None
         self.is_rnn = None
 
-        self.max_steps = int(1e30)
         self.games_num = int(1e30)
         self._games_played = None
         self._n_step = None
@@ -172,6 +171,8 @@ class CorePlayer(PpoPlayerContinuous):
 
         logdir = 'runs/' + kwargs['params']['config']['full_experiment_name']
         self._writer = SummaryWriter(log_dir=logdir)
+
+        self.max_steps = self.config.get('max_frames', int(1e30))
 
     def _pre_step(self):
         pass
