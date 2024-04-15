@@ -5,13 +5,14 @@ import torch
 
 from poselib.motion_lib import MotionLib, USE_CACHE
 from poselib.visualization.plt_plotter import Matplotlib3DPlotter
-from poselib.visualization.skeleton_plotter_tasks import Draw3DSkeletonMotion, Draw3DSkeletonState
+from poselib.visualization.skeleton_plotter_tasks import Draw3DSkeletonMotion
 from utils.buffer import TensorHistoryFIFO
 from utils.angle import calc_heading_quat_inv, quat_rotate
 
 
 class Matcher:
-    def __init__(self, motion_lib: MotionLib, traj_len: int, sim_dt: float, device: torch.device):
+    def __init__(self, motion_lib: MotionLib, traj_len: int, sim_dt: float, device: torch.device,
+                 plot_env0: bool = False):
         assert USE_CACHE, \
             f"Since MotionLib must located in the GPU, USE_CACHE of MotionLib must be True. But it is {USE_CACHE}."
 
@@ -35,7 +36,11 @@ class Matcher:
         self._motions_plot = None
 
         self._build_motion_traj(motion_lib)
-        self._build_plotter()
+
+        self._vis_task = None
+        self._plotter = None
+        if plot_env0:
+            self._build_plotter()
 
     def _build_plotter(self):
         self._vis_task = Draw3DSkeletonMotion(task_name="motion", skeleton_motion=self._motions_plot[0], frame_index=0)
@@ -71,8 +76,9 @@ class Matcher:
 
         min_dist_stack_idx = self._min_dist_stack_idx(obs)
         motion_idx = self._frame_idx_to_motion_idx(min_dist_stack_idx)
-        frame_idx = min_dist_stack_idx[0] - self._motion_start_idx[motion_idx[0]]
-        self._update_plotter(motion_idx[0], frame_idx)
+        if self._plotter is not None:
+            frame_idx = min_dist_stack_idx[0] - self._motion_start_idx[motion_idx[0]]
+            self._update_plotter(motion_idx[0], frame_idx)
         return motion_idx
 
     def _min_dist_stack_idx(self, obs: torch.Tensor) -> torch.Tensor:

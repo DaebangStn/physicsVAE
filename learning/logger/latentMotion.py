@@ -14,6 +14,7 @@ class LatentMotionLogger(BaseLogger):
         motion_id:
             {latent_idx}: int (L) - L: number of motion id (resizeable)
     """
+
     def __init__(self, filename: str, exp_name: str, num_envs: int, latent_dim: int):
         super().__init__(filename, exp_name)
 
@@ -43,10 +44,10 @@ class LatentMotionLogger(BaseLogger):
             self._motion_id_group.create_dataset(str(self._latent_idx[env_idx]), shape=(0,), maxshape=(None,), dtype='i4',
                                                  chunks=True)
 
-    def log(self, data: torch.Tensor):
-        assert data.shape[0] == self._latent_idx.shape[0], \
-            f"latent_idx({self._latent_idx.shape[0]}) != data({data.shape[0]})"
+    def log(self, motion_indices: torch.Tensor):
+        assert motion_indices.shape[0] == self._latent_idx.shape[0], \
+            f"latent_idx({self._latent_idx.shape[0]}) != data({motion_indices.shape[0]})"
 
-        for i in range(data.shape[0]):
+        for i in range(motion_indices.shape[0]):
             motion_ids = self._motion_id_group[str(self._latent_idx[i])]
-            self._append_ds(motion_ids, data[i:i+1].to("cpu").numpy())
+            self._append_ds(motion_ids, motion_indices[i:i + 1].to("cpu").numpy())

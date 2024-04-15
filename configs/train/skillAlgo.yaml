@@ -5,9 +5,9 @@ algo:
   name: skillAlgo
   memo: humanoid_walk_latent64
   motion_file:
-    assets/motions/dataset_humanoid.yaml
+#    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
-#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: skill
@@ -44,7 +44,8 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
+#  runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
+  runs/last_keypointMaxObsTask_ep_30500_rew_7181.9023.pth
 
 hparam:
   max_frames: 1500
@@ -57,9 +58,13 @@ hparam:
   save_frequency: 100
 
   logger:
-    log_action: False
-    log_latent_motion_id: True
-    filename: plot
+    show_matcher_out: False
+    action: False
+    latent_motion_id: False
+    motion_transition: True
+    filename:
+      plot
+#      junk
 
   # learning hyperparameters
   horizon_length: 32
@@ -93,10 +98,10 @@ hparam:
 
     disc:
       input_divisor: 16
-#      num_obs: 140
-      num_obs: 125
-      obs_traj_len: 4
-#      obs_traj_len: 10
+      num_obs: 140
+#      num_obs: 125
+#      obs_traj_len: 4
+      obs_traj_len: 10
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
@@ -109,7 +114,7 @@ hparam:
       loss_coef: 5
 
     latent:
-      update_freq_max: 150
-      update_freq_min: 140
+      update_freq_max: 210
+      update_freq_min: 200
 
 seed: 1

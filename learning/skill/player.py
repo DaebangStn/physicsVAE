@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 from learning.style.player import StylePlayer, keyp_task_obs_angle_transform, keyp_task_concat_obs
 from learning.skill.algorithm import sample_latent
 from learning.logger.latentMotion import LatentMotionLogger
-from poselib.matcher import Matcher
+from learning.logger.motionTransition import MotionTransitionLogger
+from learning.logger.matcher import Matcher
+from utils.env import sample_color
 from utils.buffer import TensorHistoryFIFO
 from utils.angle import calc_heading_quat_inv, quat_rotate
-from utils.env import sample_color
 
 
 class SkillPlayer(StylePlayer):
@@ -23,6 +24,7 @@ class SkillPlayer(StylePlayer):
         self._matcher = None
         self._matcher_obs_buf = None
         self._latent_logger = None
+        self._transition_logger = None
 
         # placeholders for the current episode
         self._z = None
@@ -53,7 +55,7 @@ class SkillPlayer(StylePlayer):
             obs_latent = torch.cat([obs_concat, self._z], dim=1)
             obs = {'obs': obs_latent}
 
-        if self._latent_logger:
+        if self._latent_logger or self._transition_logger:
             obs['matcher'] = keyp_obs_to_matcher(obs_raw['obs'], self._key_body_ids, self._dof_offsets)
         return obs
 
@@ -73,18 +75,26 @@ class SkillPlayer(StylePlayer):
 
         logger_config = self.config.get('logger', None)
         if logger_config is not None:
-            log_latent = logger_config.get('log_latent_motion_id', False)
-            if log_latent:
+            log_latent = logger_config.get('latent_motion_id', False)
+            motion_transition = logger_config.get('motion_transition', False)
+            if log_latent or motion_transition:
                 full_experiment_name = kwargs['params']['config']['full_experiment_name']
+                show_matcher_out = logger_config.get('show_matcher_out', False)
 
-                self._build_matcher()
+                self._build_matcher(show_matcher_out)
                 self._matcher_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
-                self._latent_logger = LatentMotionLogger(logger_config['filename'], full_experiment_name,
-                                                         self.env.num, self._latent_dim)
 
-    def _build_matcher(self):
+                if log_latent:
+                    self._latent_logger = LatentMotionLogger(logger_config['filename'], full_experiment_name,
+                                                             self.env.num, self._latent_dim)
+                if motion_transition:
+                    self._transition_logger = MotionTransitionLogger(logger_config['filename'], full_experiment_name,
+                                                                     self.env.num)
+
+    def _build_matcher(self, show_matcher_out: bool):
         plt.switch_backend('TkAgg')  # Since pycharm IDE embeds matplotlib, it is necessary to switch backend
-        self._matcher = Matcher(self._demo_fetcher.motion_lib, self._disc_obs_traj_len, self.env.dt, self.device)
+        self._matcher = Matcher(self._demo_fetcher.motion_lib, self._disc_obs_traj_len, self.env.dt, self.device,
+                                show_matcher_out)
 
     def _enc_debug(self, disc_obs):
         with torch.no_grad():
@@ -99,17 +109,20 @@ class SkillPlayer(StylePlayer):
 
     def _pre_step(self):
         super()._pre_step()
-        if self._latent_logger:
+        if self._latent_logger or self._transition_logger:
             self._matcher_obs_buf.push_on_reset(self.obses['matcher'], self.dones)
 
     def _post_step(self):
         super()._post_step()
         if self._show_reward:
             self._enc_debug(self._disc_obs_buf.history)
-        if self._latent_logger:
+        if self._latent_logger or self._transition_logger:
             self._matcher_obs_buf.push(self.obses['matcher'])
             motion_id = self._matcher.match(self._matcher_obs_buf.history)
-            self._latent_logger.log(motion_id)
+            if self._latent_logger:
+                self._latent_logger.log(motion_id)
+            if self._transition_logger:
+                self._transition_logger.log(motion_id)
         self._remain_latent_steps -= 1
 
     def _update_latent(self):
@@ -124,6 +137,8 @@ class SkillPlayer(StylePlayer):
 
         if self._latent_logger:
             self._latent_logger.update_z(update_env, self._z[update_env])
+        if self._transition_logger:
+            self._transition_logger.update_z(update_env)
 
 
 @torch.jit.script

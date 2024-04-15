@@ -90,8 +90,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     # Overriding test mode
     if config_train["test"]:
         assert config_train["checkpoint"] is not None, "Checkpoint path not found in config"
-        config_env["sim"]["headless"] = False
-        config_env["env"]["num_envs"] = 8 if args.num_envs is None else args.num_envs
+        # config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
         config_env["env"]["spacing"] = 1
         full_experiment_name = "test_" + full_experiment_name
         args.wandb_proj = None

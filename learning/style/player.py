@@ -78,7 +78,7 @@ class StylePlayer(CorePlayer):
 
         logger_config = self.config.get('logger', None)
         if logger_config is not None:
-            log_action = logger_config.get('log_action', False)
+            log_action = logger_config.get('action', False)
             if log_action:
                 full_experiment_name = kwargs['params']['config']['full_experiment_name']
                 self._action_logger = ActionLogger(logger_config['filename'], full_experiment_name, self.actions_num)

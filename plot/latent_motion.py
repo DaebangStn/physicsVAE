@@ -6,12 +6,6 @@ import matplotlib.pyplot as plt
 from utils.plot import *
 
 
-def sort_list_by_key(_sorted: list, _key: list):
-    paired_sorted = sorted(zip(_key, _sorted), key=lambda x: x[0])
-    _, sorted_tuple = zip(*paired_sorted)
-    return list(sorted_tuple)
-
-
 def plot_latent_and_motion_id(f, exp_name):
     base_group = f[exp_name]["LatentMotionLogger"]
     latent_num = base_group['latent'].shape[0]

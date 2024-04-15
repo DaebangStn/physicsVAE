@@ -12,7 +12,7 @@ class BaseLogger:
     """
     def __init__(self, filename: str, experiment_name: str):
         log_file = h5py.File(filename + '.hdf5', 'a')
-        print(f"===> Loaded {filename} for logging {experiment_name}")
+        print(f"===> Loaded {filename}.hdf5 for logging {experiment_name}")
 
         if experiment_name not in log_file:
             log_file.create_group(experiment_name)
@@ -27,7 +27,13 @@ class BaseLogger:
         pass
 
     @staticmethod
-    def _append_ds(ds: Dataset, data: np.ndarray):
-        data_len = data.shape[0]
-        ds.resize(ds.shape[0] + data_len, axis=0)
-        ds[-data_len:] = data
+    def _append_ds(ds: Dataset, data: np.ndarray, axis=0):
+        new_len = data.shape[axis] + ds.shape[axis]
+        new_shape = list(ds.shape)
+        new_shape[axis] = new_len
+        ds.resize(tuple(new_shape))
+
+        slc = [slice(None)] * data.ndim
+        slc[axis] = slice(ds.shape[axis] - data.shape[axis], None)  # [:, :, ..., -data.shape[axis]:, :, ...]
+
+        ds[tuple(slc)] = data
