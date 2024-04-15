@@ -1,27 +1,27 @@
 env:
   name: keypointMaxObsTask
-  num_envs: 512
+  num_envs: 128
   spacing: 4
 
   humanoid_asset_filename:  # from the project root
-    assets/urdf/amp_humanoid_sword_shield.xml
-#    assets/urdf/amp_humanoid.xml
+#    assets/urdf/amp_humanoid_sword_shield.xml
+    assets/urdf/amp_humanoid.xml
   joint_information_path:
     assets/urdf/joint_information.yaml
 
   num_states: 1  # do not use
-  num_obs: 253  # sword and shield (max observation)
-#  num_obs: 223  # naive humanoid (max observation)
-  num_act: 31  # dof(#) - sword and shield
-#  num_act: 28  # dof(#) - naive humanoid
-  max_episode_steps: 40000000
+#  num_obs: 253  # sword and shield (max observation)
+  num_obs: 223  # naive humanoid (max observation)
+#  num_act: 31  # dof(#) - sword and shield
+  num_act: 28  # dof(#) - naive humanoid
+  max_episode_steps: 1200
 
   recovery_limit: 60
   drop_on_reset_prob: 0
-  reference_state_init_prob: 1
+  reference_state_init_prob: 0.5
   viewer_follow_env0: False
 
 sim:
-  headless: True
+  headless: False
   device_id: 0
   engine: PHYSX

@@ -1,6 +1,8 @@
+import time
 from typing import Optional
 
 import torch
+from rl_games.common.a2c_common import swap_and_flatten01
 
 from learning.style.algorithm import StyleAlgorithm, disc_reward
 from utils.angle import *
@@ -53,13 +55,13 @@ class SkillAlgorithm(StyleAlgorithm):
     """
     def env_step(self, actions):
         obs, rew, done, info = super().env_step(actions)
-        obs['obs'] = torch.cat([obs['obs'], self._z], dim=1)
+        obs['obs'] = self._append_latent(obs)
         return obs, rew, done, info
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         self._update_latent()
         obs = super().env_reset(env_ids)
-        obs['obs'] = torch.cat([obs['obs'], self._z], dim=1)
+        obs['obs'] = self._append_latent(obs)
         return obs
 
     def init_tensors(self):
@@ -80,6 +82,9 @@ class SkillAlgorithm(StyleAlgorithm):
         e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
         div_loss = self._diversity_loss(batch_dict['obs'], res_dict['mus'])
         return loss + e_loss * self._enc_loss_coef + div_loss * self._div_loss_coef
+
+    def _append_latent(self, obs: dict):
+        return torch.cat([obs['obs'], self._z], dim=1)
 
     def _diversity_loss(self, obs, mu):
         rollout_z = obs[:, -self._latent_dim:]

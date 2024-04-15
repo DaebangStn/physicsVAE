@@ -143,7 +143,6 @@ class CoreAlgorithm(A2CAgent):
 
                 if self.game_rewards.current_size > 0:
                     mean_rewards = self.game_rewards.get_mean()
-                    mean_shaped_rewards = self.game_shaped_rewards.get_mean()
                     mean_lengths = self.game_lengths.get_mean()
                     self.mean_rewards = mean_rewards[0]
 
@@ -152,12 +151,6 @@ class CoreAlgorithm(A2CAgent):
                         self.writer.add_scalar(rewards_name + '/step'.format(i), mean_rewards[i], frame)
                         self.writer.add_scalar(rewards_name + '/iter'.format(i), mean_rewards[i], epoch_num)
                         self.writer.add_scalar(rewards_name + '/time'.format(i), mean_rewards[i], total_time)
-                        self.writer.add_scalar('shaped_' + rewards_name + '/step'.format(i), mean_shaped_rewards[i],
-                                               frame)
-                        self.writer.add_scalar('shaped_' + rewards_name + '/iter'.format(i), mean_shaped_rewards[i],
-                                               epoch_num)
-                        self.writer.add_scalar('shaped_' + rewards_name + '/time'.format(i), mean_shaped_rewards[i],
-                                               total_time)
 
                     self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
                     self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
@@ -212,12 +205,8 @@ class CoreAlgorithm(A2CAgent):
         self._pre_rollout()
 
         for n in range(self.horizon_length):
-            self.obs = self.env_reset()
-            if self.use_action_masks:
-                masks = self.vec_env.get_action_masks()
-                res_dict = self.get_masked_action_values(self.obs, masks)
-            else:
-                res_dict = self.get_action_values(self.obs)
+            self.obs = self.env_reset()  # update latent
+            res_dict = self.get_action_values(self.obs)
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
             for k in self.update_list:
@@ -231,29 +220,21 @@ class CoreAlgorithm(A2CAgent):
 
             step_time += (step_time_end - step_time_start)
 
-            shaped_rewards = self.rewards_shaper(rewards)
-            if self.value_bootstrap and 'time_outs' in infos:
-                shaped_rewards += self.gamma * res_dict['values'] * self.cast_obs(infos['time_outs']).unsqueeze(
-                    1).float()
-
-            self.experience_buffer.update_data('rewards', n, shaped_rewards)
+            self.experience_buffer.update_data('rewards', n, rewards)
             self.experience_buffer.update_data('dones', n, self.dones)
 
             self.current_rewards += rewards
-            self.current_shaped_rewards += shaped_rewards
             self.current_lengths += 1
             all_done_indices = self.dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
 
             self.game_rewards.update(self.current_rewards[env_done_indices])
-            self.game_shaped_rewards.update(self.current_shaped_rewards[env_done_indices])
             self.game_lengths.update(self.current_lengths[env_done_indices])
             self.algo_observer.process_infos(infos, env_done_indices)
 
             not_dones = 1.0 - self.dones.float()
 
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
-            self.current_shaped_rewards = self.current_shaped_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
 
         self._post_rollout1()
