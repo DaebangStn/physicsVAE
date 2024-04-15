@@ -43,7 +43,7 @@ class SkillAlgorithm(StyleAlgorithm):
             if t == self.horizon_length - 1:
                 nextnonterminal = 1.0 - fdones
             else:
-                nextnonterminal = 1.0 - mb_fdones[t + 1]
+                nextnonterminal = 1.0 - mb_fdones[t+1]
             nextnonterminal = nextnonterminal.unsqueeze(1)
 
             delta = mb_rewards[t] + self.gamma * nextnonterminal * mb_next_values[t] - mb_extrinsic_values[t]
@@ -53,37 +53,23 @@ class SkillAlgorithm(StyleAlgorithm):
     """ keypointTask returns the Tuple of tensors so that we should post-process the observation.
     env_step and env_reset are overridden to post-process the observation.
     """
+    def env_step(self, actions):
+        obs, rew, done, info = super().env_step(actions)
+        obs['obs'] = self._append_latent(obs)
+        return obs, rew, done, info
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         self._update_latent()
         obs = super().env_reset(env_ids)
+        obs['obs'] = self._append_latent(obs)
         return obs
-
-    def get_action_values(self, obs):
-        processed_obs = self._preproc_obs(obs['obs'])
-        self.model.eval()
-        input_dict = {
-            'is_train': False,
-            'prev_actions': None,
-            'obs': processed_obs,
-            'rnn_states': self.rnn_states,
-            'latent': self._z
-        }
-        with torch.no_grad():
-            return self.model(input_dict)
-
-    def get_values(self, obs):
-        with torch.no_grad():
-            self.model.eval()
-            processed_obs = self._preproc_obs(obs['obs'])
-            return self.model.critic(processed_obs, latent=self._z)
 
     def init_tensors(self):
         super().init_tensors()
         batch_size = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['rollout_z'] = torch.empty(batch_size + (self._latent_dim,),
                                                                       device=self.device)
-        self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
+        self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size, ),
                                                                         device=self.device)
 
     def prepare_dataset(self, batch_dict):
@@ -94,14 +80,17 @@ class SkillAlgorithm(StyleAlgorithm):
     def _additional_loss(self, batch_dict, res_dict):
         loss = super()._additional_loss(batch_dict, res_dict)
         e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
-        div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
+        div_loss = self._diversity_loss(batch_dict['obs'], res_dict['mus'])
         return loss + e_loss * self._enc_loss_coef + div_loss * self._div_loss_coef
 
-    def _diversity_loss(self, batch_dict, mu):
-        rollout_z = batch_dict['latent']
-        obs = batch_dict['obs']
+    def _append_latent(self, obs: dict):
+        return torch.cat([obs['obs'], self._z], dim=1)
+
+    def _diversity_loss(self, obs, mu):
+        rollout_z = obs[:, -self._latent_dim:]
+        obs = obs[:, :-self._latent_dim]
         sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
-        sampled_mu, sampled_sigma = self.model.actor(obs, latent=sampled_z)
+        sampled_mu, sampled_sigma = self.model.actor(torch.cat([obs, sampled_z], dim=1))
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
         mu = torch.clamp(mu, -1.0, 1.0)
@@ -201,8 +190,7 @@ class SkillAlgorithm(StyleAlgorithm):
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
         disc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['rollout_z'] = input_dict['rollout_z'][0:disc_input_size]  # For encoder
-        batch_dict['latent'] = input_dict['rollout_z']  # For diversity loss
+        batch_dict['rollout_z'] = input_dict['rollout_z'][0:disc_input_size]
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
