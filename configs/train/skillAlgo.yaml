@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: latent_feature
+  memo: sword_base
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -44,8 +44,8 @@ network:
 
 
 checkpoint:  # from the project root
+#  runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
 #  runs/keypointMaxObsTask_skillAlgo_18-22-52-50_sword_base/nn/last_keypointMaxObsTask_ep_11200_rew_7062.3867.pth
-#  runs/last_keypointMaxObsTask_ep_46800_rew_7122.5166.pth
 
 hparam:
 #  max_frames: 1500
@@ -62,6 +62,8 @@ hparam:
     action: False
     latent_motion_id: False
     motion_transition: True
+
+    motion_match_length: 4
     filename:
       plot
 #      junk
@@ -73,7 +75,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 4096
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -88,7 +90,7 @@ hparam:
     disc_scale: 2.0
     enc_scale: 0.5
 
-    show_on_player: True
+    show_on_player: False
 
   style:
     replay_buf:
@@ -97,11 +99,11 @@ hparam:
       num_demo_update: 128
 
     disc:
-      input_divisor: 16
+      input_divisor: 4
       num_obs: 140
 #      num_obs: 125
 #      obs_traj_len: 4
-      obs_traj_len: 10
+      obs_traj_len: 16
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001

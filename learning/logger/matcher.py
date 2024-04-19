@@ -100,7 +100,7 @@ def motion_lib_to_matcher(gts: torch.Tensor, grs: torch.Tensor, grvs: torch.Tens
                           ) -> Tuple[torch.Tensor, int]:
     # returns: root_h, local_root_vel/anVel, dof_pos, dof_vel, local_keypoint_pos
     # dim0: frame
-    # dim1:    1 +     3*2 +                 31[28] + 31[28] + 3 * 6[4]          = 87[75]
+    # dim1:    1 +     3*2 +                 31[28] + 31[28] + 3 * 18[12]          = 87[75]
     assert gts.shape[0] > traj_len, f"Frame length({gts.shape[0]}) is shorter than traj_len({traj_len})."
 
     root_h = gts[:, 0:1, 2]

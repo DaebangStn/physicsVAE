@@ -15,8 +15,8 @@ class MotionTransitionLogger(BaseLogger):
             {env_idx}: int (D) - D: number of transition (resizeable)
     """
 
-    def __init__(self, filename: str, exp_name: str, num_env: int):
-        super().__init__(filename, exp_name)
+    def __init__(self, filename: str, exp_name: str, num_env: int, cfg: dict):
+        super().__init__(filename, exp_name, cfg)
 
         self._ds_motion = self._base_group.create_dataset("motion_id", shape=(num_env, 0), maxshape=(num_env, None),
                                                           dtype='i4', chunks=True)
