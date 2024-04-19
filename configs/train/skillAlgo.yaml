@@ -3,11 +3,11 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: sword_base
+  memo: less_disc_naive
   motion_file:
-#    assets/motions/dataset_humanoid.yaml
+    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
-    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: skill
@@ -75,7 +75,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 16384
+  minibatch_size: 8192
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -99,11 +99,11 @@ hparam:
       num_demo_update: 128
 
     disc:
-      input_divisor: 4
-      num_obs: 140
-#      num_obs: 125
-#      obs_traj_len: 4
-      obs_traj_len: 16
+      input_divisor: 16
+#      num_obs: 140
+      num_obs: 125
+      obs_traj_len: 2
+#      obs_traj_len: 16
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
