@@ -1,3 +1,6 @@
+from typing import Optional
+
+import yaml
 import numpy as np
 import h5py
 from h5py import Dataset
@@ -10,7 +13,7 @@ class BaseLogger:
                                                     |
                                              self._base_group
     """
-    def __init__(self, filename: str, experiment_name: str):
+    def __init__(self, filename: str, experiment_name: str, cfg: Optional[dict] = None):
         log_file = h5py.File(filename + '.hdf5', 'a')
         print(f"===> Loaded {filename}.hdf5 for logging {experiment_name}")
 
@@ -22,6 +25,9 @@ class BaseLogger:
             group.create_group(c_name)
 
         self._base_group = group[c_name]
+
+        if cfg is not None:
+            self._base_group.create_dataset('env_cfg', data=yaml.dump(cfg).encode('utf-8'))
 
     def log(self, data):
         pass

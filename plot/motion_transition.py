@@ -7,7 +7,7 @@ import matplotlib.gridspec as Gs
 from utils.plot import *
 
 
-THRESHOLD = 0.8  # for some latent, if the motion_id frequency is lower than this, it is regarded as noise motion
+THRESHOLD = 0.3  # for some latent, if the motion_id frequency is lower than this, it is regarded as noise motion
 PLOT_LAST = True
 PLOT_INIT_TERM = True
 

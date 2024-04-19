@@ -69,7 +69,7 @@ class StylePlayer(CorePlayer):
                                                   self._dof_offsets, self._key_body_ids)
             self.env.set_motion_fetcher(self._demo_fetcher)
 
-        self._show_reward = self.config.get('show_reward', False)
+        self._show_reward = self.config['reward'].get('show_on_player', False)
 
         style_conf = self.config['style']
         self._disc_obs_traj_len = style_conf['disc']['obs_traj_len']

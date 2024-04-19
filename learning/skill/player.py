@@ -80,20 +80,21 @@ class SkillPlayer(StylePlayer):
             if log_latent or motion_transition:
                 full_experiment_name = kwargs['params']['config']['full_experiment_name']
                 show_matcher_out = logger_config.get('show_matcher_out', False)
+                motion_match_length = logger_config.get('motion_match_length', 4)
 
-                self._build_matcher(show_matcher_out)
-                self._matcher_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+                self._build_matcher(show_matcher_out, motion_match_length)
+                self._matcher_obs_buf = TensorHistoryFIFO(motion_match_length)
 
                 if log_latent:
                     self._latent_logger = LatentMotionLogger(logger_config['filename'], full_experiment_name,
                                                              self.env.num, self._latent_dim)
                 if motion_transition:
                     self._transition_logger = MotionTransitionLogger(logger_config['filename'], full_experiment_name,
-                                                                     self.env.num)
+                                                                     self.env.num, self.config)
 
-    def _build_matcher(self, show_matcher_out: bool):
+    def _build_matcher(self, show_matcher_out: bool, motion_match_length: int):
         plt.switch_backend('TkAgg')  # Since pycharm IDE embeds matplotlib, it is necessary to switch backend
-        self._matcher = Matcher(self._demo_fetcher.motion_lib, self._disc_obs_traj_len, self.env.dt, self.device,
+        self._matcher = Matcher(self._demo_fetcher.motion_lib, motion_match_length, self.env.dt, self.device,
                                 show_matcher_out)
 
     def _enc_debug(self, disc_obs):

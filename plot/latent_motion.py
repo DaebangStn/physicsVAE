@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from utils.plot import *
 
 
+PLOT_LAST = True
+
+
 def plot_latent_and_motion_id(f, exp_name):
     base_group = f[exp_name]["LatentMotionLogger"]
     latent_num = base_group['latent'].shape[0]
@@ -68,8 +71,12 @@ if __name__ == '__main__':
 
     with h5py.File(args.hdf, 'r+') as f:
         for exp_name in f:
-            try:
-                plot_latent_and_motion_id(f, exp_name)
-            except Exception as e:
-                print(f"Error occurred while plotting {exp_name}: {e}")
-                continue
+            if PLOT_LAST:
+                plot_latent_and_motion_id(f, list(f.keys())[-1])
+            else:
+                for exp_name in f:
+                    try:
+                        plot_latent_and_motion_id(f, exp_name)
+                    except Exception as e:
+                        print(f"Error occurred while plotting {exp_name}: {e}")
+                        continue
