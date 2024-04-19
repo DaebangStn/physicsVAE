@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import h5py
 import numpy as np
 from matplotlib.colors import Normalize
@@ -7,8 +9,10 @@ import matplotlib.gridspec as Gs
 from utils.plot import *
 
 
-THRESHOLD = 0.3  # for some latent, if the motion_id frequency is lower than this, it is regarded as noise motion
-PLOT_LAST = True
+# for some latent, if the motion_id frequency is lower than this, it is regarded as noise motion
+# THRESHOLD = 0.3
+THRESHOLD = -1  # find the most frequent motion id
+PLOT_LAST = False
 PLOT_INIT_TERM = True
 
 
@@ -17,10 +21,33 @@ def get_motion_id(motion_id: np.ndarray, noise_id: int) -> int:
     if num_id == 0:
         return noise_id
     unique, counts = np.unique(motion_id, return_counts=True)
+    if THRESHOLD == -1:
+        return unique[np.argmax(counts)]
     max_count = np.max(counts)
     if max_count / num_id < THRESHOLD:
         return noise_id
     return unique[np.argmax(counts)]
+
+
+def get_tick_labels(init_freq: np.ndarray, term_freq: np.ndarray, total_freq: List[int], motion_id_min: int,
+                    motion_id_max: int) -> Tuple[List[str], List[str]]:
+    xtick_labels = None
+    ytick_labels = None
+    if PLOT_INIT_TERM:
+        xtick_labels = [str(i) + f"\n({term_freq[i]})" + f"\n[{total_freq[i]}]"
+                        for i in range(motion_id_min, motion_id_max)]
+        ytick_labels = [str(i) + f"\n({init_freq[i]})" for i in range(motion_id_min, motion_id_max)]
+    else:
+        xtick_labels = [str(i) for i in range(motion_id_min, motion_id_max)] + ["noise"]
+        ytick_labels = xtick_labels
+    if THRESHOLD != -1:
+        if PLOT_INIT_TERM:
+            xtick_labels += ["noise" + f"\n({term_freq[-1]})" + f"\n[{total_freq[-1]}]"]
+            ytick_labels += ["noise" + f"\n({init_freq[-1]})"]
+        else:
+            xtick_labels += ["noise"]
+            ytick_labels += ["noise"]
+    return xtick_labels, ytick_labels
 
 
 def plot_motion_transition(f, exp_name):
@@ -95,6 +122,8 @@ def plot_motion_transition(f, exp_name):
     heatmap = plt.imshow(heatmap_data_norm.T, aspect='auto', cmap='seismic', interpolation='nearest', norm=norm)
     plt.colorbar(heatmap)
 
+    if THRESHOLD == -1:
+        grid_size -= 1
     for i in range(grid_size):
         for j in range(grid_size):
             plt.text(i, j, f"{heatmap_data_norm[i, j]:.2f}\n({heatmap_data[i, j]})", ha='center', va='center',
@@ -102,19 +131,20 @@ def plot_motion_transition(f, exp_name):
 
     exp_name = shorten_middle(exp_name, 35)
     plt.title(f"{exp_name}\n(motion transition probability)-Thresh:{THRESHOLD}")
-    tick_positions = np.arange(motion_id_min, motion_id_max + 1, 1)
     if PLOT_INIT_TERM:
         plt.xlabel("Motion From\n(Terminated Motion count)\n[Total Motion count]")
         plt.ylabel("Motion To\n(Initiated Motion count)")
-        xtick_labels = ([str(i) + f"\n({term_freq[i]})" + f"\n[{total_freq[i]}]" for i in range(motion_id_min, motion_id_max)] +
-                        ["noise" + f"\n({term_freq[-1]})" + f"\n[{total_freq[-1]}]"])
-        ytick_labels = ([str(i) + f"\n({init_freq[i]})" for i in range(motion_id_min, motion_id_max)] +
-                        ["noise" + f"\n({init_freq[-1]})"])
     else:
         plt.xlabel("Motion From")
         plt.ylabel("Motion To")
-        xtick_labels = [str(i) for i in range(motion_id_min, motion_id_max)] + ["noise"]
-        ytick_labels = xtick_labels
+
+    tick_positions = None
+    if THRESHOLD != -1:
+        tick_positions = np.arange(motion_id_min, motion_id_max + 1, 1)
+    else:
+        tick_positions = np.arange(motion_id_min, motion_id_max, 1)
+
+    xtick_labels, ytick_labels = get_tick_labels(init_freq, term_freq, total_freq, motion_id_min, motion_id_max)
     plt.xticks(tick_positions, xtick_labels)
     plt.yticks(tick_positions, ytick_labels)
     plt.gca().invert_yaxis()
