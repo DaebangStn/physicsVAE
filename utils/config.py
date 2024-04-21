@@ -72,8 +72,9 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
 
     # Compute latent related values
     if config_train["algo"]["name"] in ["skillAlgo"]:
-        latent_dim = config_train["network"]["space"]["latent_dim"]
-        config_env["env"]["num_obs"] += latent_dim
+        pass
+        # latent_dim = config_train["network"]["space"]["latent_dim"]
+        # config_env["env"]["num_obs"] += latent_dim
 
     # Overriding parameters passed on the cli
     if args.test:

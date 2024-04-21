@@ -16,6 +16,22 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
             self._latent_dim = int(kwargs['space']['latent_dim'])
             super().__init__(param, **kwargs)  # build action/value/disc network
             self._build_enc()
+            self._build_latent_enc()
+
+        def _build_latent_enc(self):
+            units = [512, 256]
+            self._latent_enc_mlp = nn.Sequential(
+                nn.Linear(self._latent_dim, units[0]),
+                nn.ReLU(),
+                nn.Linear(units[0], units[1]),
+                nn.ReLU(),
+                nn.Linear(units[1], self._latent_dim),
+                nn.ReLU()
+            )
+            for m in self._latent_enc_mlp.modules():
+                if isinstance(m, nn.Linear):
+                    nn.init.uniform_(m.weight, -0.1, 0.1)
+                    nn.init.zeros_(m.bias)
 
         def _build_enc(self):
             self._enc_mlp = self._disc_mlp
@@ -24,8 +40,14 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
             nn.init.zeros_(self._enc_linear.bias)
             self._enc = nn.Sequential(self._enc_mlp, self._enc_linear)
 
+        def _calc_input_size(self, input_shape, cnn_layers=None):
+            return input_shape[0] + self._latent_dim
+
         def enc(self, obs):
             return torch.nn.functional.normalize(self._enc(obs), dim=-1)
+
+        def latent_feature(self, obs):
+            return self._latent_enc_mlp(obs)
 
         @property
         def enc_weights(self):

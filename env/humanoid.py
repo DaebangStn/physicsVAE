@@ -178,6 +178,12 @@ class HumanoidTask(VecTask):
         self._humanoids_id_env.append(humanoid)
         self._humanoids_id_sim.append(self._gym.get_actor_index(env, humanoid, gymapi.DOMAIN_SIM))
 
+        dof_prop = self._gym.get_asset_dof_properties(self._humanoid_asset)
+        dof_prop["driveMode"].fill(gymapi.DOF_MODE_POS)
+        dof_prop["stiffness"] = dof_prop["stiffness"] * self._stiffness_coef
+        dof_prop["damping"] = dof_prop["damping"] * self._damping_coef
+        self._gym.set_actor_dof_properties(env, humanoid, dof_prop)
+
     def _compute_observations(self):
         #  dof and actor root state is used for observation
         self._buf["obs"] = torch.cat([self._buf["dPos"], self._buf["dVel"], self._buf["actor"]], dim=-1)
@@ -220,6 +226,9 @@ class HumanoidTask(VecTask):
         self._joint_info = env_cfg["joint_information"]
         self._recovery_limit = env_cfg.get("recovery_limit", 0)
         self._viewer_follow_env0 = env_cfg.get("viewer_follow_env0", False)
+
+        self._stiffness_coef = env_cfg.get("stiffness_coef", 1.0)
+        self._damping_coef = env_cfg.get("damping_coef", 1.0)
 
         return env_cfg
 

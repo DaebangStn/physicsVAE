@@ -1,3 +1,4 @@
+import torch
 from rl_games.algos_torch.models import ModelA2CContinuousLogStd
 
 
@@ -15,6 +16,35 @@ class CoreModel(ModelA2CContinuousLogStd):
         """
         def __init__(self, net, **kwargs):
             super().__init__(net, **self._rl_games_compatible_keywords(**kwargs))
+
+        def _actor_module(self, obs):
+            with torch.no_grad():
+                a_out = obs
+                a_out = self.a2c_network.actor_mlp(a_out)
+
+                mu = self.a2c_network.mu_act(self.a2c_network.mu(a_out))
+                if self.a2c_network.fixed_sigma:
+                    sigma = mu * 0.0 + self.a2c_network.sigma_act(self.a2c_network.sigma)
+                else:
+                    sigma = self.a2c_network.sigma_act(self.a2c_network.sigma(a_out))
+                return mu, sigma
+
+        def _critic_module(self, obs):
+            with torch.no_grad():
+                c_out = obs
+                c_out = self.a2c_network.critic_mlp(c_out)
+                value = self.a2c_network.value_act(self.a2c_network.value(c_out))
+                return value
+
+        def actor(self, obs, **kwargs):
+            assert self.a2c_network.separate, 'actor is not supported for non-separate network'
+            obs = self.norm_obs(obs)
+            return self._actor_module(obs)
+
+        def critic(self, obs, **kwargs):
+            assert self.a2c_network.separate, 'critic is not supported for non-separate network'
+            obs = self.norm_obs(obs)
+            return self._critic_module(obs)
 
         @staticmethod
         def _rl_games_compatible_keywords(**kwargs):
