@@ -3,11 +3,11 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: humanoid_walk_no_norm
+  memo: latent_feature
   motion_file:
-    assets/motions/dataset_humanoid.yaml
+#    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
-#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: skill
@@ -44,13 +44,13 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
-#  runs/last_keypointMaxObsTask_ep_30500_rew_7181.9023.pth
+#  runs/keypointMaxObsTask_skillAlgo_18-22-52-50_sword_base/nn/last_keypointMaxObsTask_ep_11200_rew_7062.3867.pth
+#  runs/last_keypointMaxObsTask_ep_46800_rew_7122.5166.pth
 
 hparam:
 #  max_frames: 1500
 
-  normalize_input: False
+  normalize_input: True
   normalize_value: True
   normalize_advantage: True
   clip_value: False
@@ -88,7 +88,7 @@ hparam:
     disc_scale: 2.0
     enc_scale: 0.5
 
-    show_on_player: False
+    show_on_player: True
 
   style:
     replay_buf:
@@ -98,8 +98,8 @@ hparam:
 
     disc:
       input_divisor: 16
-#      num_obs: 140
-      num_obs: 125
+      num_obs: 140
+#      num_obs: 125
 #      obs_traj_len: 4
       obs_traj_len: 10
       loss_coef: 5
