@@ -6,7 +6,7 @@ algo:
   memo: Atk_Jump
   motion_file:
 #    assets/motions/amp_humanoid_walk.npy
-    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: style
@@ -40,7 +40,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_styleAlgo_12-22-30-54_Atk_Jump/nn/last_keypointMaxObsTask_ep_29000_rew_7217.8936.pth
+  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 

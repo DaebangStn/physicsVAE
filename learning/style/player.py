@@ -33,7 +33,7 @@ class StylePlayer(CorePlayer):
             obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
             return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
         else:
-            return {'obs': keyp_task_concat_obs(obs)}, rew, done, info
+            return {'obs': keyp_task_concat_obs(obs['obs'])}, rew, done, info
 
     def env_reset(self, env):
         obs = super().env_reset(env)
@@ -41,7 +41,7 @@ class StylePlayer(CorePlayer):
             obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
             return {'obs': obs, 'disc_obs': disc_obs}
         else:
-            return {'obs': keyp_task_concat_obs(obs)}
+            return {'obs': keyp_task_concat_obs(obs['obs'])}
 
     def restore(self, fn):
         super().restore(fn)

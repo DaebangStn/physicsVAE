@@ -3,11 +3,11 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: less_disc_naive
+  memo: sword_grad_penalty_20
   motion_file:
-    assets/motions/dataset_humanoid.yaml
+#    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
-#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: skill
@@ -45,7 +45,7 @@ network:
 
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
-#  runs/keypointMaxObsTask_skillAlgo_18-22-52-50_sword_base/nn/last_keypointMaxObsTask_ep_11200_rew_7062.3867.pth
+  runs/keypointMaxObsTask_skillAlgo_21-23-12-05_sword_grad_penalty_20/nn/last_keypointMaxObsTask_ep_8600_rew_7009.3784.pth
 
 hparam:
 #  max_frames: 1500
@@ -100,14 +100,14 @@ hparam:
 
     disc:
       input_divisor: 16
-#      num_obs: 140
-      num_obs: 125
-      obs_traj_len: 2
+      num_obs: 140
+#      num_obs: 125
+      obs_traj_len: 10
 #      obs_traj_len: 16
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
-      grad_penalty_scale: 5
+      grad_penalty_scale: 20
       log_hist: False
 
   skill:
