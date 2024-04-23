@@ -36,6 +36,10 @@ network:
     initializer:
       name: default
 
+  latent:
+    build: True
+    units: [512, 256]
+
   disc:  # discriminator and encoder shares the network
     units: [1024, 1024, 512]
     activation: relu
@@ -45,7 +49,7 @@ network:
 
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_18-22-52-50_sword_base/nn/last_keypointMaxObsTask_ep_11200_rew_7062.3867.pth
-#  runs/last_keypointMaxObsTask_ep_46800_rew_7122.5166.pth
+  runs/latent_feature_last_keypointMaxObsTask_ep_35500_rew_-35.745937.pth
 
 hparam:
 #  max_frames: 1500

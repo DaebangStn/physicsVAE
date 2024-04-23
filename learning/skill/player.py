@@ -3,6 +3,8 @@ from typing import Tuple, List
 import torch
 import matplotlib.pyplot as plt
 
+from rl_games.algos_torch.players import rescale_actions, unsqueeze_obs
+
 from learning.style.player import StylePlayer, keyp_task_obs_angle_transform, keyp_task_concat_obs
 from learning.skill.algorithm import sample_latent
 from learning.logger.latentMotion import LatentMotionLogger
@@ -45,15 +47,34 @@ class SkillPlayer(StylePlayer):
         obs = self._post_process_obs(obs_raw)
         return obs
 
+    def get_action(self, obs, is_deterministic=False):
+        if self.has_batch_dimension == False:
+            obs = unsqueeze_obs(obs)
+        obs = self._preproc_obs(obs)
+        with torch.no_grad():
+            mu, sigma = self.model.actor(obs, latent=self._z)
+            sigma = torch.exp(sigma)
+
+        if is_deterministic:
+            current_action = mu
+        else:
+            current_action = torch.normal(mu, sigma)
+
+        if self.has_batch_dimension == False:
+            current_action = torch.squeeze(current_action.detach())
+
+        if self.clip_actions:
+            return rescale_actions(self.actions_low, self.actions_high, torch.clamp(current_action, -1.0, 1.0))
+        else:
+            return current_action
+
     def _post_process_obs(self, obs_raw):
         if self._show_reward:
             obs_concat, disc_obs = keyp_task_obs_angle_transform(obs_raw['obs'], self._key_body_ids, self._dof_offsets)
-            obs_latent = torch.cat([obs_concat, self._z], dim=1)
-            obs = {'obs': obs_latent, 'disc_obs': disc_obs}
+            obs = {'obs': obs_concat, 'disc_obs': disc_obs}
         else:
             obs_concat = keyp_task_concat_obs(obs_raw['obs'])
-            obs_latent = torch.cat([obs_concat, self._z], dim=1)
-            obs = {'obs': obs_latent}
+            obs = {'obs': obs_concat}
 
         if self._latent_logger or self._transition_logger:
             obs['matcher'] = keyp_obs_to_matcher(obs_raw['obs'], self._key_body_ids, self._dof_offsets)
@@ -145,7 +166,7 @@ class SkillPlayer(StylePlayer):
 @torch.jit.script
 def keyp_obs_to_matcher(
         obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
-                   torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         key_idx: List[int], dof_offsets: List[int]) -> torch.Tensor:
     # returns: root_h, local_root_vel/anVel, dof_pos, dof_vel, local_keypoint_pos
     # dim:     1 +     3*2 +                 31[28] + 31[28] + 3 * 6[4]          = 87[75]

@@ -58,7 +58,7 @@ def build_runner():
 
 def main():
     args = build_args()
-    if args.wandb_proj is not None:
+    if args.wandb_proj is not None and args.sweep:
         import wandb
         wandb.init(project=args.wandb_proj, sync_tensorboard=True, monitor_gym=True, save_code=True)
 

@@ -27,6 +27,8 @@ def build_args() -> Namespace:
          "help": "Number of environments to run in parallel"},
         {"name": "--wandb_proj", "type": str, "required": False, "default": None,
          "help": "Wandb project name. If this flag is set, wandb will be enabled."},
+        {"name": "--sweep", "type": bool, "default": False,
+         "help": "Enable the wandb sweep."},
     ]
 
     args = parse_arguments(custom_parameters=custom_params)
@@ -44,7 +46,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
     with open(config_env_path.as_posix(), 'r') as f:
         config_env = yaml.load(f, Loader=yaml.SafeLoader)
 
-    # Overriding wandb config
+    # Overriding wandb config in the sweep
     if wandb.run is not None:
         if "max_frames" in wandb.config:
             config_train["hparam"]["max_frames"] = wandb.config.max_frames
@@ -70,12 +72,6 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
             config_train["algo"]["joint_information"] = joint_info[asset_filename]
         config_env["env"]["joint_information"] = joint_info[asset_filename]
 
-    # Compute latent related values
-    if config_train["algo"]["name"] in ["skillAlgo"]:
-        pass
-        # latent_dim = config_train["network"]["space"]["latent_dim"]
-        # config_env["env"]["num_obs"] += latent_dim
-
     # Overriding parameters passed on the cli
     if args.test:
         config_train["test"] = args.test
@@ -95,14 +91,17 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_env["env"]["spacing"] = 1
         full_experiment_name = "test_" + full_experiment_name
         args.wandb_proj = None
-
     # Overriding debug mode
-    if config_train["debug"]:
+    elif config_train["debug"]:
         config_train["hparam"]["minibatch_size"] = 16
         config_env["sim"]["headless"] = False
         config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
         full_experiment_name = "debug_" + full_experiment_name
         args.wandb_proj = None
+    else:
+        if args.wandb_proj is not None and wandb.run is None:
+            wandb.init(project=args.wandb_proj, name=full_experiment_name,
+                       sync_tensorboard=True, monitor_gym=True, save_code=True)
 
     # Overriding config_env to config_train
     config_train["config"]["full_experiment_name"] = full_experiment_name

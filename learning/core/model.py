@@ -24,10 +24,10 @@ class CoreModel(ModelA2CContinuousLogStd):
 
                 mu = self.a2c_network.mu_act(self.a2c_network.mu(a_out))
                 if self.a2c_network.fixed_sigma:
-                    sigma = mu * 0.0 + self.a2c_network.sigma_act(self.a2c_network.sigma)
+                    logstd = mu * 0.0 + self.a2c_network.sigma_act(self.a2c_network.sigma)
                 else:
-                    sigma = self.a2c_network.sigma_act(self.a2c_network.sigma(a_out))
-                return mu, sigma
+                    logstd = self.a2c_network.sigma_act(self.a2c_network.sigma(a_out))
+                return mu, logstd
 
         def _critic_module(self, obs):
             with torch.no_grad():

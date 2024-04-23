@@ -1,6 +1,6 @@
 env:
   name: keypointMaxObsTask
-  num_envs: 1024
+  num_envs: 128
   spacing: 4
 
   humanoid_asset_filename:  # from the project root
@@ -25,6 +25,6 @@ env:
   viewer_follow_env0: False
 
 sim:
-  headless: True
+  headless: False
   device_id: 0
   engine: PHYSX
