@@ -70,7 +70,7 @@ class SkillPlayer(StylePlayer):
 
     def _post_process_obs(self, obs_raw):
         if self._show_reward:
-            obs_concat, disc_obs = keyp_task_obs_angle_transform(obs_raw['obs'], self._key_body_ids)
+            obs_concat, disc_obs = keyp_task_obs_angle_transform(obs_raw['obs'], self._key_body_ids, self._dof_offsets)
             obs = {'obs': obs_concat, 'disc_obs': disc_obs}
         else:
             obs_concat = keyp_task_concat_obs(obs_raw['obs'])

@@ -48,8 +48,10 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_18-22-52-50_sword_base/nn/last_keypointMaxObsTask_ep_11200_rew_7062.3867.pth
+#  runs/keypointMaxObsTask_skillAlgo_23-22-37-37_sword/nn/last_keypointMaxObsTask_ep_9000_rew_-67.02413.pth
+
 #  runs/enc010_last_keypointMaxObsTask_ep_15500_rew_7199.027.pth
+
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 
@@ -92,7 +94,7 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 0.1
+    enc_scale: 0.0
 
     show_on_player: True
 

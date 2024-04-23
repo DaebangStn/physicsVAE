@@ -29,6 +29,9 @@ class SkillAlgorithm(StyleAlgorithm):
         self._mean_enc_reward = None
         self._std_enc_reward = None
         self._remain_latent_steps = None
+        self._prev_action = None
+        self._prev_action_dot = None  # da/dt
+        self._prev_dVel = None
 
         self._color_projector = None
 
@@ -85,6 +88,7 @@ class SkillAlgorithm(StyleAlgorithm):
                                                                       device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
+        self.experience_buffer.tensor_dict['action_two_dot'] = torch.zeros(batch_size + (1,), device=self.device)
 
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
@@ -165,6 +169,11 @@ class SkillAlgorithm(StyleAlgorithm):
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
 
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
+
+    def _pre_rollout(self):
+        self._prev_action = None
+        self._prev_action_dot = None
+        self._prev_dVel = None
 
     def _post_rollout1(self):
         rollout_obs = self.experience_buffer.tensor_dict['rollout_obs']

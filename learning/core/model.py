@@ -36,13 +36,15 @@ class CoreModel(ModelA2CContinuousLogStd):
 
         def actor(self, obs, **kwargs):
             assert self.a2c_network.separate, 'actor is not supported for non-separate network'
-            obs = self.norm_obs(obs)
-            return self._actor_module(obs)
+            with torch.no_grad():
+                obs = self.norm_obs(obs)
+                return self._actor_module(obs)
 
         def critic(self, obs, **kwargs):
             assert self.a2c_network.separate, 'critic is not supported for non-separate network'
-            obs = self.norm_obs(obs)
-            return self._critic_module(obs)
+            with torch.no_grad():
+                obs = self.norm_obs(obs)
+                return self._critic_module(obs)
 
         @staticmethod
         def _rl_games_compatible_keywords(**kwargs):
