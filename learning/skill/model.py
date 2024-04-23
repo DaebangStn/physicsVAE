@@ -54,12 +54,14 @@ class SkillModel(StyleModel):
         def actor(self, obs, **kwargs):
             assert self.a2c_network.separate, 'actor is not supported for non-separate network'
             assert 'latent' in kwargs, 'latent is not provided'
-            return self._actor_module(self._attach_latent_to_obs(obs, kwargs['latent']))
+            with torch.no_grad():
+                return self._actor_module(self._attach_latent_to_obs(obs, kwargs['latent']))
 
         def critic(self, obs, **kwargs):
             assert self.a2c_network.separate, 'critic is not supported for non-separate network'
             assert 'latent' in kwargs, 'latent is not provided'
-            return self._critic_module(self._attach_latent_to_obs(obs, kwargs['latent']))
+            with torch.no_grad():
+                return self._critic_module(self._attach_latent_to_obs(obs, kwargs['latent']))
 
         def enc(self, obs):
             return self.a2c_network.enc(obs)

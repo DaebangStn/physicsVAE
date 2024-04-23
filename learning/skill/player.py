@@ -70,14 +70,14 @@ class SkillPlayer(StylePlayer):
 
     def _post_process_obs(self, obs_raw):
         if self._show_reward:
-            obs_concat, disc_obs = keyp_task_obs_angle_transform(obs_raw['obs'], self._key_body_ids, self._dof_offsets)
+            obs_concat, disc_obs = keyp_task_obs_angle_transform(obs_raw['obs'], self._key_body_ids)
             obs = {'obs': obs_concat, 'disc_obs': disc_obs}
         else:
             obs_concat = keyp_task_concat_obs(obs_raw['obs'])
             obs = {'obs': obs_concat}
 
         if self._latent_logger or self._transition_logger:
-            obs['matcher'] = keyp_obs_to_matcher(obs_raw['obs'], self._key_body_ids, self._dof_offsets)
+            obs['matcher'] = keyp_obs_to_matcher(obs_raw['obs'], self._key_body_ids)
         return obs
 
     def _init_variables(self, **kwargs):
@@ -166,8 +166,8 @@ class SkillPlayer(StylePlayer):
 @torch.jit.script
 def keyp_obs_to_matcher(
         obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
-        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
-        key_idx: List[int], dof_offsets: List[int]) -> torch.Tensor:
+                   torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        key_idx: List[int]) -> torch.Tensor:
     # returns: root_h, local_root_vel/anVel, dof_pos, dof_vel, local_keypoint_pos
     # dim:     1 +     3*2 +                 31[28] + 31[28] + 3 * 6[4]          = 87[75]
     aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
