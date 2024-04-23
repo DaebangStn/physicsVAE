@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: latent_feature
+  memo: sword
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -37,7 +37,7 @@ network:
       name: default
 
   latent:
-    build: True
+    build: False
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
@@ -49,9 +49,9 @@ network:
 
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_18-22-52-50_sword_base/nn/last_keypointMaxObsTask_ep_11200_rew_7062.3867.pth
-  runs/latent_feature_last_keypointMaxObsTask_ep_35500_rew_-35.745937.pth
+#  runs/enc010_last_keypointMaxObsTask_ep_15500_rew_7199.027.pth
 checkpoint_disc:
-  runs/enc010_last_keypointMaxObsTask_ep_15500_rew_7199.027.pth
+#  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 
 hparam:
 #  max_frames: 1500
@@ -79,7 +79,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 4096
+  minibatch_size: 8192
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -92,7 +92,7 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 0.5
+    enc_scale: 0.1
 
     show_on_player: True
 

@@ -44,7 +44,10 @@ class StylePlayer(CorePlayer):
             return {'obs': keyp_task_concat_obs(obs['obs'])}
 
     def restore(self, fn):
-        super().restore(fn)
+        try:
+            super().restore(fn)
+        except Exception as e:
+            print(f"There was an error while restoring the player: {e}")
         if self._checkpoint_disc is not None:
             self._checkpoint_disc = torch_ext.load_checkpoint(self._checkpoint_disc)
             self.model.disc_load_state_dict(self._checkpoint_disc['model'])

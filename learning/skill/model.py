@@ -16,18 +16,16 @@ class SkillModel(StyleModel):
             super().__init__(net, **kwargs)
 
         def forward(self, input_dict):
-            is_train = input_dict.get('is_train', True)
-            prev_actions = input_dict.get('prev_actions', None)
-
             input_dict['obs'] = self._attach_latent_to_obs(input_dict['obs'], input_dict['latent'])
 
             mu, logstd, value, states = self.a2c_network(input_dict)
             sigma = torch.exp(logstd)
             distr = torch.distributions.Normal(mu, sigma, validate_args=False)
 
+            is_train = input_dict.get('is_train', True)
             if is_train:
                 entropy = distr.entropy().sum(dim=-1)
-                prev_neglogp = self.neglogp(prev_actions, mu, sigma, logstd)
+                prev_neglogp = self.neglogp(input_dict['prev_actions'], mu, sigma, logstd)
                 result = {
                     'prev_neglogp': torch.squeeze(prev_neglogp),
                     'values': value,
@@ -40,7 +38,6 @@ class SkillModel(StyleModel):
                     'replay_disc_logit': self.disc(input_dict['replay_obs']),
                     'demo_disc_logit': self.disc(input_dict['demo_obs']),
                 }
-                return result
             else:
                 selected_action = distr.sample()
                 neglogp = self.neglogp(selected_action, mu, sigma, logstd)

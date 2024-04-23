@@ -73,9 +73,9 @@ class SkillAlgorithm(StyleAlgorithm):
             return self.model(input_dict)
 
     def get_values(self, obs):
+        processed_obs = self._preproc_obs(obs['obs'])
+        self.model.eval()
         with torch.no_grad():
-            self.model.eval()
-            processed_obs = self._preproc_obs(obs['obs'])
             return self.model.critic(processed_obs, latent=self._z)
 
     def init_tensors(self):
