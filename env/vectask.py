@@ -154,9 +154,10 @@ class VecTask:
 
         self._compute_device = sim_cfg['device_id']
         self._graphics_device = self._compute_device if not self._headless else -1
+        self._num_sub_steps = sim_cfg.get('num_sub_steps', 1)
 
         self._sim_params = gymapi.SimParams()
-        self._dt = self._sim_params.dt
+        self._dt = self._sim_params.dt * self._num_sub_steps
         engine = sim_cfg['engine']
         if engine == 'PHYSX':
             self._sim_engine = gymapi.SIM_PHYSX
@@ -192,9 +193,10 @@ class VecTask:
         return env_cfg
 
     def _run_physics(self):
-        self._gym.simulate(self._sim)
+        for _ in range(self._num_sub_steps):
+            self._gym.simulate(self._sim)
+            self.render()
         self._gym.fetch_results(self._sim, None)
-        self.render()
 
     def _refresh_tensors(self):
         self._gym.refresh_dof_state_tensor(self._sim)
