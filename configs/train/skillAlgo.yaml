@@ -50,6 +50,8 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_18-22-52-50_sword_base/nn/last_keypointMaxObsTask_ep_11200_rew_7062.3867.pth
   runs/latent_feature_last_keypointMaxObsTask_ep_35500_rew_-35.745937.pth
+checkpoint_disc:
+  runs/enc010_last_keypointMaxObsTask_ep_15500_rew_7199.027.pth
 
 hparam:
 #  max_frames: 1500
