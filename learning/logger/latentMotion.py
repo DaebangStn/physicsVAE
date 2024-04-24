@@ -6,7 +6,7 @@ from learning.logger.hdfBase import HdfBaseLogger
 
 class LatentMotionLogger(HdfBaseLogger):
     """
-    See hierarchy in BaseLogger
+    See hierarchy in HdfBaseLogger
 
     logger_specific_group:
         root(None):
@@ -15,8 +15,8 @@ class LatentMotionLogger(HdfBaseLogger):
             {latent_idx}: int (L) - L: number of motion id (resizeable)
     """
 
-    def __init__(self, filename: str, exp_name: str, num_envs: int, latent_dim: int):
-        super().__init__(filename, exp_name)
+    def __init__(self, filename: str, exp_name: str, num_envs: int, latent_dim: int, cfg: dict):
+        super().__init__(filename, exp_name, cfg)
 
         self._latent_idx = np.empty(num_envs, dtype=int)
         self._ds_motion_id = None

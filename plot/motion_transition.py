@@ -1,10 +1,8 @@
 from typing import List, Tuple
 
 import h5py
-import numpy as np
 from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as Gs
 
 from utils.plot import *
 
@@ -16,23 +14,8 @@ PLOT_LAST = False
 PLOT_INIT_TERM = True
 
 
-def get_motion_id(motion_id: np.ndarray, noise_id: int) -> int:
-    num_id = motion_id.shape[0]
-    if num_id == 0:
-        return noise_id
-    unique, counts = np.unique(motion_id, return_counts=True)
-    if THRESHOLD == -1:
-        return unique[np.argmax(counts)]
-    max_count = np.max(counts)
-    if max_count / num_id < THRESHOLD:
-        return noise_id
-    return unique[np.argmax(counts)]
-
-
 def get_tick_labels(init_freq: np.ndarray, term_freq: np.ndarray, total_freq: List[int], motion_id_min: int,
                     motion_id_max: int) -> Tuple[List[str], List[str]]:
-    xtick_labels = None
-    ytick_labels = None
     if PLOT_INIT_TERM:
         xtick_labels = [str(i) + f"\n({term_freq[i]})" + f"\n[{total_freq[i]}]"
                         for i in range(motion_id_min, motion_id_max)]
@@ -62,6 +45,7 @@ def plot_motion_transition(f, exp_name):
     motion_id_max = np.max(envs_motion_id) + 1  # +1 for the noise motion
     motion_id_min = np.min(envs_motion_id)
 
+    # Loop for find motion transitions
     motion_transitions = []  # (motion_id_from, motion_id_to)
     initial_motion_ids = []
     termination_motion_ids = []
@@ -80,8 +64,8 @@ def plot_motion_transition(f, exp_name):
                 continue
             before_trans_motion_ids = motion_ids[last_transition:trans_idx_now]
             after_trans_motion_ids = motion_ids[trans_idx_now:trans_idx_next]
-            before_mid = get_motion_id(before_trans_motion_ids, motion_id_max)
-            after_mid = get_motion_id(after_trans_motion_ids, motion_id_max)
+            before_mid = get_motion_id(before_trans_motion_ids, motion_id_max, THRESHOLD)
+            after_mid = get_motion_id(after_trans_motion_ids, motion_id_max, THRESHOLD)
             motion_transitions.append((before_mid, after_mid))
 
             last_transition = trans_idx_now
@@ -93,19 +77,24 @@ def plot_motion_transition(f, exp_name):
 
     print("Transitions#: ", len(motion_transitions))
 
+    # Count the frequency of initial state and termination state
+    if THRESHOLD != -1:
+        grid_size = motion_id_max - motion_id_min + 1
+    else:
+        grid_size = motion_id_max - motion_id_min
     init_mid, init_cnt = np.unique(initial_motion_ids, return_counts=True)
     term_mid, term_cnt = np.unique(termination_motion_ids, return_counts=True)
-    init_freq = np.zeros(motion_id_max + 1, dtype=np.int64)
-    term_freq = np.zeros(motion_id_max + 1, dtype=np.int64)
+    init_freq = np.zeros(grid_size, dtype=np.int64)
+    term_freq = np.zeros(grid_size, dtype=np.int64)
     init_freq[init_mid] = init_cnt
     term_freq[term_mid] = term_cnt
 
+    # Count the frequency of motion transitions
     motion_transitions = np.array(motion_transitions)
     trans, frequencies = np.unique(
         motion_transitions.view([('', motion_transitions.dtype)] * motion_transitions.shape[1]),
         return_counts=True)
 
-    grid_size = motion_id_max - motion_id_min + 1
     heatmap_data = np.zeros((grid_size, grid_size), dtype=np.int64)
     for ((id_from, id_to), freq) in zip(trans, frequencies):
         heatmap_data[id_from - motion_id_min, id_to - motion_id_min] = freq
@@ -115,30 +104,28 @@ def plot_motion_transition(f, exp_name):
     heatmap_data_norm = heatmap_data / sum_y_axis[:, None]
     norm = Normalize(vmin=0, vmax=1)
 
-    # fig = plt.figure(figsize=(8, 6))
-    # gs = Gs.GridSpec(2, 1, height_ratios=[10, 1])
-    # fig.add_subplot(gs[0])
-
     heatmap = plt.imshow(heatmap_data_norm.T, aspect='auto', cmap='seismic', interpolation='nearest', norm=norm)
     plt.colorbar(heatmap)
 
-    if THRESHOLD == -1:
-        grid_size -= 1
+    # Annotate the heatmap with the raw data
     for i in range(grid_size):
         for j in range(grid_size):
             plt.text(i, j, f"{heatmap_data_norm[i, j]:.2f}\n({heatmap_data[i, j]})", ha='center', va='center',
                      color='red' if heatmap_data_norm[i, j] < 0.5 else 'blue')
 
+    # Set the title and labels
     exp_name = shorten_middle(exp_name, 35)
-    plt.title(f"{exp_name}\n(motion transition probability)-Thresh:{THRESHOLD}")
+    if THRESHOLD != -1:
+        title = f"{exp_name}\n(motion transition probability)-Thresh:{THRESHOLD}"
+    else:
+        title = f"{exp_name}\n(motion transition probability)-MaxFreq"
+    plt.title(title)
     if PLOT_INIT_TERM:
         plt.xlabel("Motion From\n(Terminated Motion count)\n[Total Motion count]")
         plt.ylabel("Motion To\n(Initiated Motion count)")
     else:
         plt.xlabel("Motion From")
         plt.ylabel("Motion To")
-
-    tick_positions = None
     if THRESHOLD != -1:
         tick_positions = np.arange(motion_id_min, motion_id_max + 1, 1)
     else:
@@ -148,16 +135,9 @@ def plot_motion_transition(f, exp_name):
     plt.xticks(tick_positions, xtick_labels)
     plt.yticks(tick_positions, ytick_labels)
     plt.gca().invert_yaxis()
-    plt.gcf().canvas.mpl_connect('key_press_event', lambda event: plt.close() if event.key == 'q' else None)
-
-    # ax = fig.add_subplot(gs[1])
-    # ax.set_axis_off()
-    # ax.set_xlim(0, 1)
-    # ax.set_ylim(0, 1)
-    # ax.text(0, 1, f"Initial Motion IDs: {init_mid} Frequency: {init_freq}", ha='left', va='top')
-    # ax.text(0, 0, f"Termination Motion IDs: {term_mid} Frequency: {term_freq}", ha='left', va='top')
-
     plt.tight_layout()
+
+    plt.gcf().canvas.mpl_connect('key_press_event', lambda event: plt.close() if event.key == 'q' else None)
     plt.show()
 
 

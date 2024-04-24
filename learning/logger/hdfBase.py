@@ -13,7 +13,7 @@ class HdfBaseLogger:
                                                     |
                                              self._base_group
     """
-    def __init__(self, filename: str, experiment_name: str, cfg: Optional[dict] = None):
+    def __init__(self, filename: str, experiment_name: str, cfg: dict):
         log_file = h5py.File(filename + '.hdf5', 'a')
         print(f"===> Loaded {filename}.hdf5 for logging {experiment_name}")
 
@@ -25,9 +25,7 @@ class HdfBaseLogger:
             group.create_group(c_name)
 
         self._base_group = group[c_name]
-
-        if cfg is not None:
-            self._base_group.create_dataset('env_cfg', data=yaml.dump(cfg).encode('utf-8'))
+        self._base_group.create_dataset('env_cfg', data=yaml.dump(cfg).encode('utf-8'))
 
     def log(self, data):
         pass

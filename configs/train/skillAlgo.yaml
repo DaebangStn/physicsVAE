@@ -67,8 +67,10 @@ hparam:
   intermediate_save_frequency: 100
 
   logger:
+    motion_match_length: 4
     show_matcher_out: False
     action: False
+    motion: False
     latent_motion_id: False
     motion_transition: False
     jitter: True

@@ -201,7 +201,8 @@ class CorePlayer(PpoPlayerContinuous):
             log_action = logger_config.get('action', False)
             if log_action:
                 full_experiment_name = kwargs['params']['config']['full_experiment_name']
-                self._action_logger = ActionLogger(logger_config['filename'], full_experiment_name, self.actions_num)
+                self._action_logger = ActionLogger(logger_config['filename'], full_experiment_name, self.actions_num,
+                                                   self.config)
 
     def _pre_step(self):
         pass

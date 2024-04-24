@@ -12,8 +12,8 @@ class ActionLogger(HdfBaseLogger):
             action: float (N, D) - N: number of collected actions (resizeable), D: dimension of action
     """
 
-    def __init__(self, filename: str, exp_name: str, action_size: int):
-        super().__init__(filename, exp_name)
+    def __init__(self, filename: str, exp_name: str, action_size: int, cfg: dict):
+        super().__init__(filename, exp_name, cfg)
 
         self._action_size = action_size
         if "action" not in self._base_group:

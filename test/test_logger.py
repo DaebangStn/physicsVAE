@@ -10,19 +10,19 @@ from learning.logger.jitter import JitterLogger
 
 @pytest.mark.logger
 def test_base_logger():
-    logger = HdfBaseLogger("test", "test")
+    logger = HdfBaseLogger("test", "test", {})
     logger.log(torch.tensor([1, 2, 3]))
 
 
 @pytest.mark.logger
 def test_action_logger():
-    logger = ActionLogger("test", "test", 3)
+    logger = ActionLogger("test", "test", 3, {})
     logger.log(torch.tensor([[1, 2, 3], [4, 5, 6]]))
 
 
 @pytest.mark.logger
 def test_latent_logger():
-    logger = LatentMotionLogger("test", "test", 3, latent_dim=3)
+    logger = LatentMotionLogger("test", "test", 3, latent_dim=3, cfg={})
     logger.update_z(torch.tensor([0, 1, 2]), torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]]))
     logger.log(torch.Tensor([1, 2, 3]))
     logger.log(torch.Tensor([4, 5, 6]))
