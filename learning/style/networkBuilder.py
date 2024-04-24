@@ -44,7 +44,10 @@ class StyleNetworkBuilder(CoreNetworkBuilder):
             torch.nn.init.uniform_(self._disc_logistics.weight, -1, 1)
             torch.nn.init.zeros_(self._disc_logistics.bias)
 
-            self.disc = nn.Sequential(self._disc_mlp, self._disc_logistics)
+            self._disc = nn.Sequential(self._disc_mlp, self._disc_logistics)
+
+        def disc(self, normalized_obs):
+            return self._disc(normalized_obs)
 
         def disc_load_state_dict(self, state_dict):
             for name, param in self._disc_mlp.named_parameters():

@@ -1,10 +1,8 @@
-import time
 from typing import Optional
 
 import torch
 
-from learning.style.algorithm import StyleAlgorithm, disc_reward, keyp_task_obs_angle_transform
-from learning.logger.jitter import JitterLogger
+from learning.style.algorithm import StyleAlgorithm, disc_reward
 from utils.angle import *
 from utils.env import sample_color
 from utils.buffer import TensorHistoryFIFO
@@ -32,10 +30,6 @@ class SkillAlgorithm(StyleAlgorithm):
         # reward related
         self._enc_rew_scale = None
 
-        # Loggers
-        self._action_jitter = None
-        # self._dof_jitter = None
-
         # placeholders for the current episode
         self._z = None
         self._rollout_z = None
@@ -47,6 +41,10 @@ class SkillAlgorithm(StyleAlgorithm):
 
         super().__init__(**kwargs)
 
+    # Since the latent is changed over the reset,
+    # we cannot regard next-step-obs to be the same as the current-step-next-obs
+    # So, we need to calculate next-value for all steps in the rollout.
+    # But, RL-games implementation does not consider this.
     def discount_values(self, fdones, last_extrinsic_values, mb_fdones, mb_extrinsic_values, mb_rewards):
         mb_next_values = self.experience_buffer.tensor_dict['next_values']
         lastgaelam = 0
@@ -67,48 +65,22 @@ class SkillAlgorithm(StyleAlgorithm):
     env_step and env_reset are overridden to post-process the observation.
     """
 
-    def env_step(self, actions):
-        if self._action_jitter is not None:
-            self._action_jitter.log(actions, self.frame)
-
-        obs, rewards, dones, infos = super(StyleAlgorithm, self).env_step(actions)
-        obs_concat, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
-
-        # if self._dof_jitter is not None:
-        #     aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs['obs']
-        #     self._dof_jitter.log(dPos, self.frame)
-
-        obs = {'obs': obs_concat, 'disc_obs': disc_obs}
-        return obs, rewards, dones, infos
-
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         self._update_latent()
         obs = super().env_reset(env_ids)
         return obs
 
-    def get_action_values(self, obs):
-        processed_obs = self._preproc_obs(obs['obs'])
-        self.model.eval()
-        input_dict = {
-            'is_train': False,
-            'prev_actions': None,
-            'obs': processed_obs,
-            'rnn_states': self.rnn_states,
-            'latent': self._z
-        }
-        with torch.no_grad():
-            return self.model(input_dict)
-
     def get_values(self, obs):
         processed_obs = self._preproc_obs(obs['obs'])
+
         self.model.eval()
         with torch.no_grad():
-            return self.model.critic(processed_obs, latent=self._z)
+            return self.model.critic_latent(processed_obs, self._z)
 
     def init_tensors(self):
         super().init_tensors()
         batch_size = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['rollout_z'] = torch.empty(batch_size + (self._latent_dim,),
+        self.experience_buffer.tensor_dict['latent'] = torch.empty(batch_size + (self._latent_dim,),
                                                                       device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
@@ -119,13 +91,13 @@ class SkillAlgorithm(StyleAlgorithm):
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
-        dataset_dict['rollout_z'] = batch_dict['rollout_z']
+        dataset_dict['latent'] = batch_dict['latent']
         if self._jitter_obs_buf is not None:
             dataset_dict['jitter_obs'] = batch_dict['jitter_obs']
 
     def _additional_loss(self, batch_dict, res_dict):
         loss = super()._additional_loss(batch_dict, res_dict)
-        e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
+        e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
         loss += e_loss * self._enc_loss_coef
         div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
         loss += div_loss * self._div_loss_coef
@@ -134,11 +106,16 @@ class SkillAlgorithm(StyleAlgorithm):
             loss += jitter_loss * self._jitter_loss_coef
         return loss
 
+    def _addition_input_for_get_action_values(self, input_dict):
+        input_dict = super()._addition_input_for_get_action_values(input_dict)
+        input_dict['latent'] = self._z
+        return input_dict
+
     def _diversity_loss(self, batch_dict, mu):
         rollout_z = batch_dict['latent']
         obs = batch_dict['obs']
         sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
-        sampled_mu, sampled_sigma = self.model.actor(obs, latent=sampled_z)
+        sampled_mu, sampled_sigma = self.model.actor_latent(obs, sampled_z)
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
         mu = torch.clamp(mu, -1.0, 1.0)
@@ -174,7 +151,7 @@ class SkillAlgorithm(StyleAlgorithm):
         similarity = torch.sum(enc * rollout_z, dim=-1, keepdim=True)
         likelihood_loss = -similarity.mean()
 
-        # TODO: original code ignores the gradient penalty and regularization
+        # original code ignores the gradient penalty and regularization
 
         self._write_stat(
             enc_loss=likelihood_loss.detach(),
@@ -182,14 +159,6 @@ class SkillAlgorithm(StyleAlgorithm):
             enc_reward_std=self._std_enc_reward,
         )
         return likelihood_loss
-
-    def _enc_reward(self, disc_obs, z):
-        with torch.no_grad():
-            if self.normalize_input:
-                disc_obs = self.model.norm_disc_obs(disc_obs)
-            enc = self.model.enc(disc_obs)
-            similarity = torch.sum(enc * z, dim=-1, keepdim=True)
-        return torch.clamp_min(similarity, 0.0).view(self.horizon_length, self.num_actors, -1)
 
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
@@ -219,20 +188,13 @@ class SkillAlgorithm(StyleAlgorithm):
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
-        # Loggers
-        logger_config = self.config.get('logger', None)
-        if logger_config is not None:
-            jitter = logger_config.get('jitter', False)
-            if jitter:
-                self._action_jitter = JitterLogger(self.writer, 'action')
-                # self._dof_jitter = JitterLogger(self.writer, 'dof')
-
     def _post_rollout1(self):
         rollout_obs = self.experience_buffer.tensor_dict['rollout_obs']
-        self._rollout_z = self.experience_buffer.tensor_dict['rollout_z']
+        self._rollout_z = self.experience_buffer.tensor_dict['latent']
 
-        skill_reward = self._enc_reward(rollout_obs, self._rollout_z)
-        style_reward = disc_reward(self.model, rollout_obs, self.normalize_input, self.device)
+        skill_reward = enc_reward(self.model, rollout_obs, self._rollout_z
+                                  ).view(self.horizon_length, self.num_actors, -1)
+        style_reward = disc_reward(self.model, rollout_obs, self.device)
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = (self._task_rew_scale * task_reward +
                            self._disc_rew_scale * style_reward +
@@ -248,7 +210,7 @@ class SkillAlgorithm(StyleAlgorithm):
 
     def _post_rollout2(self, batch_dict):
         batch_dict = super()._post_rollout2(batch_dict)
-        batch_dict['rollout_z'] = self._rollout_z.view(-1, self._latent_dim)
+        batch_dict['latent'] = self._rollout_z.view(-1, self._latent_dim)
         if self._jitter_obs_buf is not None:
             batch_dict['jitter_obs'] = self.experience_buffer.tensor_dict['jitter_obs'].view(-1, self._jitter_obs_size)
         return batch_dict
@@ -256,14 +218,15 @@ class SkillAlgorithm(StyleAlgorithm):
     def _pre_step(self, n: int):
         super()._pre_step(n)
         if self._jitter_obs_buf is not None:
-            self._jitter_obs_buf.push_on_reset(self.model.attach_latent_to_obs(self.obs['obs'], self._z), self.dones)
+            self._jitter_obs_buf.push_on_reset(self.model.attach_latent_and_norm_obs(self.obs['obs'], self._z),
+                                               self.dones)
 
     def _post_step(self, n):
         super()._post_step(n)
         if self._jitter_obs_buf is not None:
-            self._jitter_obs_buf.push(self.model.attach_latent_to_obs(self.obs['obs'], self._z))
+            self._jitter_obs_buf.push(self.model.attach_latent_and_norm_obs(self.obs['obs'], self._z))
             self.experience_buffer.update_data('jitter_obs', n, self._jitter_obs_buf.history)
-        self.experience_buffer.update_data('rollout_z', n, self._z)
+        self.experience_buffer.update_data('latent', n, self._z)
         self.experience_buffer.update_data('next_values', n, self.get_values(self.obs))
         self._remain_latent_steps -= 1
 
@@ -272,8 +235,8 @@ class SkillAlgorithm(StyleAlgorithm):
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
         enc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['rollout_z'] = input_dict['rollout_z'][0:enc_input_size]  # For encoder
-        batch_dict['latent'] = input_dict['rollout_z']  # For diversity loss
+        batch_dict['latent_enc'] = input_dict['latent'][0:enc_input_size]  # For encoder
+        batch_dict['latent'] = input_dict['latent']  # For diversity loss
 
         if self._jitter_obs_buf is not None:
             jitter_input_size = max(input_dict['jitter_obs'].shape[0] // self._jitter_input_divisor, 2)
@@ -298,3 +261,10 @@ def sample_latent(batch_size: int, latent_dim: int, device: torch.device) -> tor
     z = torch.normal(mean=0.0, std=1.0, size=(batch_size, latent_dim), device=device)
     z = torch.nn.functional.normalize(z, dim=1)
     return z
+
+
+def enc_reward(model, disc_obs, z):
+    with torch.no_grad():
+        enc = model.enc(disc_obs)
+        similarity = torch.sum(enc * z, dim=-1, keepdim=True)
+        return torch.clamp_min(similarity, 0.0)

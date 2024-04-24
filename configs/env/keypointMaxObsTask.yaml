@@ -1,6 +1,6 @@
 env:
   name: keypointMaxObsTask
-  num_envs: 128
+  num_envs: 2048
   spacing: 4
 
   humanoid_asset_filename:  # from the project root
@@ -17,7 +17,7 @@ env:
   max_episode_steps: 1200
 
   stiffness_coef: 1.0
-  damping_coef: 1.0
+  damping_coef: 1.5
 
   recovery_limit: 60
   drop_on_reset_prob: 0
@@ -25,7 +25,7 @@ env:
   viewer_follow_env0: False
 
 sim:
-  headless: False
+  headless: True
   device_id: 0
   engine: PHYSX
-  num_sub_steps: 1
+  num_sub_steps: 2

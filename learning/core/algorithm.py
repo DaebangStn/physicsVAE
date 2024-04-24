@@ -6,19 +6,21 @@ from typing import Optional
 import numpy as np
 import torch
 from torch.optim import Adam
-import torch.distributed as dist
 from rl_games.common.datasets import PPODataset
 from rl_games.common import common_losses
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase, print_statistics
 
+from learning.logger.jitter import JitterLogger
 from utils.rl_games import rl_games_net_build_param
 
 
 class CoreAlgorithm(A2CAgent):
     def __init__(self, **kwargs):
         ContinuousA2CBase.__init__(self, **kwargs)
+
+        self._fixed_sigma = None
 
         # rl-games default values
         self.model = None
@@ -30,6 +32,10 @@ class CoreAlgorithm(A2CAgent):
         self.is_tensor_obses = True
         self.int_save_freq = None
         self._prev_int_ckpt_path = None
+
+        # Loggers
+        self._action_jitter = None
+
         self._init_learning_variables(**kwargs)
 
         self.init_rnn_from_model(self.model)
@@ -53,19 +59,18 @@ class CoreAlgorithm(A2CAgent):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch,
          old_sigma_batch, return_batch, value_preds_batch) = self._unpack_input(input_dict)
 
-        batch_dict_copy = batch_dict.copy()  # since model modifies the dict, make a copy
         with ((torch.cuda.amp.autocast(enabled=self.mixed_precision))):
             # 2. Run the model
             res_dict = self.model(batch_dict)
             action_log_probs = res_dict['prev_neglogp']
-            values = res_dict['values']
+            normalized_values = res_dict['values']
             entropy = res_dict['entropy']
             mu = res_dict['mus']
             sigma = res_dict['sigmas']
 
             # 3. Calculate the loss
             a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
-            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, values)
+            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values)
             b_loss = self._bound_loss(mu)
 
             losses, _ = torch_ext.apply_masks(  # vestige of RNN
@@ -77,7 +82,7 @@ class CoreAlgorithm(A2CAgent):
                     - entropy * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
-            loss += self._additional_loss(batch_dict_copy, res_dict)
+            loss += self._additional_loss(batch_dict, res_dict)
 
             # 4. Zero the gradients
             if self.multi_gpu:
@@ -99,14 +104,38 @@ class CoreAlgorithm(A2CAgent):
                 'old_neglogp': old_action_log_probs_batch,
             }, curr_e_clip, 0)
 
-        with torch.no_grad():
-            kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, True)
-        self.train_result = (a_loss, c_loss, entropy, kl_dist, self.last_lr, lr_mul,
-                             mu.detach(), sigma.detach(), b_loss)
+        mu = mu.detach()
+        sigma = sigma.detach()
+        self.train_result = (a_loss, c_loss, entropy, self._policy_kl(mu, sigma, old_mu_batch, old_sigma_batch),
+                             self.last_lr, lr_mul, mu, sigma, b_loss)
+
+    def env_step(self, actions):
+        if self._action_jitter is not None:
+            self._action_jitter.log(actions, self.frame)
+        return super().env_step(actions)
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         obs = self.vec_env.reset(env_ids)
         return self.obs_to_tensors(obs)
+
+    def get_action_values(self, obs):
+        processed_obs = self._preproc_obs(obs['obs'])
+        input_dict = {
+            'is_train': False,
+            'obs': processed_obs,
+        }
+        input_dict = self._addition_input_for_get_action_values(input_dict)
+
+        self.model.eval()
+        with torch.no_grad():
+            return self.model(input_dict)
+
+    def get_values(self, obs):
+        processed_obs = self._preproc_obs(obs['obs'])
+
+        self.model.eval()
+        with torch.no_grad():
+            return self.model.critic(processed_obs)
 
     def train(self):
         self.init_tensors()
@@ -269,10 +298,13 @@ class CoreAlgorithm(A2CAgent):
         surr2 = advantage * torch.clamp(ratio, 1.0 - curr_e_clip, 1.0 + curr_e_clip)
         a_loss = torch.max(-surr1, -surr2)
 
-        clipped = (torch.abs(ratio - 1.0) > curr_e_clip).detach()
-        self._write_stat(clip_frac=clipped.float().mean().item())
+        clipped = torch.abs(ratio - 1.0) > curr_e_clip
+        self._write_stat(clip_frac=clipped.detach().float().mean().item())
 
         return a_loss
+
+    def _addition_input_for_get_action_values(self, input_dict):
+        return input_dict
 
     def _bound_loss(self, mu):
         if self.bound_loss_type == 'regularisation':
@@ -310,6 +342,24 @@ class CoreAlgorithm(A2CAgent):
                               weight_decay=self.weight_decay)
 
         self.bound_loss_type = config_hparam.get('bound_loss_type', 'bound')  # 'regularisation' or 'bound'
+
+        self._fixed_sigma = self.model.a2c_network.fixed_sigma
+
+        # Loggers
+        logger_config = self.config.get('logger', None)
+        if logger_config is not None:
+            jitter = logger_config.get('jitter', False)
+            if jitter:
+                self._action_jitter = JitterLogger(self.writer, 'action')
+
+    def _policy_kl(self, mu, sigma, old_mu, old_sigma):
+        with torch.no_grad():
+            if self._fixed_sigma:
+                kl = ((mu - old_mu)**2) / (2 * old_sigma**2 + 1e-7)
+                kl = kl.sum(dim=-1).mean()
+            else:
+                kl = torch_ext.policy_kl(mu, sigma, old_mu, old_sigma, True)
+            return kl
 
     def _prepare_data(self, **kwargs):
         self.dataset = PPODataset(self.batch_size, self.minibatch_size, self.is_discrete, self.is_rnn,

@@ -51,8 +51,8 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
             self._input_shape = input_shape
             return input_shape[0] + self._latent_dim
 
-        def enc(self, obs):
-            return torch.nn.functional.normalize(self._enc(obs), dim=-1)
+        def enc(self, normalized_obs):
+            return torch.nn.functional.normalize(self._enc(normalized_obs), dim=-1)
 
         def latent_feature(self, latent):
             if self._build_latent_net:

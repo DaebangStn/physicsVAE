@@ -191,14 +191,8 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_num_demo_update = int(config_buffer['num_demo_update'])
 
     def _post_rollout1(self):
-        if self._disc_log_hist:
-            style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'],
-                                        self.normalize_input, self.device, self.writer, self.frame
-                                        ).view(self.horizon_length, self.num_actors, -1))
-        else:
-            style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'],
-                                        self.normalize_input, self.device
-                                        ).view(self.horizon_length, self.num_actors, -1))
+        style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'], self.device
+                                   ).view(self.horizon_length, self.num_actors, -1)
 
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = self._task_rew_scale * task_reward + self._disc_rew_scale * style_reward
@@ -210,7 +204,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._std_style_reward = style_reward.std()
 
     def _post_rollout2(self, batch_dict):
-        # Since demo_obs and replay_obs has a order with (order, env)
+        # Since demo_obs and replay_obs has an order with (order, env)
         # Rollout_obs is not applied swap_and_flatten01
         batch_dict['rollout_obs'] = self.experience_buffer.tensor_dict['rollout_obs'].view(-1, self._disc_obs_size)
         return batch_dict
@@ -227,18 +221,9 @@ class StyleAlgorithm(CoreAlgorithm):
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
         disc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
-        rollout_obs = input_dict['rollout_obs'][0:disc_input_size]
-        replay_obs = input_dict['replay_obs'][0:disc_input_size]
-        demo_obs = input_dict['demo_obs'][0:disc_input_size]
-        if self.normalize_input:
-            batch_dict['rollout_obs'] = self.model.norm_disc_obs(rollout_obs)
-            batch_dict['replay_obs'] = self.model.norm_disc_obs(replay_obs)
-            batch_dict['demo_obs'] = self.model.norm_disc_obs(demo_obs)
-            batch_dict['demo_obs'].requires_grad_(True)
-        else:
-            batch_dict['rollout_obs'] = rollout_obs
-            batch_dict['replay_obs'] = replay_obs
-            batch_dict['demo_obs'] = demo_obs
+        batch_dict['rollout_obs'] = input_dict['rollout_obs'][0:disc_input_size]
+        batch_dict['replay_obs'] = input_dict['replay_obs'][0:disc_input_size]
+        batch_dict['demo_obs'] = input_dict['demo_obs'][0:disc_input_size]
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
 
@@ -349,16 +334,9 @@ def motion_lib_angle_transform(
     return obs.view(num_steps, -1)
 
 
-def disc_reward(model, disc_obs, normalize_input, device, writer=None, step=None):
+def disc_reward(model, disc_obs, device):
     with torch.no_grad():
-        if normalize_input:
-            disc_obs = model.norm_disc_obs(disc_obs)
         disc = model.disc(disc_obs)
         prob = 1 / (1 + torch.exp(-disc))
         reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=device)))
-
-        if writer is not None:
-            writer.add_histogram('disc', disc.flatten(), step)
-            writer.add_histogram('disc_rew', reward.flatten(), step)
-
     return reward

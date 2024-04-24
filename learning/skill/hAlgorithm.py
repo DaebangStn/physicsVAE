@@ -64,7 +64,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
             obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
             obs_step = {'obs': obs, 'disc_obs': disc_obs}
 
-            disc_rew = disc_reward(disc_obs, self._llc_disc, self.normalize_input, self.device)
+            disc_rew = disc_reward(disc_obs, self._llc_disc, self.device)
 
             rew_step[~done] += rew[~done]
             disc_rew_step[~done] += disc_rew[~done]

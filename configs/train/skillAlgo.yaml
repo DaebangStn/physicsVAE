@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo:
+  memo: enc_loss
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -37,7 +37,7 @@ network:
       name: default
 
   latent:
-    build: True
+    build: False
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
@@ -48,9 +48,9 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_24-14-44-32_None/nn/keypointMaxObsTask_ep_3800_rew_5926.2485_3800.pth
+#  runs/keypointMaxObsTask_skillAlgo_24-20-24-07_enc_loss/nn/keypointMaxObsTask_ep_100_rew_-60.184128_100.pth
 
-  runs/last_keypointMaxObsTask_ep_2200_rew_7114.134.pth
+#  runs/last_keypointMaxObsTask_ep_2200_rew_7114.134.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -85,7 +85,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 512
+  minibatch_size: 8192
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -98,7 +98,7 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 0.0
+    enc_scale: 10.0
 
     show_on_player: False
 
@@ -123,14 +123,14 @@ hparam:
   skill:
     div_loss_coef: 0.01
     enc:
-      loss_coef: 5
+      loss_coef: 500
 
     latent:
       update_freq_max: 150
       update_freq_min: 1
 
-  jitter:
-    loss_coef: 0.02
-    input_divisor: 16
+#  jitter:
+#    loss_coef: 0.02
+#    input_divisor: 16
 
 seed: 1

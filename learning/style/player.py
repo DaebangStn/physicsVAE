@@ -108,7 +108,7 @@ class StylePlayer(CorePlayer):
         self._matcher_obs_buf = TensorHistoryFIFO(motion_match_length)
 
     def _disc_debug(self, disc_obs):
-        reward = disc_reward(self.model, disc_obs, self.normalize_input, self.device).mean().item()
+        reward = disc_reward(self.model, disc_obs, self.device).mean().item()
         print(f"disc_reward {reward:.3f}")
         if self._games_played == 0:
             self._writer.add_scalar("player/reward_disc", reward, self._n_step)

@@ -16,65 +16,33 @@ class SkillModel(StyleModel):
             super().__init__(net, **kwargs)
 
         def forward(self, input_dict):
-            input_dict['obs'] = self.attach_latent_to_obs(input_dict['obs'], input_dict['latent'])
+            output_dict = super().forward(input_dict)
+            if input_dict.get('is_train', False):
+                output_dict['enc'] = self.enc(input_dict['rollout_obs'])
+            return output_dict
 
-            mu, logstd, value, states = self.a2c_network(input_dict)
-            sigma = torch.exp(logstd)
-            distr = torch.distributions.Normal(mu, sigma, validate_args=False)
-
-            is_train = input_dict.get('is_train', True)
-            if is_train:
-                entropy = distr.entropy().sum(dim=-1)
-                prev_neglogp = self.neglogp(input_dict['prev_actions'], mu, sigma, logstd)
-                result = {
-                    'prev_neglogp': torch.squeeze(prev_neglogp),
-                    'values': value,
-                    'entropy': entropy,
-                    'rnn_states': states,
-                    'mus': mu,
-                    'sigmas': sigma,
-                    'enc': self.enc(input_dict['rollout_obs']),
-                    'rollout_disc_logit': self.disc(input_dict['rollout_obs']),
-                    'replay_disc_logit': self.disc(input_dict['replay_obs']),
-                    'demo_disc_logit': self.disc(input_dict['demo_obs']),
-                }
-            else:
-                selected_action = distr.sample()
-                neglogp = self.neglogp(selected_action, mu, sigma, logstd)
-                result = {
-                    'neglogpacs': torch.squeeze(neglogp),
-                    'values': self.denorm_value(value),
-                    'actions': selected_action,
-                    'rnn_states': states,
-                    'mus': mu,
-                    'sigmas': sigma,
-                }
-            return result
-
-        def attach_latent_to_obs(self, obs: torch.Tensor, latent: torch.Tensor):
+        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor):
             latent_feature = self.a2c_network.latent_feature(latent)
-            obs = self.norm_obs(obs)
-            obs = torch.cat([obs, latent_feature], dim=-1)
-            return obs
+            normalized_obs = self.norm_obs(obs)
+            normalized_obs = torch.cat([normalized_obs, latent_feature], dim=-1)
+            return normalized_obs
 
-        def actor(self, obs, **kwargs):
-            assert self.a2c_network.separate, 'actor is not supported for non-separate network'
-            assert 'latent' in kwargs, 'latent is not provided'
-            with torch.no_grad():
-                return self.actor_module(self.attach_latent_to_obs(obs, kwargs['latent']))
+        def actor_latent(self, obs, latent):
+            return self.actor_module(self.attach_latent_and_norm_obs(obs, latent))
 
-        def critic(self, obs, **kwargs):
-            assert self.a2c_network.separate, 'critic is not supported for non-separate network'
-            assert 'latent' in kwargs, 'latent is not provided'
-            with torch.no_grad():
-                value = self.critic_module(self.attach_latent_to_obs(obs, kwargs['latent']))
-                return self.denorm_value(value)
+        def critic_latent(self, obs, latent):
+            normalized_value = self.critic_module(self.attach_latent_and_norm_obs(obs, latent))
+            return normalized_value
 
         def enc(self, obs):
-            return self.a2c_network.enc(obs)
+            normalized_obs = self._norm_disc_obs(obs)
+            return self.a2c_network.enc(normalized_obs)
 
         def enc_load_state_dict(self, state_dict):
             self.a2c_network.enc_load_state_dict(state_dict)
+
+        def _compute_obs(self, input_dict: dict) -> torch.Tensor:
+            return self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'])
 
         @property
         def enc_weights(self):

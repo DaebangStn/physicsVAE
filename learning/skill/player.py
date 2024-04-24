@@ -2,8 +2,8 @@ import torch
 
 from rl_games.algos_torch.players import rescale_actions, unsqueeze_obs
 
-from learning.style.player import StylePlayer, keyp_task_obs_angle_transform, keyp_task_concat_obs, keyp_obs_to_matcher
-from learning.skill.algorithm import sample_latent
+from learning.style.player import StylePlayer
+from learning.skill.algorithm import sample_latent, enc_reward
 from learning.logger.latentMotion import LatentMotionLogger
 from learning.logger.motionTransition import MotionTransitionLogger
 from utils.env import sample_color
@@ -91,12 +91,7 @@ class SkillPlayer(StylePlayer):
                                                                  self.env.num, self.config)
 
     def _enc_debug(self, disc_obs):
-        with torch.no_grad():
-            if self.normalize_input:
-                disc_obs = self.model.norm_disc_obs(disc_obs)
-            enc = self.model.enc(disc_obs)
-            similarity = torch.sum(enc * self._z, dim=-1, keepdim=True)
-            reward = torch.clamp_min(similarity, 0.0).mean().item()
+        reward = enc_reward(self.model, disc_obs, self._z).mean().item()
         print(f"enc_reward {reward:.3f}")
         if self._games_played == 0:
             self._writer.add_scalar("player/reward_enc", reward, self._n_step)

@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: \
+  memo:
   motion_file:
 #    assets/motions/amp_humanoid_walk.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -43,7 +43,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_styleAlgo_18-12-34-36_walk_2_disc/nn/last_keypointMaxObsTask_ep_2100_rew_7137.912.pth
 
-  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
+#  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
@@ -57,7 +57,7 @@ hparam:
   normalize_advantage: True
   clip_value: False
   reward_shaper: {}
-  save_frequency: 100
+  save_frequency: 1000
 
   logger:
     motion_match_length: 4

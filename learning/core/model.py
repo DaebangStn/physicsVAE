@@ -16,9 +16,10 @@ class CoreModel(ModelA2CContinuousLogStd):
         """
         def __init__(self, net, **kwargs):
             super().__init__(net, **self._rl_games_compatible_keywords(**kwargs))
+            assert self.a2c_network.separate, 'CoreModel only supports separate network'
 
-        def actor_module(self, obs):
-            a_out = obs
+        def actor_module(self, normalized_obs):
+            a_out = normalized_obs
             a_out = self.a2c_network.actor_mlp(a_out)
 
             mu = self.a2c_network.mu_act(self.a2c_network.mu(a_out))
@@ -28,24 +29,55 @@ class CoreModel(ModelA2CContinuousLogStd):
                 logstd = self.a2c_network.sigma_act(self.a2c_network.sigma(a_out))
             return mu, logstd
 
-        def critic_module(self, obs):
-            c_out = obs
+        def critic_module(self, normalized_obs):
+            c_out = normalized_obs
             c_out = self.a2c_network.critic_mlp(c_out)
-            value = self.a2c_network.value_act(self.a2c_network.value(c_out))
-            return value
+            normalized_value = self.a2c_network.value_act(self.a2c_network.value(c_out))
+            return normalized_value
 
-        def actor(self, obs, **kwargs):
-            assert self.a2c_network.separate, 'actor is not supported for non-separate network'
-            with torch.no_grad():
-                obs = self.norm_obs(obs)
-                return self.actor_module(obs)
+        def actor(self, obs):
+            normalized_obs = self.norm_obs(obs)
+            return self.actor_module(normalized_obs)
 
-        def critic(self, obs, **kwargs):
-            assert self.a2c_network.separate, 'critic is not supported for non-separate network'
-            with torch.no_grad():
-                obs = self.norm_obs(obs)
-                value = self.critic_module(obs)
-                return self.denorm_value(value)
+        def critic(self, obs):
+            obs = self.norm_obs(obs)
+            normalized_value = self.critic_module(obs)
+            return self.denorm_value(normalized_value)
+
+        def forward(self, input_dict):
+            normalized_obs = self._compute_obs(input_dict)
+            mu, logstd = self.actor_module(normalized_obs)
+            sigma = torch.exp(logstd)
+            distr = torch.distributions.Normal(mu, sigma, validate_args=False)
+
+            normalized_value = self.critic_module(normalized_obs)
+
+            result = {
+                'mus': mu,
+                'sigmas': sigma,
+            }
+
+            if input_dict['is_train']:
+                prev_neglogp = self.neglogp(input_dict['prev_actions'], mu, sigma, logstd)
+                result.update({
+                    'prev_neglogp': torch.squeeze(prev_neglogp),
+                    'entropy': distr.entropy().sum(dim=-1),
+                    'values': normalized_value,
+                })
+            else:
+                selected_action = distr.sample()
+                neglogp = self.neglogp(selected_action, mu, sigma, logstd)
+                result.update({
+                    'neglogpacs': torch.squeeze(neglogp),
+                    'actions': selected_action,
+                    'values': self.denorm_value(normalized_value),
+                })
+            return result
+
+        def _compute_obs(self, input_dict: dict) -> torch.Tensor:
+            obs = input_dict['obs']
+            normalized_obs = self.norm_obs(obs)
+            return normalized_obs
 
         @staticmethod
         def _rl_games_compatible_keywords(**kwargs):
