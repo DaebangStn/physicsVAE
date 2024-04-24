@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 
-from learning.logger.base import BaseLogger
+from learning.logger.hdfBase import HdfBaseLogger
 
 
-class LatentMotionLogger(BaseLogger):
+class LatentMotionLogger(HdfBaseLogger):
     """
     See hierarchy in BaseLogger
 
@@ -36,7 +36,7 @@ class LatentMotionLogger(BaseLogger):
             for j in range(self._ds_latent.shape[0]):
                 if np.allclose(z[i], self._ds_latent[j]):
                     self._latent_idx[env_idx] = j
-                    return
+                    continue
 
             # There is no same latent vector in the dataset
             self._latent_idx[env_idx] = self._ds_latent.shape[0]

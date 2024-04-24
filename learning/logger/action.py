@@ -1,9 +1,9 @@
 import torch
 
-from learning.logger.base import BaseLogger
+from learning.logger.hdfBase import HdfBaseLogger
 
 
-class ActionLogger(BaseLogger):
+class ActionLogger(HdfBaseLogger):
     """
     See hierarchy in BaseLogger
 

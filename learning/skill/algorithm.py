@@ -2,9 +2,9 @@ import time
 from typing import Optional
 
 import torch
-from rl_games.common.a2c_common import swap_and_flatten01
 
-from learning.style.algorithm import StyleAlgorithm, disc_reward
+from learning.style.algorithm import StyleAlgorithm, disc_reward, keyp_task_obs_angle_transform
+from learning.logger.jitter import JitterLogger
 from utils.angle import *
 from utils.env import sample_color
 
@@ -23,15 +23,16 @@ class SkillAlgorithm(StyleAlgorithm):
         # reward related
         self._enc_rew_scale = None
 
+        # Loggers
+        self._action_jitter = None
+        # self._dof_jitter = None
+
         # placeholders for the current episode
         self._z = None
         self._rollout_z = None
         self._mean_enc_reward = None
         self._std_enc_reward = None
         self._remain_latent_steps = None
-        self._prev_action = None
-        self._prev_action_dot = None  # da/dt
-        self._prev_dVel = None
 
         self._color_projector = None
 
@@ -56,6 +57,20 @@ class SkillAlgorithm(StyleAlgorithm):
     """ keypointTask returns the Tuple of tensors so that we should post-process the observation.
     env_step and env_reset are overridden to post-process the observation.
     """
+
+    def env_step(self, actions):
+        if self._action_jitter is not None:
+            self._action_jitter.log(actions, self.frame)
+
+        obs, rewards, dones, infos = super(StyleAlgorithm, self).env_step(actions)
+        obs_concat, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+
+        # if self._dof_jitter is not None:
+        #     aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs['obs']
+        #     self._dof_jitter.log(dPos, self.frame)
+
+        obs = {'obs': obs_concat, 'disc_obs': disc_obs}
+        return obs, rewards, dones, infos
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         self._update_latent()
@@ -88,7 +103,6 @@ class SkillAlgorithm(StyleAlgorithm):
                                                                       device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
-        self.experience_buffer.tensor_dict['action_two_dot'] = torch.zeros(batch_size + (1,), device=self.device)
 
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
@@ -170,10 +184,12 @@ class SkillAlgorithm(StyleAlgorithm):
 
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
-    def _pre_rollout(self):
-        self._prev_action = None
-        self._prev_action_dot = None
-        self._prev_dVel = None
+        logger_config = self.config.get('logger', None)
+        if logger_config is not None:
+            jitter = logger_config.get('jitter', False)
+            if jitter:
+                self._action_jitter = JitterLogger(self.writer, 'action')
+                # self._dof_jitter = JitterLogger(self.writer, 'dof')
 
     def _post_rollout1(self):
         rollout_obs = self.experience_buffer.tensor_dict['rollout_obs']

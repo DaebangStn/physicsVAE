@@ -6,7 +6,7 @@ import h5py
 from h5py import Dataset
 
 
-class BaseLogger:
+class HdfBaseLogger:
     """
     Hierarchy:
         [filename].hdf5 --> [experiment_name]/[logger_class_name]/[logger_specific_group]/[data]

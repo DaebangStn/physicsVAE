@@ -7,9 +7,10 @@ from rl_games.algos_torch.players import rescale_actions, unsqueeze_obs
 
 from learning.style.player import StylePlayer, keyp_task_obs_angle_transform, keyp_task_concat_obs
 from learning.skill.algorithm import sample_latent
+from learning.logger.matcher import Matcher
+from learning.logger.jitter import JitterLogger
 from learning.logger.latentMotion import LatentMotionLogger
 from learning.logger.motionTransition import MotionTransitionLogger
-from learning.logger.matcher import Matcher
 from utils.env import sample_color
 from utils.buffer import TensorHistoryFIFO
 from utils.angle import calc_heading_quat_inv, quat_rotate
@@ -23,6 +24,9 @@ class SkillPlayer(StylePlayer):
         self._latent_update_freq_min = None
         self._color_projector = None
 
+        # Loggers
+        self._action_jitter = None
+        self._dof_jitter = None
         self._matcher = None
         self._matcher_obs_buf = None
         self._latent_logger = None
@@ -37,8 +41,16 @@ class SkillPlayer(StylePlayer):
     def env_step(self, env, actions):
         if self._action_logger is not None:
             self._action_logger.log(actions)
+        if self._action_jitter is not None:
+            self._action_jitter.log(actions, self._n_step)
+
         obs_raw, rew, done, info = super(StylePlayer, self).env_step(env, actions)
         obs = self._post_process_obs(obs_raw)
+
+        if self._dof_jitter is not None:
+            aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs_raw['obs']
+            self._dof_jitter.log(dPos, self._n_step)
+
         return obs, rew, done, info
 
     def env_reset(self, env):
@@ -96,8 +108,12 @@ class SkillPlayer(StylePlayer):
 
         logger_config = self.config.get('logger', None)
         if logger_config is not None:
+            jitter = logger_config.get('jitter', False)
             log_latent = logger_config.get('latent_motion_id', False)
             motion_transition = logger_config.get('motion_transition', False)
+            if jitter:
+                self._action_jitter = JitterLogger(self._writer, 'action')
+                self._dof_jitter = JitterLogger(self._writer, 'dof')
             if log_latent or motion_transition:
                 full_experiment_name = kwargs['params']['config']['full_experiment_name']
                 show_matcher_out = logger_config.get('show_matcher_out', False)

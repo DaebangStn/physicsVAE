@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: sword
+  memo: jitter_test
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -37,7 +37,7 @@ network:
       name: default
 
   latent:
-    build: False
+    build: True
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
@@ -48,9 +48,9 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_23-22-37-37_sword/nn/last_keypointMaxObsTask_ep_9000_rew_-67.02413.pth
+#  runs/keypointMaxObsTask_skillAlgo_24-12-34-30_jitter_test/nn/last_keypointMaxObsTask_ep_2100_rew_6710.046.pth
 
-#  runs/enc010_last_keypointMaxObsTask_ep_15500_rew_7199.027.pth
+  runs/last_keypointMaxObsTask_ep_900_rew_6839.463.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -69,7 +69,8 @@ hparam:
     show_matcher_out: False
     action: False
     latent_motion_id: False
-    motion_transition: True
+    motion_transition: False
+    jitter: True
     filename:
       plot
 #      junk
@@ -81,7 +82,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 512
   mini_epochs: 6
 
   learning_rate: 2e-5
