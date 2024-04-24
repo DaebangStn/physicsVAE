@@ -17,7 +17,7 @@ class CoreModel(ModelA2CContinuousLogStd):
         def __init__(self, net, **kwargs):
             super().__init__(net, **self._rl_games_compatible_keywords(**kwargs))
 
-        def _actor_module(self, obs):
+        def actor_module(self, obs):
             a_out = obs
             a_out = self.a2c_network.actor_mlp(a_out)
 
@@ -28,7 +28,7 @@ class CoreModel(ModelA2CContinuousLogStd):
                 logstd = self.a2c_network.sigma_act(self.a2c_network.sigma(a_out))
             return mu, logstd
 
-        def _critic_module(self, obs):
+        def critic_module(self, obs):
             c_out = obs
             c_out = self.a2c_network.critic_mlp(c_out)
             value = self.a2c_network.value_act(self.a2c_network.value(c_out))
@@ -38,13 +38,13 @@ class CoreModel(ModelA2CContinuousLogStd):
             assert self.a2c_network.separate, 'actor is not supported for non-separate network'
             with torch.no_grad():
                 obs = self.norm_obs(obs)
-                return self._actor_module(obs)
+                return self.actor_module(obs)
 
         def critic(self, obs, **kwargs):
             assert self.a2c_network.separate, 'critic is not supported for non-separate network'
             with torch.no_grad():
                 obs = self.norm_obs(obs)
-                value = self._critic_module(obs)
+                value = self.critic_module(obs)
                 return self.denorm_value(value)
 
         @staticmethod

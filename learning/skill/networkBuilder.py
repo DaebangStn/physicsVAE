@@ -13,8 +13,10 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
         Forwards returns [mu, logstd, value, states]
         """
         def __init__(self, param, **kwargs):
+            self._input_shape = None
             self._latent_dim = int(kwargs['space']['latent_dim'])
             super().__init__(param, **kwargs)  # build action/value/disc network
+
             self._build_enc()
 
             self._build_latent_net = kwargs['latent']['build']
@@ -46,6 +48,7 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
             self._enc = nn.Sequential(self._enc_mlp, self._enc_linear)
 
         def _calc_input_size(self, input_shape, cnn_layers=None):
+            self._input_shape = input_shape
             return input_shape[0] + self._latent_dim
 
         def enc(self, obs):
@@ -69,3 +72,7 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
         @property
         def latent_dim(self):
             return self._latent_dim
+
+        @property
+        def input_size(self):
+            return self._calc_input_size(self._input_shape)

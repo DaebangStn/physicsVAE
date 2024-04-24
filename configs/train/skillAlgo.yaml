@@ -127,4 +127,8 @@ hparam:
       update_freq_max: 150
       update_freq_min: 1
 
+  jitter:
+    loss_coef: 0.1
+    input_divisor: 16
+
 seed: 1

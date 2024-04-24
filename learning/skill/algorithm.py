@@ -7,6 +7,7 @@ from learning.style.algorithm import StyleAlgorithm, disc_reward, keyp_task_obs_
 from learning.logger.jitter import JitterLogger
 from utils.angle import *
 from utils.env import sample_color
+from utils.buffer import TensorHistoryFIFO
 
 
 class SkillAlgorithm(StyleAlgorithm):
@@ -18,7 +19,15 @@ class SkillAlgorithm(StyleAlgorithm):
         self._latent_update_freq_max = None
         self._latent_update_freq_min = None
 
+        # diversity related
         self._div_loss_coef = None
+
+        # jitter related
+        self._JITTER_SIZE = None
+        self._jitter_obs_size = None
+        self._jitter_obs_buf = None
+        self._jitter_loss_coef = None
+        self._jitter_input_divisor = None
 
         # reward related
         self._enc_rew_scale = None
@@ -103,17 +112,27 @@ class SkillAlgorithm(StyleAlgorithm):
                                                                       device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
+        if self._jitter_obs_buf is not None:
+            self.experience_buffer.tensor_dict['jitter_obs'] = torch.empty(batch_size + (self._jitter_obs_size,),
+                                                                           device=self.device)
 
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
         dataset_dict['rollout_z'] = batch_dict['rollout_z']
+        if self._jitter_obs_buf is not None:
+            dataset_dict['jitter_obs'] = batch_dict['jitter_obs']
 
     def _additional_loss(self, batch_dict, res_dict):
         loss = super()._additional_loss(batch_dict, res_dict)
         e_loss = self._enc_loss(res_dict['enc'], batch_dict['rollout_z'])
+        loss += e_loss * self._enc_loss_coef
         div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
-        return loss + e_loss * self._enc_loss_coef + div_loss * self._div_loss_coef
+        loss += div_loss * self._div_loss_coef
+        if self._jitter_obs_buf is not None:
+            jitter_loss = self._jitter_loss(batch_dict)
+            loss += jitter_loss * self._jitter_loss_coef
+        return loss
 
     def _diversity_loss(self, batch_dict, mu):
         rollout_z = batch_dict['latent']
@@ -141,6 +160,15 @@ class SkillAlgorithm(StyleAlgorithm):
         self._write_stat(amp_diversity_loss=loss.detach())
         return loss
 
+    def _jitter_loss(self, batch_dict):
+        jitter_obs = batch_dict['jitter_obs'].view(-1, self._JITTER_SIZE, self.model.input_size)
+        mu, logstd = self.model.actor_module(jitter_obs)
+        jitter_mu = mu[:, 0] - 2 * mu[:, 1] + mu[:, 2]
+        jitter_loss = torch.abs(jitter_mu).mean()
+
+        self._write_stat(jitter_loss_train=jitter_loss.detach())
+        return jitter_loss
+
     def _enc_loss(self, enc, rollout_z):
         # encoding
         similarity = torch.sum(enc * rollout_z, dim=-1, keepdim=True)
@@ -166,24 +194,32 @@ class SkillAlgorithm(StyleAlgorithm):
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
 
+        # encoder related
         config_hparam = self.config
-        config_disc = config_hparam['style']['disc']
-        self._disc_input_divisor = int(config_disc['input_divisor'])
         config_skill = config_hparam['skill']
         self._div_loss_coef = config_skill['div_loss_coef']
         self._enc_loss_coef = config_skill['enc']['loss_coef']
         self._latent_update_freq_max = config_skill['latent']['update_freq_max']
         self._latent_update_freq_min = config_skill['latent']['update_freq_min']
         self._remain_latent_steps = torch.zeros(self.vec_env.num, dtype=torch.int32)
-
         self._enc_rew_scale = config_hparam['reward']['enc_scale']
 
+        # jitter related
+        config_jitter = config_hparam.get('jitter', None)
+        if config_jitter is not None:
+            self._JITTER_SIZE = 3  # jitter = a(t) - 2 * a(t-1) + a(t-2)
+            self._jitter_obs_size = self.model.input_size * self._JITTER_SIZE
+            self._jitter_obs_buf = TensorHistoryFIFO(self._JITTER_SIZE)
+            self._jitter_loss_coef = config_jitter['loss_coef']
+            self._jitter_input_divisor = config_jitter['input_divisor']
+
+        # latent related
         config_network = kwargs['params']['network']
         self._latent_dim = config_network['space']['latent_dim']
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
-
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
+        # Loggers
         logger_config = self.config.get('logger', None)
         if logger_config is not None:
             jitter = logger_config.get('jitter', False)
@@ -213,10 +249,20 @@ class SkillAlgorithm(StyleAlgorithm):
     def _post_rollout2(self, batch_dict):
         batch_dict = super()._post_rollout2(batch_dict)
         batch_dict['rollout_z'] = self._rollout_z.view(-1, self._latent_dim)
+        if self._jitter_obs_buf is not None:
+            batch_dict['jitter_obs'] = self.experience_buffer.tensor_dict['jitter_obs'].view(-1, self._jitter_obs_size)
         return batch_dict
+
+    def _pre_step(self, n: int):
+        super()._pre_step(n)
+        if self._jitter_obs_buf is not None:
+            self._jitter_obs_buf.push_on_reset(self.model.attach_latent_to_obs(self.obs['obs'], self._z), self.dones)
 
     def _post_step(self, n):
         super()._post_step(n)
+        if self._jitter_obs_buf is not None:
+            self._jitter_obs_buf.push(self.model.attach_latent_to_obs(self.obs['obs'], self._z))
+            self.experience_buffer.update_data('jitter_obs', n, self._jitter_obs_buf.history)
         self.experience_buffer.update_data('rollout_z', n, self._z)
         self.experience_buffer.update_data('next_values', n, self.get_values(self.obs))
         self._remain_latent_steps -= 1
@@ -225,9 +271,13 @@ class SkillAlgorithm(StyleAlgorithm):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        disc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['rollout_z'] = input_dict['rollout_z'][0:disc_input_size]  # For encoder
+        enc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
+        batch_dict['rollout_z'] = input_dict['rollout_z'][0:enc_input_size]  # For encoder
         batch_dict['latent'] = input_dict['rollout_z']  # For diversity loss
+
+        if self._jitter_obs_buf is not None:
+            jitter_input_size = max(input_dict['jitter_obs'].shape[0] // self._jitter_input_divisor, 2)
+            batch_dict['jitter_obs'] = input_dict['jitter_obs'][0:jitter_input_size]
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)

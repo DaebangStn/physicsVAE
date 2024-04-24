@@ -16,7 +16,7 @@ class SkillModel(StyleModel):
             super().__init__(net, **kwargs)
 
         def forward(self, input_dict):
-            input_dict['obs'] = self._attach_latent_to_obs(input_dict['obs'], input_dict['latent'])
+            input_dict['obs'] = self.attach_latent_to_obs(input_dict['obs'], input_dict['latent'])
 
             mu, logstd, value, states = self.a2c_network(input_dict)
             sigma = torch.exp(logstd)
@@ -51,17 +51,23 @@ class SkillModel(StyleModel):
                 }
             return result
 
+        def attach_latent_to_obs(self, obs: torch.Tensor, latent: torch.Tensor):
+            latent_feature = self.a2c_network.latent_feature(latent)
+            obs = self.norm_obs(obs)
+            obs = torch.cat([obs, latent_feature], dim=-1)
+            return obs
+
         def actor(self, obs, **kwargs):
             assert self.a2c_network.separate, 'actor is not supported for non-separate network'
             assert 'latent' in kwargs, 'latent is not provided'
             with torch.no_grad():
-                return self._actor_module(self._attach_latent_to_obs(obs, kwargs['latent']))
+                return self.actor_module(self.attach_latent_to_obs(obs, kwargs['latent']))
 
         def critic(self, obs, **kwargs):
             assert self.a2c_network.separate, 'critic is not supported for non-separate network'
             assert 'latent' in kwargs, 'latent is not provided'
             with torch.no_grad():
-                value = self._critic_module(self._attach_latent_to_obs(obs, kwargs['latent']))
+                value = self.critic_module(self.attach_latent_to_obs(obs, kwargs['latent']))
                 return self.denorm_value(value)
 
         def enc(self, obs):
@@ -70,12 +76,10 @@ class SkillModel(StyleModel):
         def enc_load_state_dict(self, state_dict):
             self.a2c_network.enc_load_state_dict(state_dict)
 
-        def _attach_latent_to_obs(self, obs, latent):
-            latent_feature = self.a2c_network.latent_feature(latent)
-            obs = self.norm_obs(obs)
-            obs = torch.cat([obs, latent_feature], dim=-1)
-            return obs
-
         @property
         def enc_weights(self):
             return self.a2c_network.enc_weights
+
+        @property
+        def input_size(self):
+            return self.a2c_network.input_size

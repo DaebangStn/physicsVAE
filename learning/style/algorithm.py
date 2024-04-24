@@ -147,6 +147,7 @@ class StyleAlgorithm(CoreAlgorithm):
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
 
+        # discriminator related
         config_hparam = self.config
         config_disc = config_hparam['style']['disc']
         self._disc_obs_traj_len = config_disc['obs_traj_len']
@@ -158,6 +159,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_input_divisor = int(config_disc['input_divisor'])
         self._disc_log_hist = config_disc['log_hist']
 
+        # reward related
         config_rew = config_hparam['reward']
         self._task_rew_scale = config_rew['task_scale']
         self._disc_rew_scale = config_rew['disc_scale']
