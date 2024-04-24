@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 from tensorboardX import SummaryWriter
 
@@ -5,9 +7,10 @@ from learning.logger.tensorBoardBase import TensorBoardBaseLogger
 
 
 class JitterLogger(TensorBoardBaseLogger):
-    def __init__(self, writer: SummaryWriter, name: str, derivation_order: int = 2):
+    def __init__(self, writer: SummaryWriter, name: str, derivation_order: int = 2, category: Optional[str] = None):
         assert derivation_order in [1, 2], f"Derivation order must be either 1 or 2, but got {derivation_order}"
-        super().__init__(writer, f'jitter_{name}', 'info')
+        category = category if category is not None else 'info'
+        super().__init__(writer, f'jitter_{name}', category)
 
         self._dOrder = derivation_order
         if self._dOrder == 1:

@@ -166,7 +166,7 @@ class SkillAlgorithm(StyleAlgorithm):
         jitter_mu = mu[:, 0] - 2 * mu[:, 1] + mu[:, 2]
         jitter_loss = torch.abs(jitter_mu).mean()
 
-        self._write_stat(jitter_loss_train=jitter_loss.detach())
+        self._write_stat(jitter_loss=jitter_loss.detach())
         return jitter_loss
 
     def _enc_loss(self, enc, rollout_z):
