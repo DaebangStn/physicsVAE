@@ -4,6 +4,8 @@ from torch.utils.tensorboard import SummaryWriter
 from rl_games.common.player import BasePlayer
 from rl_games.algos_torch.players import PpoPlayerContinuous
 
+from learning.logger.jitter import JitterLogger
+from learning.logger.action import ActionLogger
 from utils.rl_games import rl_games_net_build_param
 
 
@@ -30,6 +32,11 @@ class CorePlayer(PpoPlayerContinuous):
         self.games_num = int(1e30)
         self._games_played = None
         self._n_step = None
+
+        # Loggers
+        self._action_jitter = None
+        self._dof_jitter = None
+        self._action_logger = None
 
         # placeholder for rollout
         self.dones = None
@@ -145,7 +152,17 @@ class CorePlayer(PpoPlayerContinuous):
                   'av steps:', sum_steps / self._games_played * n_game_life)
 
     def env_step(self, env, actions):
+        if self._action_logger is not None:
+            self._action_logger.log(actions)
+        if self._action_jitter is not None:
+            self._action_jitter.log(actions, self._n_step)
+
         obs, rew, done, info = super().env_step(env, actions)
+
+        if self._dof_jitter is not None:
+            aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
+            self._dof_jitter.log(dPos, self._n_step)
+
         return {'obs': obs}, rew, done, info
 
     def env_reset(self, env):
@@ -173,6 +190,18 @@ class CorePlayer(PpoPlayerContinuous):
         self._writer = SummaryWriter(log_dir=logdir)
 
         self.max_steps = self.config.get('max_frames', int(1e30))
+
+        logger_config = self.config.get('logger', None)
+        if logger_config is not None:
+            log_jitter = logger_config.get('jitter', False)
+            if log_jitter:
+                self._action_jitter = JitterLogger(self._writer, 'action')
+                self._dof_jitter = JitterLogger(self._writer, 'dof')
+
+            log_action = logger_config.get('action', False)
+            if log_action:
+                full_experiment_name = kwargs['params']['config']['full_experiment_name']
+                self._action_logger = ActionLogger(logger_config['filename'], full_experiment_name, self.actions_num)
 
     def _pre_step(self):
         pass

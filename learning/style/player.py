@@ -19,15 +19,12 @@ class StylePlayer(CorePlayer):
         self._disc_obs_buf = None
         self._disc_obs_traj_len = None
 
-        self._action_logger = None
         self._show_reward = None
 
         self._checkpoint_disc = None
         super().__init__(**kwargs)
 
     def env_step(self, env, actions):
-        if self._action_logger is not None:
-            self._action_logger.log(actions)
         obs, rew, done, info = super().env_step(env, actions)
         if self._show_reward:
             obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
@@ -78,13 +75,6 @@ class StylePlayer(CorePlayer):
         self._disc_obs_traj_len = style_conf['disc']['obs_traj_len']
         if self._show_reward:
             self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
-
-        logger_config = self.config.get('logger', None)
-        if logger_config is not None:
-            log_action = logger_config.get('action', False)
-            if log_action:
-                full_experiment_name = kwargs['params']['config']['full_experiment_name']
-                self._action_logger = ActionLogger(logger_config['filename'], full_experiment_name, self.actions_num)
 
     def _disc_debug(self, disc_obs):
         reward = disc_reward(self.model, disc_obs, self.normalize_input, self.device).mean().item()

@@ -25,8 +25,6 @@ class SkillPlayer(StylePlayer):
         self._color_projector = None
 
         # Loggers
-        self._action_jitter = None
-        self._dof_jitter = None
         self._matcher = None
         self._matcher_obs_buf = None
         self._latent_logger = None
@@ -39,17 +37,8 @@ class SkillPlayer(StylePlayer):
         super().__init__(**kwargs)
 
     def env_step(self, env, actions):
-        if self._action_logger is not None:
-            self._action_logger.log(actions)
-        if self._action_jitter is not None:
-            self._action_jitter.log(actions, self._n_step)
-
         obs_raw, rew, done, info = super(StylePlayer, self).env_step(env, actions)
         obs = self._post_process_obs(obs_raw)
-
-        if self._dof_jitter is not None:
-            aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs_raw['obs']
-            self._dof_jitter.log(dPos, self._n_step)
 
         return obs, rew, done, info
 
@@ -108,20 +97,17 @@ class SkillPlayer(StylePlayer):
 
         logger_config = self.config.get('logger', None)
         if logger_config is not None:
-            jitter = logger_config.get('jitter', False)
             log_latent = logger_config.get('latent_motion_id', False)
             motion_transition = logger_config.get('motion_transition', False)
-            if jitter:
-                self._action_jitter = JitterLogger(self._writer, 'action')
-                self._dof_jitter = JitterLogger(self._writer, 'dof')
+
             if log_latent or motion_transition:
-                full_experiment_name = kwargs['params']['config']['full_experiment_name']
+                # building motion matcher
                 show_matcher_out = logger_config.get('show_matcher_out', False)
                 motion_match_length = logger_config.get('motion_match_length', 4)
-
                 self._build_matcher(show_matcher_out, motion_match_length)
                 self._matcher_obs_buf = TensorHistoryFIFO(motion_match_length)
 
+                full_experiment_name = kwargs['params']['config']['full_experiment_name']
                 if log_latent:
                     self._latent_logger = LatentMotionLogger(logger_config['filename'], full_experiment_name,
                                                              self.env.num, self._latent_dim)

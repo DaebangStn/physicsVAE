@@ -48,9 +48,9 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_24-12-34-30_jitter_test/nn/last_keypointMaxObsTask_ep_2100_rew_6710.046.pth
+#  runs/keypointMaxObsTask_skillAlgo_24-14-44-32_None/nn/keypointMaxObsTask_ep_3800_rew_5926.2485_3800.pth
 
-#  runs/last_keypointMaxObsTask_ep_900_rew_6839.463.pth
+  runs/last_keypointMaxObsTask_ep_2200_rew_7114.134.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -83,7 +83,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 16384
+  minibatch_size: 512
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -128,7 +128,7 @@ hparam:
       update_freq_min: 1
 
   jitter:
-    loss_coef: 0.1
+    loss_coef: 0.02
     input_divisor: 16
 
 seed: 1
