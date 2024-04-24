@@ -61,7 +61,8 @@ class SkillModel(StyleModel):
             assert self.a2c_network.separate, 'critic is not supported for non-separate network'
             assert 'latent' in kwargs, 'latent is not provided'
             with torch.no_grad():
-                return self._critic_module(self._attach_latent_to_obs(obs, kwargs['latent']))
+                value = self._critic_module(self._attach_latent_to_obs(obs, kwargs['latent']))
+                return self.denorm_value(value)
 
         def enc(self, obs):
             return self.a2c_network.enc(obs)

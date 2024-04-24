@@ -44,7 +44,8 @@ class CoreModel(ModelA2CContinuousLogStd):
             assert self.a2c_network.separate, 'critic is not supported for non-separate network'
             with torch.no_grad():
                 obs = self.norm_obs(obs)
-                return self._critic_module(obs)
+                value = self._critic_module(obs)
+                return self.denorm_value(value)
 
         @staticmethod
         def _rl_games_compatible_keywords(**kwargs):
