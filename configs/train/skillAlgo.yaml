@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: jitter_test
+  memo:
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -50,7 +50,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_24-12-34-30_jitter_test/nn/last_keypointMaxObsTask_ep_2100_rew_6710.046.pth
 
-  runs/last_keypointMaxObsTask_ep_900_rew_6839.463.pth
+#  runs/last_keypointMaxObsTask_ep_900_rew_6839.463.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -63,7 +63,8 @@ hparam:
   normalize_advantage: True
   clip_value: False
   reward_shaper: {}
-  save_frequency: 100
+  save_frequency: 1000
+  intermediate_save_frequency: 100
 
   logger:
     show_matcher_out: False
@@ -82,7 +83,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 512
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -97,7 +98,7 @@ hparam:
     disc_scale: 2.0
     enc_scale: 0.0
 
-    show_on_player: True
+    show_on_player: False
 
   style:
     replay_buf:

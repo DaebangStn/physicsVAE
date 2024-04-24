@@ -28,6 +28,8 @@ class CoreAlgorithm(A2CAgent):
         self.bound_loss_type = None
         self.optimizer = None
         self.is_tensor_obses = True
+        self.int_save_freq = None
+        self._prev_int_ckpt_path = None
         self._init_learning_variables(**kwargs)
 
         self.init_rnn_from_model(self.model)
@@ -141,6 +143,7 @@ class CoreAlgorithm(A2CAgent):
                 if len(b_losses) > 0:
                     self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(b_losses).item(), frame)
 
+                mean_rewards = 0
                 if self.game_rewards.current_size > 0:
                     mean_rewards = self.game_rewards.get_mean()
                     mean_lengths = self.game_lengths.get_mean()
@@ -164,6 +167,11 @@ class CoreAlgorithm(A2CAgent):
                     if self.save_freq > 0:
                         if epoch_num % self.save_freq == 0:
                             self.save(os.path.join(self.nn_dir, 'last_' + checkpoint_name))
+                        if epoch_num % self.int_save_freq == 0:
+                            if self._prev_int_ckpt_path is not None:
+                                os.remove(self._prev_int_ckpt_path + '.pth')
+                            self._prev_int_ckpt_path = os.path.join(self.nn_dir, checkpoint_name + f'_{epoch_num}')
+                            self.save(self._prev_int_ckpt_path)
 
                     if mean_rewards[0] > self.last_mean_rewards and epoch_num >= self.save_best_after:
                         print('saving next best rewards: ', mean_rewards)
@@ -288,6 +296,8 @@ class CoreAlgorithm(A2CAgent):
         self.vec_env.cleanup()
 
     def _init_learning_variables(self, **kwargs):
+        self.int_save_freq = self.config.get('intermediate_save_frequency', 500)
+
         self.model = self.network.build(**kwargs['params']['network'], **rl_games_net_build_param(self))
         self.model.to(self.ppo_device)
 
