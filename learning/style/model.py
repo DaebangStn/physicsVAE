@@ -30,14 +30,14 @@ class StyleModel(CoreModel):
         def forward(self, input_dict):
             output_dict = super().forward(input_dict)
             if input_dict.get('is_train', False):
-                output_dict['rollout_disc_logit'] = self.disc(input_dict['rollout_obs'])
-                output_dict['replay_disc_logit'] = self.disc(input_dict['replay_obs'])
+                output_dict['rollout_disc_logit'] = self.disc(input_dict['rollout_disc_obs'])
+                output_dict['replay_disc_logit'] = self.disc(input_dict['replay_disc_obs'])
 
                 # To calculate gradient penalty, we need to retain the graph for its input
-                input_dict['demo_obs'] = self._norm_disc_obs(input_dict['demo_obs']) \
-                    if self.normalize_input else input_dict['demo_obs']
-                input_dict['demo_obs'].requires_grad = True
-                output_dict['demo_disc_logit'] = self.disc(input_dict['demo_obs'], normalize=False)
+                input_dict['demo_disc_obs'] = self._norm_disc_obs(input_dict['demo_disc_obs']) \
+                    if self.normalize_input else input_dict['demo_disc_obs']
+                input_dict['demo_disc_obs'].requires_grad = True
+                output_dict['demo_disc_logit'] = self.disc(input_dict['demo_disc_obs'], normalize=False)
             return output_dict
 
         def disc(self, obs, normalize: Optional[bool] = None):

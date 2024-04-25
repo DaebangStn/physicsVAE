@@ -16,7 +16,6 @@ class CoreModel(ModelA2CContinuousLogStd):
         """
         def __init__(self, net, **kwargs):
             super().__init__(net, **self._rl_games_compatible_keywords(**kwargs))
-            assert self.a2c_network.separate, 'CoreModel only supports separate network'
 
         def actor_module(self, normalized_obs):
             a_out = normalized_obs
@@ -55,6 +54,7 @@ class CoreModel(ModelA2CContinuousLogStd):
             result = {
                 'mus': mu,
                 'sigmas': sigma,
+                'rnn_states': None,
             }
 
             if input_dict['is_train']:

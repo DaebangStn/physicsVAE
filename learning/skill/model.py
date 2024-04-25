@@ -18,7 +18,7 @@ class SkillModel(StyleModel):
         def forward(self, input_dict):
             output_dict = super().forward(input_dict)
             if input_dict.get('is_train', False):
-                output_dict['enc'] = self.enc(input_dict['rollout_obs'])
+                output_dict['enc'] = self.enc(input_dict['rollout_disc_obs'])
             return output_dict
 
         def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor):

@@ -80,8 +80,7 @@ class SkillAlgorithm(StyleAlgorithm):
     def init_tensors(self):
         super().init_tensors()
         batch_size = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['latent'] = torch.empty(batch_size + (self._latent_dim,),
-                                                                      device=self.device)
+        self.experience_buffer.tensor_dict['latent'] = torch.empty(batch_size + (self._latent_dim,), device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
         if self._jitter_obs_buf is not None:
@@ -115,7 +114,7 @@ class SkillAlgorithm(StyleAlgorithm):
         rollout_z = batch_dict['latent']
         obs = batch_dict['obs']
         sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
-        sampled_mu, sampled_sigma = self.model.actor_latent(obs, sampled_z)
+        sampled_mu, _ = self.model.actor_latent(obs, sampled_z)
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
         mu = torch.clamp(mu, -1.0, 1.0)
@@ -189,12 +188,12 @@ class SkillAlgorithm(StyleAlgorithm):
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
     def _post_rollout1(self):
-        rollout_obs = self.experience_buffer.tensor_dict['rollout_obs']
+        disc_obs = self.experience_buffer.tensor_dict['disc_obs']
         self._rollout_z = self.experience_buffer.tensor_dict['latent']
 
-        skill_reward = enc_reward(self.model, rollout_obs, self._rollout_z
+        skill_reward = enc_reward(self.model, disc_obs, self._rollout_z
                                   ).view(self.horizon_length, self.num_actors, -1)
-        style_reward = disc_reward(self.model, rollout_obs, self.device)
+        style_reward = disc_reward(self.model, disc_obs, self.device)
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = (self._task_rew_scale * task_reward +
                            self._disc_rew_scale * style_reward +
@@ -234,7 +233,7 @@ class SkillAlgorithm(StyleAlgorithm):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        enc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
+        enc_input_size = max(input_dict['rollout_disc_obs'].shape[0] // self._disc_input_divisor, 2)
         batch_dict['latent_enc'] = input_dict['latent'][0:enc_input_size]  # For encoder
         batch_dict['latent'] = input_dict['latent']  # For diversity loss
 

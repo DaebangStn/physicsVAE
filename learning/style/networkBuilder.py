@@ -13,14 +13,8 @@ class StyleNetworkBuilder(CoreNetworkBuilder):
         Forwards returns [mu, logstd, value, states]
         """
         def __init__(self, param, **kwargs):
-            actions_num = kwargs.get('actions_num')
             super().__init__(param, **kwargs)  # build action/value network
             self._build_disc(**kwargs)
-            if self.fixed_sigma:  # Overwrite sigma to exclude from computation graph
-                sigma_init = self.init_factory.create(**self.space_config['sigma_init'])
-                self.sigma = nn.Parameter(torch.zeros(actions_num, requires_grad=False, dtype=torch.float32),
-                                          requires_grad=False)
-                sigma_init(self.sigma)
 
         def _build_disc(self, **kwargs):
             conf = kwargs['disc']

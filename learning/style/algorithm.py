@@ -72,12 +72,11 @@ class StyleAlgorithm(CoreAlgorithm):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
 
-        dataset_dict['rollout_obs'] = batch_dict['rollout_obs']
-        dataset_dict['replay_obs'] = (self._replay_buffer['rollout'].sample(self.batch_size)
-                                      if self._replay_buffer['rollout'].count > 0 else
-                                      batch_dict['rollout_obs'])
-        dataset_dict['demo_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
-        self._update_replay_buffer(batch_dict['rollout_obs'])
+        dataset_dict['rollout_disc_obs'] = batch_dict['disc_obs']
+        dataset_dict['replay_disc_obs'] = (self._replay_buffer['rollout'].sample(self.batch_size)
+                                           if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
+        dataset_dict['demo_disc_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
+        self._update_replay_buffer(batch_dict['disc_obs'])
 
     def _additional_loss(self, batch_dict, res_dict):
         agent_disc_logit = torch.cat([res_dict['rollout_disc_logit'], res_dict['replay_disc_logit']], dim=0)
@@ -100,7 +99,7 @@ class StyleAlgorithm(CoreAlgorithm):
         disc_weights_loss = torch.sum(torch.square(disc_weights))
 
         # gradients penalty
-        demo_grad = torch.autograd.grad(demo_disc_logit, batch_dict['demo_obs'], create_graph=True,
+        demo_grad = torch.autograd.grad(demo_disc_logit, batch_dict['demo_disc_obs'], create_graph=True,
                                         retain_graph=True, only_inputs=True,
                                         grad_outputs=torch.ones_like(demo_disc_logit))[0]
         penalty_loss = torch.mean(torch.sum(torch.square(demo_grad), dim=-1))
@@ -141,8 +140,8 @@ class StyleAlgorithm(CoreAlgorithm):
 
         # append experience buffer
         batch_shape = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['rollout_obs'] = torch.empty(batch_shape + (self._disc_obs_size,),
-                                                                        device=self.device)
+        self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_shape + (self._disc_obs_size,),
+                                                                     device=self.device)
 
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
@@ -191,9 +190,8 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_num_demo_update = int(config_buffer['num_demo_update'])
 
     def _post_rollout1(self):
-        style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['rollout_obs'], self.device
+        style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'], self.device
                                    ).view(self.horizon_length, self.num_actors, -1)
-
         task_reward = self.experience_buffer.tensor_dict['rewards']
         combined_reward = self._task_rew_scale * task_reward + self._disc_rew_scale * style_reward
         self.experience_buffer.tensor_dict['rewards'] = combined_reward
@@ -206,7 +204,7 @@ class StyleAlgorithm(CoreAlgorithm):
     def _post_rollout2(self, batch_dict):
         # Since demo_obs and replay_obs has an order with (order, env)
         # Rollout_obs is not applied swap_and_flatten01
-        batch_dict['rollout_obs'] = self.experience_buffer.tensor_dict['rollout_obs'].view(-1, self._disc_obs_size)
+        batch_dict['disc_obs'] = self.experience_buffer.tensor_dict['disc_obs'].view(-1, self._disc_obs_size)
         return batch_dict
 
     def _pre_step(self, n: int):
@@ -214,16 +212,16 @@ class StyleAlgorithm(CoreAlgorithm):
 
     def _post_step(self, n: int):
         self._disc_obs_buf.push(self.obs['disc_obs'])
-        self.experience_buffer.update_data('rollout_obs', n, self._disc_obs_buf.history)
+        self.experience_buffer.update_data('disc_obs', n, self._disc_obs_buf.history)
 
     def _unpack_input(self, input_dict):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        disc_input_size = max(input_dict['rollout_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['rollout_obs'] = input_dict['rollout_obs'][0:disc_input_size]
-        batch_dict['replay_obs'] = input_dict['replay_obs'][0:disc_input_size]
-        batch_dict['demo_obs'] = input_dict['demo_obs'][0:disc_input_size]
+        disc_input_size = max(input_dict['rollout_disc_obs'].shape[0] // self._disc_input_divisor, 2)
+        batch_dict['rollout_disc_obs'] = input_dict['rollout_disc_obs'][0:disc_input_size]
+        batch_dict['replay_disc_obs'] = input_dict['replay_disc_obs'][0:disc_input_size]
+        batch_dict['demo_disc_obs'] = input_dict['demo_disc_obs'][0:disc_input_size]
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
 
@@ -316,7 +314,7 @@ def obs_transform(body_pos: torch.Tensor, body_rot: torch.Tensor, body_vel: torc
 @torch.jit.script
 def keyp_task_obs_angle_transform(
         obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
-                   torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         key_idx: List[int], dof_offsets: List[int]):
     aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
     obs = obs_transform(rPos, rRot, rVel, rAnVel)

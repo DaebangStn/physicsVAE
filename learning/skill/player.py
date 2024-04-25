@@ -44,7 +44,7 @@ class SkillPlayer(StylePlayer):
             obs = unsqueeze_obs(obs)
         obs = self._preproc_obs(obs)
         with torch.no_grad():
-            mu, sigma = self.model.actor(obs, latent=self._z)
+            mu, sigma = self.model.actor_latent(obs, self._z)
             sigma = torch.exp(sigma)
 
         if is_deterministic:

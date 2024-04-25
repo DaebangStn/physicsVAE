@@ -48,9 +48,9 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_24-20-24-07_enc_loss/nn/keypointMaxObsTask_ep_100_rew_-60.184128_100.pth
+#  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
-#  runs/last_keypointMaxObsTask_ep_2200_rew_7114.134.pth
+#  runs/last_keypointMaxObsTask_ep_9200_rew_7138.4688.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
