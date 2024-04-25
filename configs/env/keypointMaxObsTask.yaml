@@ -21,7 +21,7 @@ env:
 
   recovery_limit: 60
   drop_on_reset_prob: 0
-  reference_state_init_prob: 1.0
+  reference_state_init_prob: 0.5
   viewer_follow_env0: False
 
 sim:

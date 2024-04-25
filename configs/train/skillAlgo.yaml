@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: enc_loss
+  memo: latent_style
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -98,7 +98,7 @@ hparam:
   reward:
     task_scale: 0.0
     disc_scale: 2.0
-    enc_scale: 10.0
+    enc_scale: 1.0
 
     show_on_player: False
 
@@ -123,7 +123,7 @@ hparam:
   skill:
     div_loss_coef: 0.01
     enc:
-      loss_coef: 500
+      loss_coef: 5
 
     latent:
       update_freq_max: 150
