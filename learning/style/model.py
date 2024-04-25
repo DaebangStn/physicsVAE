@@ -19,29 +19,19 @@ class StyleModel(CoreModel):
             if self.normalize_input:
                 self.disc_running_mean_std = RunningMeanStd((kwargs['disc']['num_inputs'],))
 
-        def _norm_disc_obs(self, obs, normalize: Optional[bool] = None):
+        def norm_disc_obs(self, obs):
             with torch.no_grad():
-                if normalize is not None:
-                    obs = self.disc_running_mean_std(obs) if normalize else obs
-                else:
-                    obs = self.disc_running_mean_std(obs) if self.normalize_input else obs
-            return obs
+                return self.disc_running_mean_std(obs) if self.normalize_input else obs
 
         def forward(self, input_dict):
             output_dict = super().forward(input_dict)
             if input_dict.get('is_train', False):
-                output_dict['rollout_disc_logit'] = self.disc(input_dict['rollout_disc_obs'])
-                output_dict['replay_disc_logit'] = self.disc(input_dict['replay_disc_obs'])
-
-                # To calculate gradient penalty, we need to retain the graph for its input
-                input_dict['demo_disc_obs'] = self._norm_disc_obs(input_dict['demo_disc_obs']) \
-                    if self.normalize_input else input_dict['demo_disc_obs']
-                input_dict['demo_disc_obs'].requires_grad = True
-                output_dict['demo_disc_logit'] = self.disc(input_dict['demo_disc_obs'], normalize=False)
+                output_dict['rollout_disc_logit'] = self.disc(input_dict['normalized_rollout_disc_obs'])
+                output_dict['replay_disc_logit'] = self.disc(input_dict['normalized_replay_disc_obs'])
+                output_dict['demo_disc_logit'] = self.disc(input_dict['normalized_demo_disc_obs'])
             return output_dict
 
-        def disc(self, obs, normalize: Optional[bool] = None):
-            normalized_obs = self._norm_disc_obs(obs, normalize)
+        def disc(self, normalized_obs):
             return self.a2c_network.disc(normalized_obs)
 
         def disc_load_state_dict(self, state_dict):

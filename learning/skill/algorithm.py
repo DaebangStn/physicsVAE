@@ -264,6 +264,7 @@ def sample_latent(batch_size: int, latent_dim: int, device: torch.device) -> tor
 
 def enc_reward(model, disc_obs, z):
     with torch.no_grad():
-        enc = model.enc(disc_obs)
+        normalized_disc_obs = model.disc_running_mean_std(disc_obs)
+        enc = model.enc(normalized_disc_obs)
         similarity = torch.sum(enc * z, dim=-1, keepdim=True)
         return torch.clamp_min(similarity, 0.0)

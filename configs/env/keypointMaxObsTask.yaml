@@ -28,4 +28,4 @@ sim:
   headless: True
   device_id: 0
   engine: PHYSX
-  num_sub_steps: 2
+  num_sub_steps: 1

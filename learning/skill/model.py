@@ -18,7 +18,7 @@ class SkillModel(StyleModel):
         def forward(self, input_dict):
             output_dict = super().forward(input_dict)
             if input_dict.get('is_train', False):
-                output_dict['enc'] = self.enc(input_dict['rollout_disc_obs'])
+                output_dict['enc'] = self.enc(input_dict['normalized_rollout_disc_obs'])
             return output_dict
 
         def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor):
@@ -34,8 +34,7 @@ class SkillModel(StyleModel):
             normalized_value = self.critic_module(self.attach_latent_and_norm_obs(obs, latent))
             return normalized_value
 
-        def enc(self, obs):
-            normalized_obs = self._norm_disc_obs(obs)
+        def enc(self, normalized_obs):
             return self.a2c_network.enc(normalized_obs)
 
         def enc_load_state_dict(self, state_dict):

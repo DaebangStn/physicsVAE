@@ -99,7 +99,7 @@ class StyleAlgorithm(CoreAlgorithm):
         disc_weights_loss = torch.sum(torch.square(disc_weights))
 
         # gradients penalty
-        demo_grad = torch.autograd.grad(demo_disc_logit, batch_dict['demo_disc_obs'], create_graph=True,
+        demo_grad = torch.autograd.grad(demo_disc_logit, batch_dict['normalized_demo_disc_obs'], create_graph=True,
                                         retain_graph=True, only_inputs=True,
                                         grad_outputs=torch.ones_like(demo_disc_logit))[0]
         penalty_loss = torch.mean(torch.sum(torch.square(demo_grad), dim=-1))
@@ -219,9 +219,14 @@ class StyleAlgorithm(CoreAlgorithm):
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
         disc_input_size = max(input_dict['rollout_disc_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['rollout_disc_obs'] = input_dict['rollout_disc_obs'][0:disc_input_size]
-        batch_dict['replay_disc_obs'] = input_dict['replay_disc_obs'][0:disc_input_size]
-        batch_dict['demo_disc_obs'] = input_dict['demo_disc_obs'][0:disc_input_size]
+        batch_dict['normalized_rollout_disc_obs'] = self.model.disc_running_mean_std(
+            input_dict['rollout_disc_obs'][0:disc_input_size])
+        batch_dict['normalized_replay_disc_obs'] = self.model.disc_running_mean_std(
+            input_dict['replay_disc_obs'][0:disc_input_size])
+        batch_dict['normalized_demo_disc_obs'] = self.model.disc_running_mean_std(
+            input_dict['demo_disc_obs'][0:disc_input_size])
+        batch_dict['normalized_demo_disc_obs'].requires_grad = True
+
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
 
@@ -334,7 +339,8 @@ def motion_lib_angle_transform(
 
 def disc_reward(model, disc_obs, device):
     with torch.no_grad():
-        disc = model.disc(disc_obs)
+        normalized_disc_obs = model.disc_running_mean_std(disc_obs)
+        disc = model.disc(normalized_disc_obs)
         prob = 1 / (1 + torch.exp(-disc))
         reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=device)))
-    return reward
+        return reward
