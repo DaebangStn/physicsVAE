@@ -1,7 +1,7 @@
 env:
   name: keypointMaxObsTask
-  num_envs: 128
-  spacing: 1
+  num_envs: 2048
+  spacing: 4
 
   humanoid_asset_filename:  # from the project root
     assets/urdf/amp_humanoid_sword_shield.xml
@@ -22,6 +22,6 @@ env:
   viewer_follow_env0: False
 
 sim:
-  headless: False
+  headless: True
   device_id: 0
   engine: PHYSX

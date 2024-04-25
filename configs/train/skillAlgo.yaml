@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: sword_grad_penalty_20
+  memo: enc_loss
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -45,7 +45,7 @@ network:
 
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_11-22-32-37_humanoid_walk_latent64/nn/last_keypointMaxObsTask_ep_22800_rew_7192.233.pth
-  runs/keypointMaxObsTask_skillAlgo_21-23-12-05_sword_grad_penalty_20/nn/last_keypointMaxObsTask_ep_8600_rew_7009.3784.pth
+#  runs/keypointMaxObsTask_skillAlgo_21-23-12-05_sword_grad_penalty_20/nn/last_keypointMaxObsTask_ep_8600_rew_7009.3784.pth
 
 hparam:
 #  max_frames: 1500
