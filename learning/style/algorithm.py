@@ -228,15 +228,12 @@ class StyleAlgorithm(CoreAlgorithm):
         rollout_obs = input_dict['rollout_obs'][0:disc_input_size]
         replay_obs = input_dict['replay_obs'][0:disc_input_size]
         demo_obs = input_dict['demo_obs'][0:disc_input_size]
-        if self.normalize_input:
-            batch_dict['rollout_obs'] = self.model.norm_disc_obs(rollout_obs)
-            batch_dict['replay_obs'] = self.model.norm_disc_obs(replay_obs)
-            batch_dict['demo_obs'] = self.model.norm_disc_obs(demo_obs)
-            batch_dict['demo_obs'].requires_grad_(True)
-        else:
-            batch_dict['rollout_obs'] = rollout_obs
-            batch_dict['replay_obs'] = replay_obs
-            batch_dict['demo_obs'] = demo_obs
+
+        batch_dict['rollout_obs'] = self.model.norm_disc_obs(rollout_obs)
+        batch_dict['replay_obs'] = self.model.norm_disc_obs(replay_obs)
+        batch_dict['demo_obs'] = self.model.norm_disc_obs(demo_obs)
+        batch_dict['demo_obs'].requires_grad_(True)
+
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
 

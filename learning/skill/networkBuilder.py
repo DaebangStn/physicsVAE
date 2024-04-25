@@ -27,6 +27,9 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
         def enc(self, obs):
             return torch.nn.functional.normalize(self._enc(obs), dim=-1)
 
+        # def _calc_input_size(self, input_shape, cnn_layers=None):
+        #     return input_shape[0] + self._latent_dim
+
         @property
         def enc_weights(self):
             weights = []

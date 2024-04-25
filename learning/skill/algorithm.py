@@ -69,6 +69,8 @@ class SkillAlgorithm(StyleAlgorithm):
                                                                       device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size, ),
                                                                         device=self.device)
+        # self.experience_buffer.tensor_dict['obses'] = torch.empty(batch_size + (self.obs_shape[0] + self._latent_dim,),
+        #                                                                 device=self.device)
 
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
