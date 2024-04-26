@@ -106,8 +106,8 @@ class CoreAlgorithm(A2CAgent):
 
         mu = mu.detach()
         sigma = sigma.detach()
-        self.train_result = (a_loss, c_loss, entropy, self._policy_kl(mu, sigma, old_mu_batch, old_sigma_batch),
-                             self.last_lr, lr_mul, mu, sigma, b_loss)
+        kl = self._policy_kl(mu, sigma, old_mu_batch, old_sigma_batch)
+        self.train_result = (a_loss, c_loss, entropy, kl, self.last_lr, lr_mul, mu, sigma, b_loss)
 
     def env_step(self, actions):
         if self._action_jitter is not None:
@@ -119,23 +119,17 @@ class CoreAlgorithm(A2CAgent):
         return self.obs_to_tensors(obs)
 
     def get_action_values(self, obs):
-        processed_obs = self._preproc_obs(obs['obs'])
-        input_dict = {
-            'is_train': False,
-            'obs': processed_obs,
-        }
-        input_dict = self._addition_input_for_get_action_values(input_dict)
-
         self.model.eval()
         with torch.no_grad():
-            return self.model(input_dict)
+            return self.model({
+                'is_train': False,
+                'obs': obs['obs'],
+            })
 
     def get_values(self, obs):
-        processed_obs = self._preproc_obs(obs['obs'])
-
         self.model.eval()
         with torch.no_grad():
-            return self.model.critic(processed_obs)
+            return self.model.critic(obs['obs'])
 
     def train(self):
         self.init_tensors()
@@ -303,9 +297,6 @@ class CoreAlgorithm(A2CAgent):
 
         return a_loss
 
-    def _addition_input_for_get_action_values(self, input_dict):
-        return input_dict
-
     def _bound_loss(self, mu):
         if self.bound_loss_type == 'regularisation':
             b_loss = self.reg_loss(mu)
@@ -355,7 +346,7 @@ class CoreAlgorithm(A2CAgent):
     def _policy_kl(self, mu, sigma, old_mu, old_sigma):
         with torch.no_grad():
             if self._fixed_sigma:
-                kl = ((mu - old_mu)**2) / (2 * old_sigma**2 + 1e-7)
+                kl = ((mu - old_mu) ** 2) / (2 * old_sigma ** 2 + 1e-7)
                 kl = kl.sum(dim=-1).mean()
             else:
                 kl = torch_ext.policy_kl(mu, sigma, old_mu, old_sigma, True)

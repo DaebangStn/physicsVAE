@@ -18,33 +18,38 @@ class CoreModel(ModelA2CContinuousLogStd):
             super().__init__(net, **self._rl_games_compatible_keywords(**kwargs))
 
         def actor_module(self, normalized_obs):
-            a_out = normalized_obs
-            a_out = self.a2c_network.actor_mlp(a_out)
+            net = self.a2c_network
+            a_out = normalized_obs.contiguous().view(normalized_obs.size(0), -1)
+            a_out = net.actor_mlp(a_out)
 
-            mu = self.a2c_network.mu_act(self.a2c_network.mu(a_out))
-            if self.a2c_network.fixed_sigma:
-                logstd = mu * 0.0 + self.a2c_network.sigma_act(self.a2c_network.sigma)
+            mu = net.mu_act(net.mu(a_out))
+            if net.fixed_sigma:
+                logstd = mu * 0.0 + net.sigma_act(net.sigma)
             else:
-                logstd = self.a2c_network.sigma_act(self.a2c_network.sigma(a_out))
+                logstd = net.sigma_act(net.sigma(a_out))
             return mu, logstd
 
         def critic_module(self, normalized_obs):
+            net = self.a2c_network
             c_out = normalized_obs
-            c_out = self.a2c_network.critic_mlp(c_out)
-            normalized_value = self.a2c_network.value_act(self.a2c_network.value(c_out))
+            c_out = net.critic_mlp(c_out)
+            normalized_value = net.value_act(net.value(c_out))
             return normalized_value
 
-        def actor(self, obs):
+        def actor(self, obs: torch.Tensor):
             normalized_obs = self.norm_obs(obs)
-            return self.actor_module(normalized_obs)
+            mu, logstd = self.actor_module(normalized_obs)
+            sigma = torch.exp(logstd)
+            return mu, sigma
 
-        def critic(self, obs):
+        def critic(self, obs: torch.Tensor):
             obs = self.norm_obs(obs)
             normalized_value = self.critic_module(obs)
-            return self.denorm_value(normalized_value)
+            value = self.denorm_value(normalized_value)
+            return value
 
         def forward(self, input_dict):
-            normalized_obs = self._compute_obs(input_dict)
+            normalized_obs = self.norm_obs(input_dict['obs'])
             mu, logstd = self.actor_module(normalized_obs)
             sigma = torch.exp(logstd)
             distr = torch.distributions.Normal(mu, sigma, validate_args=False)
@@ -73,11 +78,6 @@ class CoreModel(ModelA2CContinuousLogStd):
                     'values': self.denorm_value(normalized_value),
                 })
             return result
-
-        def _compute_obs(self, input_dict: dict) -> torch.Tensor:
-            obs = input_dict['obs']
-            normalized_obs = self.norm_obs(obs)
-            return normalized_obs
 
         @staticmethod
         def _rl_games_compatible_keywords(**kwargs):
