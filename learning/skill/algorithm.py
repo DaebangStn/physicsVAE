@@ -83,8 +83,8 @@ class SkillAlgorithm(StyleAlgorithm):
         self.experience_buffer.tensor_dict['latent'] = torch.empty(batch_size + (self._latent_dim,), device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
-        self.experience_buffer.tensor_dict['obses'] = torch.empty(batch_size + (self.obs_shape[0] - self._latent_dim,),
-                                                                        device=self.device)
+        # self.experience_buffer.tensor_dict['obses'] = torch.empty(batch_size + (self.obs_shape[0] - self._latent_dim,),
+        #                                                                 device=self.device)
         if self._jitter_obs_buf is not None:
             self.experience_buffer.tensor_dict['jitter_obs'] = torch.empty(batch_size + (self._jitter_obs_size,),
                                                                            device=self.device)

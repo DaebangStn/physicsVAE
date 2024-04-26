@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo:
+  memo: brought_network_from_prev_latent_feature
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
