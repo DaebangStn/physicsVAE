@@ -132,6 +132,8 @@ class TensorFIFO:
             f"[TensorFIFO] set_flag shape mismatch: {item.shape[0]} != {set_flag.shape[0]}"
         assert item.shape == self._q[0].shape, \
             f"[TensorFIFO] item shape mismatch: {item.shape} != {self._q[0].shape}"
+        if len(set_flag.shape) == 1:
+            set_flag = set_flag.unsqueeze(1)
 
         self._q[idx] = torch.where(set_flag, item, self._q[idx])
 

@@ -219,11 +219,11 @@ class StyleAlgorithm(CoreAlgorithm):
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
         disc_input_size = max(input_dict['rollout_disc_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['normalized_rollout_disc_obs'] = self.model.disc_running_mean_std(
+        batch_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(
             input_dict['rollout_disc_obs'][0:disc_input_size])
-        batch_dict['normalized_replay_disc_obs'] = self.model.disc_running_mean_std(
+        batch_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
             input_dict['replay_disc_obs'][0:disc_input_size])
-        batch_dict['normalized_demo_disc_obs'] = self.model.disc_running_mean_std(
+        batch_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
             input_dict['demo_disc_obs'][0:disc_input_size])
         batch_dict['normalized_demo_disc_obs'].requires_grad = True
 
@@ -339,8 +339,7 @@ def motion_lib_angle_transform(
 
 def disc_reward(model, disc_obs, device):
     with torch.no_grad():
-        normalized_disc_obs = model.norm_disc_obs(disc_obs)
-        disc = model.disc(normalized_disc_obs)
+        disc = model.disc(model.norm_disc_obs(disc_obs))
         prob = 1 / (1 + torch.exp(-disc))
         reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=device)))
         return reward
