@@ -71,7 +71,7 @@ class SkillModel(StyleModel):
             return normalized_obs_actor, normalized_obs_critic
 
         def actor_latent(self, obs, latent):
-            normed_obs, _ = self.attach_latent_and_norm_obs(obs, latent, True)
+            normed_obs, _ = self.attach_latent_and_norm_obs(obs, latent)
             # return self.actor_module(normed_obs)
             mu, logstd, _, _ = self.a2c_network({
                 'obs': normed_obs,
@@ -80,7 +80,7 @@ class SkillModel(StyleModel):
             return mu, torch.exp(logstd)
 
         def critic_latent(self, obs, latent):
-            _, normed_obs = self.attach_latent_and_norm_obs(obs, latent, False)
+            _, normed_obs = self.attach_latent_and_norm_obs(obs, latent)
             # normalized_value = self.critic_module(normed_obs)
             # return normalized_value
             _, _, normalized_value, _ = self.a2c_network({
