@@ -339,7 +339,7 @@ def motion_lib_angle_transform(
 
 def disc_reward(model, disc_obs, device):
     with torch.no_grad():
-        normalized_disc_obs = model.disc_running_mean_std(disc_obs)
+        normalized_disc_obs = model.norm_disc_obs(disc_obs)
         disc = model.disc(normalized_disc_obs)
         prob = 1 / (1 + torch.exp(-disc))
         reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=device)))

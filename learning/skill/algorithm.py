@@ -83,6 +83,8 @@ class SkillAlgorithm(StyleAlgorithm):
         self.experience_buffer.tensor_dict['latent'] = torch.empty(batch_size + (self._latent_dim,), device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
+        self.experience_buffer.tensor_dict['obses'] = torch.empty(batch_size + (self.obs_shape[0] - self._latent_dim,),
+                                                                        device=self.device)
         if self._jitter_obs_buf is not None:
             self.experience_buffer.tensor_dict['jitter_obs'] = torch.empty(batch_size + (self._jitter_obs_size,),
                                                                            device=self.device)
@@ -264,7 +266,7 @@ def sample_latent(batch_size: int, latent_dim: int, device: torch.device) -> tor
 
 def enc_reward(model, disc_obs, z):
     with torch.no_grad():
-        normalized_disc_obs = model.disc_running_mean_std(disc_obs)
+        normalized_disc_obs = model.norm_disc_obs(disc_obs)
         enc = model.enc(normalized_disc_obs)
         similarity = torch.sum(enc * z, dim=-1, keepdim=True)
         return torch.clamp_min(similarity, 0.0)

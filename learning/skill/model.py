@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch
 
 from learning.style.model import StyleModel
@@ -22,13 +24,16 @@ class SkillModel(StyleModel):
         #     return output_dict
 
         def forward(self, input_dict):
-            mu, logstd = self.actor_module(
-                self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'], True))
+            norm_obs_actor, norm_obs_critic = self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'])
+            mu, logstd = self.actor_module(norm_obs_actor)
+            # mu, logstd = self.actor_module(
+            #     self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'], True))
             sigma = torch.exp(logstd)
             distr = torch.distributions.Normal(mu, sigma, validate_args=False)
 
-            normalized_value = self.critic_module(
-                self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent']))
+            normalized_value = self.critic_module(norm_obs_critic)
+            # normalized_value = self.critic_module(
+            #     self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent']))
 
             result = {
                 'mus': mu,
@@ -57,20 +62,26 @@ class SkillModel(StyleModel):
                 })
             return result
 
-        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor, latent_network: bool = False):
-            if latent_network:
-                latent_feature = self.a2c_network.latent_feature(latent)
-            else:
-                latent_feature = latent
+        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor, latent_network: bool = False
+                                       ) -> Tuple[torch.Tensor, torch.Tensor]:
+            # if latent_network:
+            #     latent_feature = self.a2c_network.latent_feature(latent)
+            # else:
+            #     latent_feature = latent
+            # normalized_obs = self.norm_obs(obs)
+            # normalized_obs = torch.cat([normalized_obs, latent_feature], dim=-1)
+
+            obs = torch.cat([obs, latent], dim=-1)
             normalized_obs = self.norm_obs(obs)
-            normalized_obs = torch.cat([normalized_obs, latent_feature], dim=-1)
-            return normalized_obs
+            return normalized_obs, normalized_obs
 
         def actor_latent(self, obs, latent):
-            return self.actor_module(self.attach_latent_and_norm_obs(obs, latent, True))
+            normed_obs, _ = self.attach_latent_and_norm_obs(obs, latent, True)
+            return self.actor_module(normed_obs)
 
         def critic_latent(self, obs, latent):
-            normalized_value = self.critic_module(self.attach_latent_and_norm_obs(obs, latent))
+            _, normed_obs = self.attach_latent_and_norm_obs(obs, latent, False)
+            normalized_value = self.critic_module(normed_obs)
             return normalized_value
 
         def enc(self, normalized_obs):
