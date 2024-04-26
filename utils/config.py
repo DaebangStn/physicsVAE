@@ -85,14 +85,12 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
 
     full_experiment_name = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] + "_" +
                             datetime.now().strftime("%d-%H-%M-%S") + "_" + str(config_train["algo"].get("memo", "")))
-    config_env["env"]["joint_information"] = joint_info[asset_filename]
 
     config_train["config"] = {}
 
     # Overriding test mode
     if config_train["test"]:
         assert config_train["checkpoint"] is not None, "Checkpoint path not found in config"
-        # config_env["env"]["num_envs"] = 2 if args.num_envs is None else args.num_envs
         config_env["env"]["spacing"] = 1
         full_experiment_name = "test_" + full_experiment_name
         args.wandb_proj = None

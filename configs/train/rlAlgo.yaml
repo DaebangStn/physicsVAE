@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: rlAlgo
-  memo:
+  memo: overriden_rl_games_disc
 
 model:
   name: core
@@ -24,7 +24,7 @@ network:
       fixed_sigma: True
 
   mlp:
-    units: [1024, 512]
+    units: [32, 32]
     activation: relu
     initializer:
       name: default
@@ -49,7 +49,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 1024
+  minibatch_size: 65536
   mini_epochs: 6
 
   learning_rate: 5e-4

@@ -109,6 +109,20 @@ class CoreAlgorithm(A2CAgent):
         kl = self._policy_kl(mu, sigma, old_mu_batch, old_sigma_batch)
         self.train_result = (a_loss, c_loss, entropy, kl, self.last_lr, lr_mul, mu, sigma, b_loss)
 
+    def _discount_values(self, mb_fdones, mb_values, mb_rewards, mb_next_values):
+        lastgaelam = 0
+        mb_advs = torch.zeros_like(mb_rewards)
+
+        for t in reversed(range(self.horizon_length)):
+            not_done = 1.0 - mb_fdones[t]
+            not_done = not_done.unsqueeze(1)
+
+            delta = mb_rewards[t] + self.gamma * mb_next_values[t] - mb_values[t]
+            lastgaelam = delta + self.gamma * self.tau * not_done * lastgaelam
+            mb_advs[t] = lastgaelam
+
+        return mb_advs
+
     def env_step(self, actions):
         if self._action_jitter is not None:
             self._action_jitter.log(actions, self.frame)
@@ -131,6 +145,12 @@ class CoreAlgorithm(A2CAgent):
         with torch.no_grad():
             return self.model.critic(obs['obs'])
 
+    def init_tensors(self):
+        super().init_tensors()
+        batch_size = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
+                                                                        device=self.device)
+
     def train(self):
         self.init_tensors()
         self.last_mean_rewards = -100500
@@ -140,7 +160,8 @@ class CoreAlgorithm(A2CAgent):
 
         while True:
             epoch_num = self.update_epoch()
-            step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul = self.train_epoch()
+            step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul \
+                = self.train_epoch()
             total_time += sum_time
             frame = self.frame // self.num_agents
 
@@ -236,7 +257,7 @@ class CoreAlgorithm(A2CAgent):
         self._pre_rollout()
 
         for n in range(self.horizon_length):
-            self.obs = self.env_reset()  # update latent
+            self.obs = self.env_reset(self.dones.nonzero()[:, 0])  # update latent
             res_dict = self.get_action_values(self.obs)
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
@@ -251,6 +272,9 @@ class CoreAlgorithm(A2CAgent):
 
             step_time += (step_time_end - step_time_start)
 
+            next_vals = self.get_values(self.obs)
+            next_vals *= ~self.dones.unsqueeze(1)
+            self.experience_buffer.update_data('next_values', n, next_vals)
             self.experience_buffer.update_data('rewards', n, rewards)
             self.experience_buffer.update_data('dones', n, self.dones)
 
@@ -270,13 +294,11 @@ class CoreAlgorithm(A2CAgent):
 
         self._post_rollout1()
 
-        last_values = self.get_values(self.obs)
-
-        fdones = self.dones.float()
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
         mb_values = self.experience_buffer.tensor_dict['values']
+        mb_next_values = self.experience_buffer.tensor_dict['next_values']
         mb_rewards = self.experience_buffer.tensor_dict['rewards']
-        mb_advs = self.discount_values(fdones, last_values, mb_fdones, mb_values, mb_rewards)
+        mb_advs = self._discount_values(mb_fdones, mb_values, mb_rewards, mb_next_values)
         mb_returns = mb_advs + mb_values
 
         batch_dict = self.experience_buffer.get_transformed_list(swap_and_flatten01, self.tensor_list)
@@ -376,7 +398,6 @@ class CoreAlgorithm(A2CAgent):
         actions_batch = input_dict['actions']
         obs_batch = input_dict['obs']
 
-        obs_batch = self._preproc_obs(obs_batch)
         lr_mul = self._last_last_lr / self.last_lr
         self._last_last_lr = self.last_lr
         curr_e_clip = self.e_clip

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 from isaacgym import gymtorch
 
@@ -27,8 +29,9 @@ class CartTask(VecTask):
         self._buf["dPos"] = self._buf["dof"].view(self._num_envs, 2, 2)[..., 0]
         self._buf["dVel"] = self._buf["dof"].view(self._num_envs, 2, 2)[..., 1]
 
-    def reset(self):
-        env_ids = torch.nonzero(self._buf["reset"]).squeeze(-1)
+    def reset(self, env_ids: Optional[torch.Tensor] = None):
+        if env_ids is None:
+            env_ids = torch.nonzero(self._buf["reset"]).squeeze(-1)
         num_reset = len(env_ids)
         if num_reset > 0:
             positions = 0.2 * (torch.rand((len(env_ids), self.num_dof), device=self._compute_device) - 0.5)
@@ -57,6 +60,7 @@ class CartTask(VecTask):
         self.progress_buf += 1
 
         # self.reset()
+        self._compute_observation()
 
         # compute rewards
         pole_angle = self._buf["obs"][:, 2]

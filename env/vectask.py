@@ -63,7 +63,7 @@ class VecTask:
         self._run_physics()
         self._post_physics(actions)
 
-        return self._buf['obs'], self._buf['rew'], self._buf['reset'], self._buf['info']
+        return self._buf['obs'].clone(), self._buf['rew'].clone(), self._buf['reset'].clone(), self._buf['info']
 
     def reset(self, env_ids: Optional[torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Reset environments with the self._buf["reset"]
