@@ -24,31 +24,13 @@ class SkillModel(StyleModel):
         #     return output_dict
 
         def forward(self, input_dict):
-            """
-            norm_obs_actor, norm_obs_critic = self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'])
-            mu, logstd = self.actor_module(norm_obs_actor)
-            # mu, logstd = self.actor_module(
-            #     self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'], True))
+            normed_obs_actor, normed_obs_critic = (
+                self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent']))
+            mu, logstd = self.actor_module(normed_obs_actor)
             sigma = torch.exp(logstd)
             distr = torch.distributions.Normal(mu, sigma, validate_args=False)
 
-            normalized_value = self.critic_module(norm_obs_critic)
-            # normalized_value = self.critic_module(
-            #     self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent']))
-            """
-
-            obs, _ = self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'])
-            input_dict2 = {
-                'obs': obs,
-                'is_train': input_dict['is_train'],
-                'prev_actions': input_dict.get('prev_actions'),
-                'normalized_rollout_disc_obs': input_dict.get('normalized_rollout_disc_obs'),
-                'normalized_replay_disc_obs': input_dict.get('normalized_replay_disc_obs'),
-                'normalized_demo_disc_obs': input_dict.get('normalized_demo_disc_obs'),
-            }
-            mu, logstd, normalized_value, states = self.a2c_network(input_dict2)
-            sigma = torch.exp(logstd)
-            distr = torch.distributions.Normal(mu, sigma, validate_args=False)
+            normalized_value = self.critic_module(normed_obs_critic)
 
             result = {
                 'mus': mu,
@@ -77,12 +59,9 @@ class SkillModel(StyleModel):
                 })
             return result
 
-        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor, latent_network: bool = False
+        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor
                                        ) -> Tuple[torch.Tensor, torch.Tensor]:
-            if latent_network:
-                latent_feature = self.a2c_network.latent_feature(latent)
-            else:
-                latent_feature = latent
+            latent_feature = self.a2c_network.latent_feature(latent)
             normalized_obs = self.norm_obs(obs)
             normalized_obs_actor = torch.cat([normalized_obs, latent_feature], dim=-1)
             normalized_obs_critic = torch.cat([normalized_obs, latent], dim=-1)

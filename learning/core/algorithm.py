@@ -13,6 +13,7 @@ from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase, print_statistics
 
 from learning.logger.jitter import JitterLogger
+from utils.buffer import TensorHistoryFIFO
 from utils.rl_games import rl_games_net_build_param
 
 
@@ -32,6 +33,13 @@ class CoreAlgorithm(A2CAgent):
         self.is_tensor_obses = True
         self.int_save_freq = None
         self._prev_int_ckpt_path = None
+
+        # jitter related
+        self._JITTER_SIZE = None
+        self._jitter_obs_size = None
+        self._jitter_obs_buf = None
+        self._jitter_loss_coef = None
+        self._jitter_input_divisor = None
 
         # Loggers
         self._action_jitter = None
@@ -150,6 +158,9 @@ class CoreAlgorithm(A2CAgent):
         batch_size = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
+        if self._jitter_obs_buf is not None:
+            self.experience_buffer.tensor_dict['jitter_obs'] = torch.empty(batch_size + (self._jitter_obs_size,),
+                                                                           device=self.device)
 
     def train(self):
         self.init_tensors()
@@ -308,6 +319,12 @@ class CoreAlgorithm(A2CAgent):
 
         return self._post_rollout2(batch_dict)
 
+    def prepare_dataset(self, batch_dict):
+        super().prepare_dataset(batch_dict)
+        dataset_dict = self.dataset.values_dict
+        if self._jitter_obs_buf is not None:
+            dataset_dict['jitter_obs'] = batch_dict['jitter_obs']
+
     def _actor_loss(self, old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip):
         ratio = torch.exp(old_action_log_probs_batch - action_log_probs)
         surr1 = advantage * ratio
@@ -358,6 +375,15 @@ class CoreAlgorithm(A2CAgent):
 
         self._fixed_sigma = self.model.a2c_network.fixed_sigma
 
+        # jitter related
+        config_jitter = config_hparam.get('jitter', None)
+        if config_jitter is not None:
+            self._JITTER_SIZE = 3  # jitter = a(t) - 2 * a(t-1) + a(t-2)
+            self._jitter_obs_size = self.model.input_size * self._JITTER_SIZE
+            self._jitter_obs_buf = TensorHistoryFIFO(self._JITTER_SIZE)
+            self._jitter_loss_coef = config_jitter['loss_coef']
+            self._jitter_input_divisor = config_jitter['input_divisor']
+
         # Loggers
         logger_config = self.config.get('logger', None)
         if logger_config is not None:
@@ -407,6 +433,11 @@ class CoreAlgorithm(A2CAgent):
             'prev_actions': actions_batch,
             'obs': obs_batch,
         }
+
+        if self._jitter_obs_buf is not None:
+            jitter_input_size = max(input_dict['jitter_obs'].shape[0] // self._jitter_input_divisor, 2)
+            batch_dict['jitter_obs'] = input_dict['jitter_obs'][0:jitter_input_size]
+
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
 
@@ -431,7 +462,20 @@ class CoreAlgorithm(A2CAgent):
         return clean_config
 
     def _additional_loss(self, batch_dict, res_dict):
-        return torch.zeros(1, device=self.ppo_device)[0]
+        loss = torch.zeros(1, device=self.ppo_device)[0]
+        if self._jitter_obs_buf is not None:
+            jitter_loss = self._jitter_loss(batch_dict)
+            loss += jitter_loss * self._jitter_loss_coef
+        return loss
+
+    def _jitter_loss(self, batch_dict):
+        jitter_obs = batch_dict['jitter_obs'].view(-1, self._JITTER_SIZE, self.model.input_size)
+        mu, _ = self.model.actor(jitter_obs)
+        jitter_mu = mu[:, 0] - 2 * mu[:, 1] + mu[:, 2]
+        jitter_loss = torch.abs(jitter_mu).mean()
+
+        self._write_stat(jitter_loss=jitter_loss.detach())
+        return jitter_loss
 
     def _pre_rollout(self):
         pass
@@ -440,10 +484,15 @@ class CoreAlgorithm(A2CAgent):
         pass
 
     def _post_rollout2(self, batch_dict):
+        if self._jitter_obs_buf is not None:
+            batch_dict['jitter_obs'] = self.experience_buffer.tensor_dict['jitter_obs'].view(-1, self._jitter_obs_size)
         return batch_dict
 
     def _pre_step(self, n: int):
-        pass
+        if self._jitter_obs_buf is not None:
+            self._jitter_obs_buf.push_on_reset(self.obs['obs'], self.dones)
 
     def _post_step(self, n: int):
-        pass
+        if self._jitter_obs_buf is not None:
+            self._jitter_obs_buf.push(self.obs['obs'])
+            self.experience_buffer.update_data('jitter_obs', n, self._jitter_obs_buf.history)

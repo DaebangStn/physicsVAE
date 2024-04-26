@@ -41,11 +41,10 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
                     nn.init.zeros_(m.bias)
 
         def _build_enc(self):
-            self._enc_mlp = self._disc_mlp
             self._enc_linear = nn.Linear(self._disc_logistics.in_features, self._latent_dim)
             nn.init.uniform_(self._enc_linear.weight, -0.1, 0.1)
             nn.init.zeros_(self._enc_linear.bias)
-            self._enc = nn.Sequential(self._enc_mlp, self._enc_linear)
+            self._enc = nn.Sequential(self._disc_mlp, self._enc_linear)
 
         def _calc_input_size(self, input_shape, cnn_layers=None):
             self._input_shape = input_shape

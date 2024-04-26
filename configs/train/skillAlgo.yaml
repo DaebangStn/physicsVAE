@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: brought_network_from_prev_latent_feature
+  memo: sword_loco
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -37,7 +37,7 @@ network:
       name: default
 
   latent:
-    build: True
+    build: False
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
@@ -85,7 +85,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 2e-5
