@@ -15,20 +15,59 @@ class SkillModel(StyleModel):
         def __init__(self, net, **kwargs):
             super().__init__(net, **kwargs)
 
-        def forward(self, input_dict):
-            output_dict = super().forward(input_dict)
-            if input_dict.get('is_train', False):
-                output_dict['enc'] = self.enc(input_dict['normalized_rollout_disc_obs'])
-            return output_dict
+        # def forward(self, input_dict):
+        #     output_dict = super().forward(input_dict)
+        #     if input_dict.get('is_train', False):
+        #         output_dict['enc'] = self.enc(input_dict['normalized_rollout_disc_obs'])
+        #     return output_dict
 
-        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor):
-            latent_feature = self.a2c_network.latent_feature(latent)
+        def forward(self, input_dict):
+            mu, logstd = self.actor_module(
+                self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent'], True))
+            sigma = torch.exp(logstd)
+            distr = torch.distributions.Normal(mu, sigma, validate_args=False)
+
+            normalized_value = self.critic_module(
+                self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent']))
+
+            result = {
+                'mus': mu,
+                'sigmas': sigma,
+                'rnn_states': None,
+            }
+
+            if input_dict['is_train']:
+                prev_neglogp = self.neglogp(input_dict['prev_actions'], mu, sigma, logstd)
+                result.update({
+                    'prev_neglogp': torch.squeeze(prev_neglogp),
+                    'entropy': distr.entropy().sum(dim=-1),
+                    'values': normalized_value,
+                    'rollout_disc_logit': self.disc(input_dict['normalized_rollout_disc_obs']),
+                    'replay_disc_logit': self.disc(input_dict['normalized_replay_disc_obs']),
+                    'demo_disc_logit': self.disc(input_dict['normalized_demo_disc_obs']),
+                    'enc': self.enc(input_dict['normalized_rollout_disc_obs']),
+                })
+            else:
+                selected_action = distr.sample()
+                neglogp = self.neglogp(selected_action, mu, sigma, logstd)
+                result.update({
+                    'neglogpacs': torch.squeeze(neglogp),
+                    'actions': selected_action,
+                    'values': self.denorm_value(normalized_value),
+                })
+            return result
+
+        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor, latent_network: bool = False):
+            if latent_network:
+                latent_feature = self.a2c_network.latent_feature(latent)
+            else:
+                latent_feature = latent
             normalized_obs = self.norm_obs(obs)
             normalized_obs = torch.cat([normalized_obs, latent_feature], dim=-1)
             return normalized_obs
 
         def actor_latent(self, obs, latent):
-            return self.actor_module(self.attach_latent_and_norm_obs(obs, latent))
+            return self.actor_module(self.attach_latent_and_norm_obs(obs, latent, True))
 
         def critic_latent(self, obs, latent):
             normalized_value = self.critic_module(self.attach_latent_and_norm_obs(obs, latent))

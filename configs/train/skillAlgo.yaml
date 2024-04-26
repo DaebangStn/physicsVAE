@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: latent_style
+  memo: latent_style_act
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
