@@ -52,7 +52,7 @@ class SkillAlgorithm(StyleAlgorithm):
     def get_values(self, obs):
         self.model.eval()
         with torch.no_grad():
-            return self.model.critic_latent(obs, self._z)
+            return self.model.critic_latent(obs['obs'], self._z)
 
     def init_tensors(self):
         super().init_tensors()
