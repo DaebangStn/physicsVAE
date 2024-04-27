@@ -145,13 +145,13 @@ class CoreAlgorithm(A2CAgent):
         with torch.no_grad():
             return self.model({
                 'is_train': False,
-                'obs': obs['obs'],
+                'obs': self.model.norm_obs(obs['obs']),
             })
 
     def get_values(self, obs):
         self.model.eval()
         with torch.no_grad():
-            return self.model.critic(obs['obs'])
+            return self.model.critic(self.model.norm_obs(obs['obs']))
 
     def init_tensors(self):
         super().init_tensors()
@@ -431,7 +431,7 @@ class CoreAlgorithm(A2CAgent):
         batch_dict = {
             'is_train': True,
             'prev_actions': actions_batch,
-            'obs': obs_batch,
+            'obs': self.model.norm_obs(obs_batch),
         }
 
         if self._jitter_obs_buf is not None:

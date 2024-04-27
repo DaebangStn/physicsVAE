@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: sword_loco
+  memo: no_disc_only_div
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -17,7 +17,7 @@ network:
   separate: True
 
   space:
-    latent_dim: 64
+    latent_dim: 2
 #    latent_dim: 32
 
     continuous:
@@ -79,13 +79,13 @@ hparam:
 #      junk
 
   # learning hyperparameters
-  horizon_length: 32
+  horizon_length: 2
   gamma: 0.99
   tau: 0.95
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 16384
+  minibatch_size: 4
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -97,7 +97,7 @@ hparam:
 
   reward:
     task_scale: 0.0
-    disc_scale: 2.0
+    disc_scale: 0.0
     enc_scale: 1.0
 
     show_on_player: False
@@ -123,7 +123,7 @@ hparam:
   skill:
     div_loss_coef: 0.01
     enc:
-      loss_coef: 5
+      loss_coef: 0
 
     latent:
       update_freq_max: 150

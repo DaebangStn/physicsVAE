@@ -36,20 +36,18 @@ class CoreModel(ModelA2CContinuousLogStd):
             normalized_value = net.value_act(net.value(c_out))
             return normalized_value
 
-        def actor(self, obs: torch.Tensor):
-            normalized_obs = self.norm_obs(obs)
-            mu, logstd = self.actor_module(normalized_obs)
+        def actor(self, normed_obs: torch.Tensor):
+            mu, logstd = self.actor_module(normed_obs)
             sigma = torch.exp(logstd)
             return mu, sigma
 
-        def critic(self, obs: torch.Tensor):
-            obs = self.norm_obs(obs)
-            normalized_value = self.critic_module(obs)
+        def critic(self, normed_obs: torch.Tensor):
+            normalized_value = self.critic_module(normed_obs)
             value = self.denorm_value(normalized_value)
             return value
 
         def forward(self, input_dict):
-            normalized_obs = self.norm_obs(input_dict['obs'])
+            normalized_obs = input_dict['obs']
             mu, logstd = self.actor_module(normalized_obs)
             sigma = torch.exp(logstd)
             distr = torch.distributions.Normal(mu, sigma, validate_args=False)

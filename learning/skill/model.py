@@ -24,8 +24,8 @@ class SkillModel(StyleModel):
         #     return output_dict
 
         def forward(self, input_dict):
-            normed_obs_actor, normed_obs_critic = (
-                self.attach_latent_and_norm_obs(input_dict['obs'], input_dict['latent']))
+            normed_obs = input_dict['obs']
+            normed_obs_actor, normed_obs_critic = self.attach_latent(normed_obs, input_dict['latent'])
             mu, logstd = self.actor_module(normed_obs_actor)
             sigma = torch.exp(logstd)
             distr = torch.distributions.Normal(mu, sigma, validate_args=False)
@@ -59,26 +59,21 @@ class SkillModel(StyleModel):
                 })
             return result
 
-        def attach_latent_and_norm_obs(self, obs: torch.Tensor, latent: torch.Tensor
-                                       ) -> Tuple[torch.Tensor, torch.Tensor]:
+        def attach_latent(self, normed_obs: torch.Tensor, latent: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
             latent_feature = self.a2c_network.latent_feature(latent)
-            normalized_obs = self.norm_obs(obs)
-            normalized_obs_actor = torch.cat([normalized_obs, latent_feature], dim=-1)
-            normalized_obs_critic = torch.cat([normalized_obs, latent], dim=-1)
-
-            # obs = torch.cat([obs, latent], dim=-1)
-            # normalized_obs = self.norm_obs(obs)
+            normalized_obs_actor = torch.cat([normed_obs, latent_feature], dim=-1)
+            normalized_obs_critic = torch.cat([normed_obs, latent], dim=-1)
             return normalized_obs_actor, normalized_obs_critic
 
-        def actor_latent(self, obs, latent):
-            normed_obs, _ = self.attach_latent_and_norm_obs(obs, latent)
-            mu, logstd = self.actor_module(normed_obs)
+        def actor_latent(self, normed_obs, latent):
+            act_obs, _ = self.attach_latent(normed_obs, latent)
+            mu, logstd = self.actor_module(act_obs)
             sigma = torch.exp(logstd)
             return mu, sigma
 
-        def critic_latent(self, obs, latent):
-            _, normed_obs = self.attach_latent_and_norm_obs(obs, latent)
-            normalized_value = self.critic_module(normed_obs)
+        def critic_latent(self, normed_obs, latent):
+            _, crt_obs = self.attach_latent(normed_obs, latent)
+            normalized_value = self.critic_module(crt_obs)
             value = self.denorm_value(normalized_value)
             return value
 

@@ -45,14 +45,14 @@ class SkillAlgorithm(StyleAlgorithm):
         with torch.no_grad():
             return self.model({
                 'is_train': False,
-                'obs': obs['obs'],
+                'obs': self.model.norm_obs(obs['obs']),
                 'latent': self._z,
             })
 
     def get_values(self, obs):
         self.model.eval()
         with torch.no_grad():
-            return self.model.critic_latent(obs['obs'], self._z)
+            return self.model.critic_latent(self.model.norm_obs(obs['obs']), self._z)
 
     def init_tensors(self):
         super().init_tensors()
@@ -65,36 +65,59 @@ class SkillAlgorithm(StyleAlgorithm):
         dataset_dict['latent'] = batch_dict['latent']
 
     def _additional_loss(self, batch_dict, res_dict):
-        loss = super()._additional_loss(batch_dict, res_dict)
-        e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
-        loss += e_loss * self._enc_loss_coef
+        # loss = super()._additional_loss(batch_dict, res_dict)
+        # e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
+        # loss += e_loss * self._enc_loss_coef
         div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
-        loss += div_loss * self._div_loss_coef
+        loss = div_loss
         return loss
 
-    def _diversity_loss(self, batch_dict, mu):
+    # def _diversity_loss(self, batch_dict, mu):
+    #     rollout_z = batch_dict['latent']
+    #     obs = batch_dict['obs']
+    #     sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
+    #     sampled_mu, _ = self.model.actor_latent(obs, sampled_z)
+    #
+    #     sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
+    #     mu = torch.clamp(mu, -1.0, 1.0)
+    #     z_diff = (1 - (rollout_z * sampled_z).sum(dim=-1)) / 2
+    #
+    #     # Original KL implementation (a)
+    #     kl = torch.square(sampled_mu - mu).mean(dim=-1)
+    #
+    #     # Right KL divergence (b)
+    #     # kl = ((sampled_mu - mu) ** 2 /
+    #     #       (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
+    #
+    #     # Original loss implementation (1)
+    #     loss = torch.square(kl / (z_diff + 1e-5) - 1).mean()
+    #
+    #     # My loss suggestion (2)
+    #     # loss = (kl / (z_diff + 1e-5)).mean()
+    #
+    #     self._write_stat(amp_diversity_loss=loss.detach())
+    #     return loss
+
+    def _diversity_loss(self, batch_dict, mu2):
         rollout_z = batch_dict['latent']
-        obs = batch_dict['obs']
-        sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
-        sampled_mu, _ = self.model.actor_latent(obs, sampled_z)
+        normed_obs = batch_dict['obs']
+        new_z = sample_latent(normed_obs.shape[0], self._latent_dim, self.device)
+        mu, sigma = self.model.actor_latent(normed_obs, new_z)
 
-        sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
-        mu = torch.clamp(mu, -1.0, 1.0)
-        z_diff = (1 - (rollout_z * sampled_z).sum(dim=-1)) / 2
+        clipped_action_params = torch.clamp(mu2, -1.0, 1.0)
+        clipped_mu = torch.clamp(mu, -1.0, 1.0)
 
-        # Original KL implementation (a)
-        kl = torch.square(sampled_mu - mu).mean(dim=-1)
+        a_diff = clipped_action_params - clipped_mu
+        a_diff = torch.mean(torch.square(a_diff), dim=-1)
 
-        # Right KL divergence (b)
-        # kl = ((sampled_mu - mu) ** 2 /
-        #       (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
+        z_diff = new_z * rollout_z
+        z_diff = torch.sum(z_diff, dim=-1)
+        z_diff = 0.5 - 0.5 * z_diff
 
-        # Original loss implementation (1)
-        loss = torch.square(kl / (z_diff + 1e-5) - 1).mean()
+        diversity_bonus = a_diff / (z_diff + 1e-5)
+        diversity_loss = torch.square(1 - diversity_bonus)
 
-        # My loss suggestion (2)
-        # loss = (kl / (z_diff + 1e-5)).mean()
-
+        loss = diversity_loss.mean()
         self._write_stat(amp_diversity_loss=loss.detach())
         return loss
 
