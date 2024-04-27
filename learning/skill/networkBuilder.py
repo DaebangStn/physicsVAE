@@ -33,7 +33,7 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
                 nn.Linear(units[0], units[1]),
                 nn.ReLU(),
                 nn.Linear(units[1], self._latent_dim),
-                nn.ReLU()
+                nn.Tanh()
             )
             for m in self._latent_enc_mlp.modules():
                 if isinstance(m, nn.Linear):

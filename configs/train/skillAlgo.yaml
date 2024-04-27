@@ -37,7 +37,7 @@ network:
       name: default
 
   latent:
-    build: False
+    build: True
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
