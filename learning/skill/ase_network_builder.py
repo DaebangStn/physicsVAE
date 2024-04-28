@@ -56,8 +56,8 @@ class ASEBuilder(amp_network_builder.AMPBuilder):
             input_shape = kwargs.get('input_shape')
             self.value_size = kwargs.get('value_size', 1)
             self.num_seqs = num_seqs = kwargs.get('num_seqs', 1)
-            amp_input_shape = kwargs.get('amp_input_shape')
-            self._ase_latent_shape = kwargs.get('ase_latent_shape')
+            amp_input_shape = (int(kwargs['disc']["num_inputs"]),)
+            self._ase_latent_shape = (int(kwargs['space']['latent_dim']),)
 
             network_builder.NetworkBuilder.BaseNetwork.__init__(self)
 
@@ -168,11 +168,11 @@ class ASEBuilder(amp_network_builder.AMPBuilder):
             if self.is_continuous:
                 mu = self.mu_act(self.mu(a_out))
                 if self.space_config['fixed_sigma']:
-                    sigma = mu * 0.0 + self.sigma_act(self.sigma)
+                    logstd = mu * 0.0 + self.sigma_act(self.sigma)
                 else:
-                    sigma = self.sigma_act(self.sigma(a_out))
+                    logstd = self.sigma_act(self.sigma(a_out))
 
-                return mu, sigma
+                return mu, logstd
             return
 
         def get_enc_weights(self):
@@ -256,7 +256,7 @@ class ASEBuilder(amp_network_builder.AMPBuilder):
             z = torch.nn.functional.normalize(z, dim=-1)
             return z
 
-    def build(self, name, **kwargs):
+    def build(self, placeholeder, **kwargs):
         net = ASEBuilder.Network(self.params, **kwargs)
         return net
 

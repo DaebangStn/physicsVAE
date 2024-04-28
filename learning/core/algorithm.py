@@ -41,6 +41,9 @@ class CoreAlgorithm(A2CAgent):
         self._jitter_loss_coef = None
         self._jitter_input_divisor = None
 
+        # Reward related
+        self._task_rew_scale = None
+
         # Loggers
         self._action_jitter = None
 
@@ -54,6 +57,7 @@ class CoreAlgorithm(A2CAgent):
 
         # placeholders for the current episode
         self.train_result = None
+        self.reward = None
         self.dones = None
         self.current_rewards = None
         self.current_shaped_rewards = None
@@ -91,6 +95,8 @@ class CoreAlgorithm(A2CAgent):
                     + b_loss * self.bounds_loss_coef)
 
             loss += self._additional_loss(batch_dict, res_dict)
+
+            self._write_stat(total_loss=loss.detach())
 
             # 4. Zero the gradients
             if self.multi_gpu:
@@ -156,6 +162,8 @@ class CoreAlgorithm(A2CAgent):
     def init_tensors(self):
         super().init_tensors()
         batch_size = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['task_rewards'] = torch.empty(batch_size + (self.value_size,),
+                                                                         device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
         if self._jitter_obs_buf is not None:
@@ -277,7 +285,7 @@ class CoreAlgorithm(A2CAgent):
 
             self._pre_step(n)
             step_time_start = time.time()
-            self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
+            self.obs, self.reward, self.dones, infos = self.env_step(res_dict['actions'])
             step_time_end = time.time()
             self._post_step(n)
 
@@ -286,10 +294,10 @@ class CoreAlgorithm(A2CAgent):
             next_vals = self.get_values(self.obs)
             next_vals *= ~self.dones.unsqueeze(1)
             self.experience_buffer.update_data('next_values', n, next_vals)
-            self.experience_buffer.update_data('rewards', n, rewards)
+            self.experience_buffer.update_data('rewards', n, self.reward)
             self.experience_buffer.update_data('dones', n, self.dones)
 
-            self.current_rewards += rewards
+            self.current_rewards += self.reward
             self.current_lengths += 1
             all_done_indices = self.dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
@@ -383,6 +391,10 @@ class CoreAlgorithm(A2CAgent):
             self._jitter_obs_buf = TensorHistoryFIFO(self._JITTER_SIZE)
             self._jitter_loss_coef = config_jitter['loss_coef']
             self._jitter_input_divisor = config_jitter['input_divisor']
+
+        # reward related
+        config_rew = config_hparam['reward']
+        self._task_rew_scale = config_rew['task_scale']
 
         # Loggers
         logger_config = self.config.get('logger', None)
@@ -484,6 +496,12 @@ class CoreAlgorithm(A2CAgent):
         pass
 
     def _post_rollout2(self, batch_dict):
+        task_reward = self.experience_buffer.tensor_dict['task_rewards']
+        self._write_stat(
+            task_reward_mean=task_reward.mean().item(),
+            task_reward_std=task_reward.std().item(),
+        )
+
         if self._jitter_obs_buf is not None:
             batch_dict['jitter_obs'] = self.experience_buffer.tensor_dict['jitter_obs'].view(-1, self._jitter_obs_size)
         return batch_dict
@@ -493,6 +511,15 @@ class CoreAlgorithm(A2CAgent):
             self._jitter_obs_buf.push_on_reset(self.obs['obs'], self.dones)
 
     def _post_step(self, n: int):
+        self.experience_buffer.update_data('task_rewards', n, self.reward)
+        self.reward *= self._task_rew_scale
         if self._jitter_obs_buf is not None:
             self._jitter_obs_buf.push(self.obs['obs'])
             self.experience_buffer.update_data('jitter_obs', n, self._jitter_obs_buf.history)
+
+    def print_gradient(self):
+        for name, param in self.model.named_parameters():
+            if param.grad is not None:
+                print(f"{name} grad mean: {param.grad.abs().mean().item()}")
+            else:
+                print(f"{name} has no gradients")

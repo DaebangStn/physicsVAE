@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: no_disc_only_div
+  memo: implanted_net
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -29,6 +29,7 @@ network:
         name: const_initializer
         val: -2.9
       fixed_sigma: True
+      learn_sigma: False
 
   mlp:
     units: [1024, 1024, 512]
@@ -46,6 +47,13 @@ network:
     initializer:
       name: default
 
+  enc:
+    units: [1024, 512]
+    activation: relu
+    separate: False
+
+    initializer:
+      name: default
 
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
@@ -79,13 +87,13 @@ hparam:
 #      junk
 
   # learning hyperparameters
-  horizon_length: 2
+  horizon_length: 32
   gamma: 0.99
   tau: 0.95
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 4
+  minibatch_size: 8192
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -121,9 +129,9 @@ hparam:
       log_hist: False
 
   skill:
-    div_loss_coef: 0.01
+    div_loss_coef: 1
     enc:
-      loss_coef: 0
+      loss_coef: 5
 
     latent:
       update_freq_max: 150

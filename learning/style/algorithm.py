@@ -34,12 +34,6 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_store_prob = None
         self._replay_num_demo_update = None
 
-        # placeholders for the current episode
-        self._mean_task_reward = None
-        self._mean_style_reward = None
-        self._std_task_reward = None
-        self._std_style_reward = None
-
         super().__init__(**kwargs)
 
     """ keypointTask returns the Tuple of tensors so that we should post-process the observation.
@@ -125,10 +119,6 @@ class StyleAlgorithm(CoreAlgorithm):
             disc_demo_acc=demo_acc.detach(),
             disc_agent_logit=agent_disc_logit.detach(),
             disc_demo_logit=demo_disc_logit.detach(),
-            task_reward_mean=self._mean_task_reward,
-            disc_reward_mean=self._mean_style_reward,
-            task_reward_std=self._std_task_reward,
-            disc_reward_std=self._std_style_reward,
         )
 
         return loss
@@ -139,8 +129,10 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_obs_size = config_hparam['style']['disc']['num_obs'] * self._disc_obs_traj_len
 
         # append experience buffer
-        batch_shape = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_shape + (self._disc_obs_size,),
+        batch_size = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['disc_rewards'] = torch.empty(batch_size + (self.value_size,),
+                                                                         device=self.device)
+        self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_size + (self._disc_obs_size,),
                                                                      device=self.device)
 
     def _init_learning_variables(self, **kwargs):
@@ -160,7 +152,6 @@ class StyleAlgorithm(CoreAlgorithm):
 
         # reward related
         config_rew = config_hparam['reward']
-        self._task_rew_scale = config_rew['task_scale']
         self._disc_rew_scale = config_rew['disc_scale']
 
     def _prepare_data(self, **kwargs):
@@ -189,22 +180,16 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_store_prob = config_buffer['store_prob']
         self._replay_num_demo_update = int(config_buffer['num_demo_update'])
 
-    def _post_rollout1(self):
-        style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'], self.device
-                                   ).view(self.horizon_length, self.num_actors, -1)
-        task_reward = self.experience_buffer.tensor_dict['rewards']
-        combined_reward = self._task_rew_scale * task_reward + self._disc_rew_scale * style_reward
-        self.experience_buffer.tensor_dict['rewards'] = combined_reward
-
-        self._mean_task_reward = task_reward.mean()
-        self._mean_style_reward = style_reward.mean()
-        self._std_task_reward = task_reward.std()
-        self._std_style_reward = style_reward.std()
-
     def _post_rollout2(self, batch_dict):
+        batch_dict = super()._post_rollout2(batch_dict)
         # Since demo_obs and replay_obs has an order with (order, env)
         # Rollout_obs is not applied swap_and_flatten01
         batch_dict['disc_obs'] = self.experience_buffer.tensor_dict['disc_obs'].view(-1, self._disc_obs_size)
+        style_reward = self.experience_buffer.tensor_dict['disc_rewards']
+        self._write_stat(
+            disc_reward_mean=style_reward.mean(),
+            disc_reward_std=style_reward.std(),
+        )
         return batch_dict
 
     def _pre_step(self, n: int):
@@ -212,7 +197,12 @@ class StyleAlgorithm(CoreAlgorithm):
 
     def _post_step(self, n: int):
         self._disc_obs_buf.push(self.obs['disc_obs'])
-        self.experience_buffer.update_data('disc_obs', n, self._disc_obs_buf.history)
+
+        disc_obs = self._disc_obs_buf.history
+        self.experience_buffer.update_data('disc_obs', n, disc_obs)
+        style_reward = disc_reward(self.model, disc_obs, self.device)
+        self.experience_buffer.update_data('disc_rewards', n, style_reward)
+        self.reward += self._disc_rew_scale * style_reward
 
     def _unpack_input(self, input_dict):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
