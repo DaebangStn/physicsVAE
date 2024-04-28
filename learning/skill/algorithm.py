@@ -68,7 +68,7 @@ class SkillAlgorithm(StyleAlgorithm):
         # e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
         # loss += e_loss * self._enc_loss_coef
         div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
-        loss = div_loss
+        loss = div_loss * self._div_loss_coef
         return loss
 
     def _diversity_loss(self, batch_dict, mu):
@@ -82,14 +82,14 @@ class SkillAlgorithm(StyleAlgorithm):
         z_diff = (1 - (rollout_z * sampled_z).sum(dim=-1)) / 2
 
         # Original KL implementation (a)
-        kl = torch.square(sampled_mu - mu).mean(dim=-1)
+        kl = torch.abs(sampled_mu - mu).mean(dim=-1)
 
         # Right KL divergence (b)
         # kl = ((sampled_mu - mu) ** 2 /
         #       (2 * (sampled_sigma ** 2 + 1e-5))).sum(dim=-1)
 
         # Original loss implementation (1)
-        loss = torch.square(kl / (z_diff + 1e-5) - 1).mean()
+        loss = torch.abs(kl / (z_diff + 1e-5) - 1).mean()
 
         # My loss suggestion (2)
         # loss = (kl / (z_diff + 1e-5)).mean()

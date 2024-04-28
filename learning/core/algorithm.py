@@ -82,8 +82,8 @@ class CoreAlgorithm(A2CAgent):
 
             # 3. Calculate the loss
             a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
-            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values)
             b_loss = self._bound_loss(mu)
+            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values)
 
             losses, _ = torch_ext.apply_masks(  # vestige of RNN
                 [a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)])

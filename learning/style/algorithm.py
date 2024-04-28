@@ -196,6 +196,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
 
     def _post_step(self, n: int):
+        super()._post_step(n)
         self._disc_obs_buf.push(self.obs['disc_obs'])
 
         disc_obs = self._disc_obs_buf.history
