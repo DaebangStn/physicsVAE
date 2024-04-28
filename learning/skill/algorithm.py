@@ -66,10 +66,10 @@ class SkillAlgorithm(StyleAlgorithm):
 
     def _additional_loss(self, batch_dict, res_dict):
         # loss = super()._additional_loss(batch_dict, res_dict)
-        # e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
-        # loss += e_loss * self._enc_loss_coef
+        e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
+        loss = e_loss * self._enc_loss_coef
         div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
-        loss = div_loss
+        loss += div_loss * self._div_loss_coef
         return loss
 
     # def _diversity_loss(self, batch_dict, mu):

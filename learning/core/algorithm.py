@@ -77,20 +77,23 @@ class CoreAlgorithm(A2CAgent):
             sigma = res_dict['sigmas']
 
             # 3. Calculate the loss
-            a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
-            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values)
+            with torch.no_grad():
+                a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
+                c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values)
             b_loss = self._bound_loss(mu)
 
             losses, _ = torch_ext.apply_masks(  # vestige of RNN
                 [a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)])
             a_loss, c_loss, entropy, b_loss = losses
 
-            loss = (a_loss
-                    + c_loss * self.critic_coef
-                    - entropy * self.entropy_coef
+            loss = (a_loss * 0
+                    + 0 * self.critic_coef
+                    - 0 * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
             loss += self._additional_loss(batch_dict, res_dict)
+
+            self._write_stat(total_loss=loss.detach().item())
 
             # 4. Zero the gradients
             if self.multi_gpu:
