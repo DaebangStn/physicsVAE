@@ -56,6 +56,9 @@ class SkillAlgorithm(StyleAlgorithm):
         batch_size = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['enc_rewards'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
+
+        # Data for computing gradient should be passed as a tensor_list (post-processing uses tensor_list)
+        self.tensor_list += ['latent']
         self.experience_buffer.tensor_dict['latent'] = torch.empty(batch_size + (self._latent_dim,), device=self.device)
 
     def prepare_dataset(self, batch_dict):
@@ -64,11 +67,11 @@ class SkillAlgorithm(StyleAlgorithm):
         dataset_dict['latent'] = batch_dict['latent']
 
     def _additional_loss(self, batch_dict, res_dict):
-        # loss = super()._additional_loss(batch_dict, res_dict)
-        # e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
-        # loss += e_loss * self._enc_loss_coef
+        loss = super()._additional_loss(batch_dict, res_dict)
+        e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
+        loss += e_loss * self._enc_loss_coef
         div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
-        loss = div_loss
+        loss += div_loss * self._div_loss_coef
         return loss
 
     def _diversity_loss(self, batch_dict, mu):
@@ -149,15 +152,13 @@ class SkillAlgorithm(StyleAlgorithm):
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
-    def _post_rollout2(self, batch_dict):
-        batch_dict = super()._post_rollout2(batch_dict)
-        batch_dict['latent'] = self.experience_buffer.tensor_dict['latent'].view(-1, self._latent_dim)
+    def _post_rollout(self, batch_dict):
+        super()._post_rollout(batch_dict)
         skill_reward = self.experience_buffer.tensor_dict['enc_rewards']
         self._write_stat(
             enc_reward_mean=skill_reward.mean(),
             enc_reward_std=skill_reward.std(),
         )
-        return batch_dict
 
     def _pre_step(self, n: int):
         super()._pre_step(n)
@@ -176,8 +177,7 @@ class SkillAlgorithm(StyleAlgorithm):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        enc_input_size = max(input_dict['rollout_disc_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['latent_enc'] = input_dict['latent'][0:enc_input_size]  # For encoder
+        batch_dict['latent_enc'] = input_dict['latent'][0:self._disc_size_mb]  # For encoder
         batch_dict['latent'] = input_dict['latent']  # For diversity loss
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,

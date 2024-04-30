@@ -311,8 +311,6 @@ class CoreAlgorithm(A2CAgent):
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
 
-        self._post_rollout1()
-
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
         mb_values = self.experience_buffer.tensor_dict['values']
         mb_next_values = self.experience_buffer.tensor_dict['next_values']
@@ -325,13 +323,21 @@ class CoreAlgorithm(A2CAgent):
         batch_dict['played_frames'] = self.batch_size
         batch_dict['step_time'] = step_time
 
-        return self._post_rollout2(batch_dict)
+        self._post_rollout(batch_dict)
+
+        return batch_dict
 
     def prepare_dataset(self, batch_dict):
+        """
+            1. Normalize and divide the observation
+            2. Add or sample custom observation
+        """
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
+        dataset_dict['obs'] = self.model.norm_obs(dataset_dict['obs'])
         if self._jitter_obs_buf is not None:
-            dataset_dict['jitter_obs'] = batch_dict['jitter_obs']
+            jitter_input_size = max(batch_dict['jitter_obs'].shape[0] // self._jitter_input_divisor, 2)
+            dataset_dict['jitter_obs'] = batch_dict['jitter_obs'][0:jitter_input_size]
 
     def _actor_loss(self, old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip):
         ratio = torch.exp(old_action_log_probs_batch - action_log_probs)
@@ -434,7 +440,6 @@ class CoreAlgorithm(A2CAgent):
         old_sigma_batch = input_dict['sigma']
         return_batch = input_dict['returns']
         actions_batch = input_dict['actions']
-        obs_batch = input_dict['obs']
 
         lr_mul = self._last_last_lr / self.last_lr
         self._last_last_lr = self.last_lr
@@ -443,12 +448,8 @@ class CoreAlgorithm(A2CAgent):
         batch_dict = {
             'is_train': True,
             'prev_actions': actions_batch,
-            'obs': self.model.norm_obs(obs_batch),
         }
-
-        if self._jitter_obs_buf is not None:
-            jitter_input_size = max(input_dict['jitter_obs'].shape[0] // self._jitter_input_divisor, 2)
-            batch_dict['jitter_obs'] = input_dict['jitter_obs'][0:jitter_input_size]
+        batch_dict.update(input_dict)
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
@@ -492,10 +493,7 @@ class CoreAlgorithm(A2CAgent):
     def _pre_rollout(self):
         pass
 
-    def _post_rollout1(self):
-        pass
-
-    def _post_rollout2(self, batch_dict):
+    def _post_rollout(self, batch_dict):
         task_reward = self.experience_buffer.tensor_dict['task_rewards']
         self._write_stat(
             task_reward_mean=task_reward.mean().item(),
@@ -504,19 +502,23 @@ class CoreAlgorithm(A2CAgent):
 
         if self._jitter_obs_buf is not None:
             batch_dict['jitter_obs'] = self.experience_buffer.tensor_dict['jitter_obs'].view(-1, self._jitter_obs_size)
-        return batch_dict
 
     def _pre_step(self, n: int):
         if self._jitter_obs_buf is not None:
             self._jitter_obs_buf.push_on_reset(self.obs['obs'], self.dones)
 
     def _post_step(self, n: int):
+        """
+            Update reward with custom ones and store the custom observation
+        """
+
         self.experience_buffer.update_data('task_rewards', n, self.reward)
         self.reward *= self._task_rew_scale
         if self._jitter_obs_buf is not None:
             self._jitter_obs_buf.push(self.obs['obs'])
             self.experience_buffer.update_data('jitter_obs', n, self._jitter_obs_buf.history)
 
+    # Helper functions
     def print_gradient(self):
         for name, param in self.model.named_parameters():
             if param.grad is not None:

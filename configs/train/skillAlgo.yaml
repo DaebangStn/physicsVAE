@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: implanted_net
+  memo: debug
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -17,7 +17,7 @@ network:
   separate: True
 
   space:
-    latent_dim: 2
+    latent_dim: 64
 #    latent_dim: 32
 
     continuous:
@@ -105,7 +105,7 @@ hparam:
 
   reward:
     task_scale: 0.0
-    disc_scale: 0.0
+    disc_scale: 1.0
     enc_scale: 1.0
 
     show_on_player: False
@@ -129,7 +129,7 @@ hparam:
       log_hist: False
 
   skill:
-    div_loss_coef: 1
+    div_loss_coef: 0.01
     enc:
       loss_coef: 5
 

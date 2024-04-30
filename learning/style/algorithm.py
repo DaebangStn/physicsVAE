@@ -20,6 +20,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_obs_size = None
         self._disc_input_divisor = None
         self._disc_log_hist = None
+        self._disc_size_mb = None
 
         # reward related
         self._task_rew_scale = None
@@ -57,25 +58,51 @@ class StyleAlgorithm(CoreAlgorithm):
                 weights['disc_running_mean_std'] = self.model.disc_running_mean_std.state_dict()
         return weights
 
+    def init_tensors(self):
+        super().init_tensors()
+        config_hparam = self.config
+        self._disc_obs_size = config_hparam['style']['disc']['num_obs'] * self._disc_obs_traj_len
+
+        # append experience buffer
+        batch_size = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['disc_rewards'] = torch.empty(batch_size + (self.value_size,),
+                                                                         device=self.device)
+
+        # Data for computing gradient should be passed as a tensor_list (post-processing uses tensor_list)
+        self.tensor_list += ['disc_obs']
+        self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_size + (self._disc_obs_size,),
+                                                                     device=self.device)
+
     def set_stats_weights(self, weights):
         super().set_stats_weights(weights)
         if self.normalize_input and 'disc_running_mean_std' in weights:
             self.model.disc_running_mean_std.set_weights(weights['disc_running_mean_std'])
 
     def prepare_dataset(self, batch_dict):
+        """
+            1. Normalize the observation
+            2. Add or sample custom observation
+        """
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
 
-        dataset_dict['rollout_disc_obs'] = batch_dict['disc_obs']
-        dataset_dict['replay_disc_obs'] = (self._replay_buffer['rollout'].sample(self.batch_size)
-                                           if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
-        dataset_dict['demo_disc_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
+        dataset_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(batch_dict['disc_obs'])
+
+        dataset_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
+            self._replay_buffer['rollout'].sample(self.batch_size)
+            if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
+
+        dataset_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
+            self._replay_buffer['demo'].sample(self.batch_size))
+
         self._update_replay_buffer(batch_dict['disc_obs'])
 
     def _additional_loss(self, batch_dict, res_dict):
+        loss = super()._additional_loss(batch_dict, res_dict)
         agent_disc_logit = torch.cat([res_dict['rollout_disc_logit'], res_dict['replay_disc_logit']], dim=0)
         d_loss = self._disc_loss(agent_disc_logit, res_dict['demo_disc_logit'], batch_dict)
-        return d_loss * self._disc_loss_coef
+        loss += d_loss * self._disc_loss_coef
+        return loss
 
     def _disc_loss(self, agent_disc_logit, demo_disc_logit, batch_dict):
         # prediction
@@ -123,18 +150,6 @@ class StyleAlgorithm(CoreAlgorithm):
 
         return loss
 
-    def init_tensors(self):
-        super().init_tensors()
-        config_hparam = self.config
-        self._disc_obs_size = config_hparam['style']['disc']['num_obs'] * self._disc_obs_traj_len
-
-        # append experience buffer
-        batch_size = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['disc_rewards'] = torch.empty(batch_size + (self.value_size,),
-                                                                         device=self.device)
-        self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_size + (self._disc_obs_size,),
-                                                                     device=self.device)
-
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
 
@@ -149,6 +164,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
         self._disc_input_divisor = int(config_disc['input_divisor'])
         self._disc_log_hist = config_disc['log_hist']
+        self._disc_size_mb = max(self.batch_size // self._disc_input_divisor, 2)
 
         # reward related
         config_rew = config_hparam['reward']
@@ -180,17 +196,13 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_store_prob = config_buffer['store_prob']
         self._replay_num_demo_update = int(config_buffer['num_demo_update'])
 
-    def _post_rollout2(self, batch_dict):
-        batch_dict = super()._post_rollout2(batch_dict)
-        # Since demo_obs and replay_obs has an order with (order, env)
-        # Rollout_obs is not applied swap_and_flatten01
-        batch_dict['disc_obs'] = self.experience_buffer.tensor_dict['disc_obs'].view(-1, self._disc_obs_size)
+    def _post_rollout(self, batch_dict):
+        super()._post_rollout(batch_dict)
         style_reward = self.experience_buffer.tensor_dict['disc_rewards']
         self._write_stat(
             disc_reward_mean=style_reward.mean(),
             disc_reward_std=style_reward.std(),
         )
-        return batch_dict
 
     def _pre_step(self, n: int):
         self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
@@ -208,13 +220,9 @@ class StyleAlgorithm(CoreAlgorithm):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        disc_input_size = max(input_dict['rollout_disc_obs'].shape[0] // self._disc_input_divisor, 2)
-        batch_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(
-            input_dict['rollout_disc_obs'][0:disc_input_size])
-        batch_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
-            input_dict['replay_disc_obs'][0:disc_input_size])
-        batch_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
-            input_dict['demo_disc_obs'][0:disc_input_size])
+        batch_dict['normalized_rollout_disc_obs'] = input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb]
+        batch_dict['normalized_replay_disc_obs'] = input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb]
+        batch_dict['normalized_demo_disc_obs'] = input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb]
         batch_dict['normalized_demo_disc_obs'].requires_grad = True
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
