@@ -73,9 +73,9 @@ class SkillAlgorithm(StyleAlgorithm):
 
     def _diversity_loss(self, batch_dict, mu):
         rollout_z = batch_dict['latent']
-        obs = batch_dict['obs']
-        sampled_z = sample_latent(obs.shape[0], self._latent_dim, self.device)
-        sampled_mu, _ = self.model.actor_latent(obs, sampled_z)
+        normed_obs = batch_dict['obs']
+        sampled_z = sample_latent(normed_obs.shape[0], self._latent_dim, self.device)
+        sampled_mu, _ = self.model.actor_latent(normed_obs, sampled_z)
 
         sampled_mu = torch.clamp(sampled_mu, -1.0, 1.0)
         mu = torch.clamp(mu, -1.0, 1.0)
@@ -96,29 +96,6 @@ class SkillAlgorithm(StyleAlgorithm):
 
         self._write_stat(amp_diversity_loss=loss.detach())
         return loss
-
-    # def _diversity_loss(self, batch_dict, mu2):
-    #     rollout_z = batch_dict['latent']
-    #     normed_obs = batch_dict['obs']
-    #     new_z = sample_latent(normed_obs.shape[0], self._latent_dim, self.device)
-    #     mu, sigma = self.model.actor_latent(normed_obs, new_z)
-    #
-    #     clipped_action_params = torch.clamp(mu2, -1.0, 1.0)
-    #     clipped_mu = torch.clamp(mu, -1.0, 1.0)
-    #
-    #     a_diff = clipped_action_params - clipped_mu
-    #     a_diff = torch.mean(torch.square(a_diff), dim=-1)
-    #
-    #     z_diff = new_z * rollout_z
-    #     z_diff = torch.sum(z_diff, dim=-1)
-    #     z_diff = 0.5 - 0.5 * z_diff
-    #
-    #     diversity_bonus = a_diff / (z_diff + 1e-5)
-    #     diversity_loss = torch.square(1 - diversity_bonus)
-    #
-    #     loss = diversity_loss.mean()
-    #     self._write_stat(amp_diversity_loss=loss.detach())
-    #     return loss
 
     def _enc_loss(self, enc, rollout_z):
         # encoding
@@ -158,9 +135,6 @@ class SkillAlgorithm(StyleAlgorithm):
         self._latent_dim = config_network['space']['latent_dim']
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
-
-    def _pre_step(self, n: int):
-        super()._pre_step(n)
 
     def _post_step(self, n):
         super()._post_step(n)

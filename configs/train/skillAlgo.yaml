@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: debug
+  memo: my_net
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
