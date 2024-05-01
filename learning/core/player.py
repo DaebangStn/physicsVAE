@@ -85,12 +85,7 @@ class CorePlayer(PpoPlayerContinuous):
                 if self.evaluation and self._n_step % self.update_checkpoint_freq == 0:
                     self.maybe_load_new_checkpoint()
 
-                if has_masks:
-                    masks = self.env.get_action_mask()
-                    action = self.get_masked_action(
-                        self.obses['obs'], masks, is_deterministic)
-                else:
-                    action = self.get_action(self.obses['obs'], is_deterministic)
+                action = self.get_action(self.obses['obs'], is_deterministic)
 
                 self._pre_step()
                 self.obses, r, self.done, info = self.env_step(self.env, action)
@@ -167,6 +162,10 @@ class CorePlayer(PpoPlayerContinuous):
 
     def env_reset(self, env):
         return {'obs': super().env_reset(env)}
+
+    def get_action(self, obs, is_deterministic=False):
+        obs = self.model.norm_obs(obs)
+        return super().get_action(obs, is_deterministic)
 
     def _init_variables(self, **kwargs):
         self.network = self.config['network']

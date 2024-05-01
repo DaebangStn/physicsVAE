@@ -66,7 +66,7 @@ class StyleAlgorithm(CoreAlgorithm):
         # append experience buffer
         batch_size = self.experience_buffer.obs_base_shape
         # Data for computing gradient should be passed as a tensor_list (post-processing uses tensor_list)
-        # self.tensor_list += ['disc_obs']
+        self.tensor_list += ['disc_obs']
         self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_size + (self._disc_obs_size,),
                                                                      device=self.device)
 
@@ -83,17 +83,17 @@ class StyleAlgorithm(CoreAlgorithm):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
 
-        # dataset_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(batch_dict['disc_obs'])
-        # dataset_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
-        #     self._replay_buffer['rollout'].sample(self.batch_size)
-        #     if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
-        # dataset_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
-        #     self._replay_buffer['demo'].sample(self.batch_size))
+        dataset_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(batch_dict['disc_obs'])
+        dataset_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
+            self._replay_buffer['rollout'].sample(self.batch_size)
+            if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
+        dataset_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
+            self._replay_buffer['demo'].sample(self.batch_size))
 
-        dataset_dict['normalized_rollout_disc_obs'] = batch_dict['disc_obs']
-        dataset_dict['normalized_replay_disc_obs'] = self._replay_buffer['rollout'].sample(self.batch_size) \
-            if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs']
-        dataset_dict['normalized_demo_disc_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
+        # dataset_dict['normalized_rollout_disc_obs'] = batch_dict['disc_obs']
+        # dataset_dict['normalized_replay_disc_obs'] = self._replay_buffer['rollout'].sample(self.batch_size) \
+        #     if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs']
+        # dataset_dict['normalized_demo_disc_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
 
         self._update_replay_buffer(batch_dict['disc_obs'])
 
@@ -195,10 +195,10 @@ class StyleAlgorithm(CoreAlgorithm):
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_store_prob = config_buffer['store_prob']
         self._replay_num_demo_update = int(config_buffer['num_demo_update'])
-
-    def _post_rollout(self, batch_dict):
-        super()._post_rollout(batch_dict)
-        batch_dict['disc_obs'] = self.experience_buffer.tensor_dict['disc_obs'].view(-1, self._disc_obs_size)
+    #
+    # def _post_rollout(self, batch_dict):
+    #     super()._post_rollout(batch_dict)
+    #     batch_dict['disc_obs'] = self.experience_buffer.tensor_dict['disc_obs'].view(-1, self._disc_obs_size)
 
     def _pre_step(self, n: int):
         super()._pre_step(n)
@@ -222,18 +222,18 @@ class StyleAlgorithm(CoreAlgorithm):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        batch_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(
-            input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb])
-        batch_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
-            input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb])
-        batch_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
-            input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb])
-        batch_dict['normalized_demo_disc_obs'].requires_grad = True
-
-        # batch_dict['normalized_rollout_disc_obs'] = input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb]
-        # batch_dict['normalized_replay_disc_obs'] = input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb]
-        # batch_dict['normalized_demo_disc_obs'] = input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb]
+        # batch_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(
+        #     input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb])
+        # batch_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
+        #     input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb])
+        # batch_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
+        #     input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb])
         # batch_dict['normalized_demo_disc_obs'].requires_grad = True
+
+        batch_dict['normalized_rollout_disc_obs'] = input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb]
+        batch_dict['normalized_replay_disc_obs'] = input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb]
+        batch_dict['normalized_demo_disc_obs'] = input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb]
+        batch_dict['normalized_demo_disc_obs'].requires_grad = True
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)

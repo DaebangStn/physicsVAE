@@ -335,6 +335,7 @@ class CoreAlgorithm(A2CAgent):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
         dataset_dict['obs'] = self.model.norm_obs(dataset_dict['obs'])
+
         if self._jitter_obs_buf is not None:
             jitter_input_size = max(batch_dict['jitter_obs'].shape[0] // self._jitter_input_divisor, 2)
             dataset_dict['jitter_obs'] = batch_dict['jitter_obs'][0:jitter_input_size]
@@ -456,8 +457,8 @@ class CoreAlgorithm(A2CAgent):
         batch_dict = {
             'is_train': True,
             'prev_actions': actions_batch,
-            'obs': input_dict['obs'],
         }
+        batch_dict.update(input_dict)
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)

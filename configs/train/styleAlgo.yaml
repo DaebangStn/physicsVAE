@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_styleAlgo_01-14-11-22_fixed_norm/nn/keypointMaxObsTask_ep_500_rew_6289.157_500.pth
+#  runs/keypointMaxObsTask_styleAlgo_01-14-58-59_fixed_norm/nn/keypointMaxObsTask.pth
 
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 
@@ -72,14 +72,14 @@ hparam:
 #      junk
 
   # learning hyperparameters
-  horizon_length: 2
+  horizon_length: 32
   gamma: 0.99
   tau: 0.95
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 2
-  mini_epochs: 2
+  minibatch_size: 32768
+  mini_epochs: 6
 
   learning_rate: 2e-5
   lr_schedule: constant
