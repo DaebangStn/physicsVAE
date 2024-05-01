@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: enc_fix
+  memo: fixed_norm
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_styleAlgo_01-10-29-08_enc_fix/nn/keypointMaxObsTask.pth
+#  runs/keypointMaxObsTask_styleAlgo_01-14-11-22_fixed_norm/nn/keypointMaxObsTask_ep_500_rew_6289.157_500.pth
 
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 
@@ -72,14 +72,14 @@ hparam:
 #      junk
 
   # learning hyperparameters
-  horizon_length: 32
+  horizon_length: 2
   gamma: 0.99
   tau: 0.95
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
-  mini_epochs: 6
+  minibatch_size: 2
+  mini_epochs: 2
 
   learning_rate: 2e-5
   lr_schedule: constant

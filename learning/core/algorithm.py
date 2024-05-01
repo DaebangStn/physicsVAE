@@ -162,8 +162,6 @@ class CoreAlgorithm(A2CAgent):
     def init_tensors(self):
         super().init_tensors()
         batch_size = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['task_rewards'] = torch.empty(batch_size + (self.value_size,),
-                                                                         device=self.device)
         self.experience_buffer.tensor_dict['next_values'] = torch.empty(batch_size + (self.value_size,),
                                                                         device=self.device)
         if self._jitter_obs_buf is not None:
@@ -285,7 +283,7 @@ class CoreAlgorithm(A2CAgent):
 
             self._pre_step(n)
             step_time_start = time.time()
-            self.obs, self.reward, self.dones, infos = self.env_step(res_dict['actions'])
+            self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
             step_time_end = time.time()
             self._post_step(n)
 
@@ -294,10 +292,10 @@ class CoreAlgorithm(A2CAgent):
             next_vals = self.get_values(self.obs)
             next_vals *= ~self.dones.unsqueeze(1)
             self.experience_buffer.update_data('next_values', n, next_vals)
-            self.experience_buffer.update_data('rewards', n, self.reward)
+            self.experience_buffer.update_data('rewards', n, rewards)
             self.experience_buffer.update_data('dones', n, self.dones)
 
-            self.current_rewards += self.reward
+            self.current_rewards += rewards
             self.current_lengths += 1
             all_done_indices = self.dones.nonzero(as_tuple=False)
             env_done_indices = all_done_indices[::self.num_agents]
@@ -310,6 +308,8 @@ class CoreAlgorithm(A2CAgent):
 
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
+
+        self._calc_rollout_reward()
 
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
         mb_values = self.experience_buffer.tensor_dict['values']
@@ -358,6 +358,14 @@ class CoreAlgorithm(A2CAgent):
         else:
             b_loss = torch.zeros(1, device=self.ppo_device)
         return b_loss
+
+    def _calc_rollout_reward(self):
+        task_reward = self.experience_buffer.tensor_dict['rewards']
+        self._write_stat(
+            task_reward_mean=task_reward.mean().item(),
+            task_reward_std=task_reward.std().item(),
+        )
+        self.experience_buffer.tensor_dict['rewards'] *= self._task_rew_scale
 
     def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
         if self.has_value_loss:
@@ -448,8 +456,8 @@ class CoreAlgorithm(A2CAgent):
         batch_dict = {
             'is_train': True,
             'prev_actions': actions_batch,
+            'obs': input_dict['obs'],
         }
-        batch_dict.update(input_dict)
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
@@ -494,12 +502,6 @@ class CoreAlgorithm(A2CAgent):
         pass
 
     def _post_rollout(self, batch_dict):
-        task_reward = self.experience_buffer.tensor_dict['task_rewards']
-        self._write_stat(
-            task_reward_mean=task_reward.mean().item(),
-            task_reward_std=task_reward.std().item(),
-        )
-
         if self._jitter_obs_buf is not None:
             batch_dict['jitter_obs'] = self.experience_buffer.tensor_dict['jitter_obs'].view(-1, self._jitter_obs_size)
 
@@ -509,10 +511,8 @@ class CoreAlgorithm(A2CAgent):
 
     def _post_step(self, n: int):
         """
-            Update reward with custom ones and store the custom observation
+            Update the custom observation
         """
-        self.experience_buffer.update_data('task_rewards', n, self.reward)
-        self.reward *= self._task_rew_scale
         if self._jitter_obs_buf is not None:
             self._jitter_obs_buf.push(self.obs['obs'])
             self.experience_buffer.update_data('jitter_obs', n, self._jitter_obs_buf.history)

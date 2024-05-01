@@ -65,9 +65,6 @@ class StyleAlgorithm(CoreAlgorithm):
 
         # append experience buffer
         batch_size = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['disc_rewards'] = torch.empty(batch_size + (self.value_size,),
-                                                                         device=self.device)
-
         # Data for computing gradient should be passed as a tensor_list (post-processing uses tensor_list)
         # self.tensor_list += ['disc_obs']
         self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_size + (self._disc_obs_size,),
@@ -86,12 +83,17 @@ class StyleAlgorithm(CoreAlgorithm):
         super().prepare_dataset(batch_dict)
         dataset_dict = self.dataset.values_dict
 
-        dataset_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(batch_dict['disc_obs'])
-        dataset_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
-            self._replay_buffer['rollout'].sample(self.batch_size)
-            if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
-        dataset_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
-            self._replay_buffer['demo'].sample(self.batch_size))
+        # dataset_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(batch_dict['disc_obs'])
+        # dataset_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
+        #     self._replay_buffer['rollout'].sample(self.batch_size)
+        #     if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
+        # dataset_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
+        #     self._replay_buffer['demo'].sample(self.batch_size))
+
+        dataset_dict['normalized_rollout_disc_obs'] = batch_dict['disc_obs']
+        dataset_dict['normalized_replay_disc_obs'] = self._replay_buffer['rollout'].sample(self.batch_size) \
+            if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs']
+        dataset_dict['normalized_demo_disc_obs'] = self._replay_buffer['demo'].sample(self.batch_size)
 
         self._update_replay_buffer(batch_dict['disc_obs'])
 
@@ -162,7 +164,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
         self._disc_input_divisor = int(config_disc['input_divisor'])
         self._disc_log_hist = config_disc['log_hist']
-        self._disc_size_mb = max(self.batch_size // self._disc_input_divisor, 2)
+        self._disc_size_mb = max(self.minibatch_size // self._disc_input_divisor, 2)
 
         # reward related
         config_rew = config_hparam['reward']
@@ -196,37 +198,42 @@ class StyleAlgorithm(CoreAlgorithm):
 
     def _post_rollout(self, batch_dict):
         super()._post_rollout(batch_dict)
-        style_reward = self.experience_buffer.tensor_dict['disc_rewards']
-        self._write_stat(
-            disc_reward_mean=style_reward.mean(),
-            disc_reward_std=style_reward.std(),
-        )
         batch_dict['disc_obs'] = self.experience_buffer.tensor_dict['disc_obs'].view(-1, self._disc_obs_size)
 
     def _pre_step(self, n: int):
         super()._pre_step(n)
-
         self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
+
+    def _calc_rollout_reward(self):
+        super()._calc_rollout_reward()
+        style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'], self.device)
+        self.experience_buffer.tensor_dict['rewards'] += style_reward * self._disc_rew_scale
+        self._write_stat(
+            disc_reward_mean=style_reward.mean().item(),
+            disc_reward_std=style_reward.std().item(),
+        )
 
     def _post_step(self, n: int):
         super()._post_step(n)
-        
         self._disc_obs_buf.push(self.obs['disc_obs'])
-
-        disc_obs = self._disc_obs_buf.history
-        self.experience_buffer.update_data('disc_obs', n, disc_obs)
-        style_reward = disc_reward(self.model, disc_obs, self.device)
-        self.experience_buffer.update_data('disc_rewards', n, style_reward)
-        self.reward += self._disc_rew_scale * style_reward
+        self.experience_buffer.update_data('disc_obs', n, self._disc_obs_buf.history)
 
     def _unpack_input(self, input_dict):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
          return_batch, value_preds_batch) = super()._unpack_input(input_dict)
 
-        batch_dict['normalized_rollout_disc_obs'] = input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb]
-        batch_dict['normalized_replay_disc_obs'] = input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb]
-        batch_dict['normalized_demo_disc_obs'] = input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb]
+        batch_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(
+            input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb])
+        batch_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
+            input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb])
+        batch_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
+            input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb])
         batch_dict['normalized_demo_disc_obs'].requires_grad = True
+
+        # batch_dict['normalized_rollout_disc_obs'] = input_dict['normalized_rollout_disc_obs'][0:self._disc_size_mb]
+        # batch_dict['normalized_replay_disc_obs'] = input_dict['normalized_replay_disc_obs'][0:self._disc_size_mb]
+        # batch_dict['normalized_demo_disc_obs'] = input_dict['normalized_demo_disc_obs'][0:self._disc_size_mb]
+        # batch_dict['normalized_demo_disc_obs'].requires_grad = True
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)
