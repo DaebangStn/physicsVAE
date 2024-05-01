@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo:
+  memo: enc_fix
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_styleAlgo_18-12-34-36_walk_2_disc/nn/last_keypointMaxObsTask_ep_2100_rew_7137.912.pth
+#  runs/keypointMaxObsTask_styleAlgo_01-10-29-08_enc_fix/nn/keypointMaxObsTask.pth
 
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 

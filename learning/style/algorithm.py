@@ -69,7 +69,7 @@ class StyleAlgorithm(CoreAlgorithm):
                                                                          device=self.device)
 
         # Data for computing gradient should be passed as a tensor_list (post-processing uses tensor_list)
-        self.tensor_list += ['disc_obs']
+        # self.tensor_list += ['disc_obs']
         self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_size + (self._disc_obs_size,),
                                                                      device=self.device)
 
@@ -87,11 +87,9 @@ class StyleAlgorithm(CoreAlgorithm):
         dataset_dict = self.dataset.values_dict
 
         dataset_dict['normalized_rollout_disc_obs'] = self.model.norm_disc_obs(batch_dict['disc_obs'])
-
         dataset_dict['normalized_replay_disc_obs'] = self.model.norm_disc_obs(
             self._replay_buffer['rollout'].sample(self.batch_size)
             if self._replay_buffer['rollout'].count > 0 else batch_dict['disc_obs'])
-
         dataset_dict['normalized_demo_disc_obs'] = self.model.norm_disc_obs(
             self._replay_buffer['demo'].sample(self.batch_size))
 
@@ -203,11 +201,16 @@ class StyleAlgorithm(CoreAlgorithm):
             disc_reward_mean=style_reward.mean(),
             disc_reward_std=style_reward.std(),
         )
+        batch_dict['disc_obs'] = self.experience_buffer.tensor_dict['disc_obs'].view(-1, self._disc_obs_size)
 
     def _pre_step(self, n: int):
+        super()._pre_step(n)
+
         self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
 
     def _post_step(self, n: int):
+        super()._post_step(n)
+        
         self._disc_obs_buf.push(self.obs['disc_obs'])
 
         disc_obs = self._disc_obs_buf.history

@@ -329,7 +329,7 @@ class CoreAlgorithm(A2CAgent):
 
     def prepare_dataset(self, batch_dict):
         """
-            1. Normalize and divide the observation
+            1. Normalize the observation
             2. Add or sample custom observation
         """
         super().prepare_dataset(batch_dict)
@@ -511,7 +511,6 @@ class CoreAlgorithm(A2CAgent):
         """
             Update reward with custom ones and store the custom observation
         """
-
         self.experience_buffer.update_data('task_rewards', n, self.reward)
         self.reward *= self._task_rew_scale
         if self._jitter_obs_buf is not None:
