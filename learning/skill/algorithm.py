@@ -54,9 +54,6 @@ class SkillAlgorithm(StyleAlgorithm):
     def init_tensors(self):
         super().init_tensors()
         batch_size = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['enc_rewards'] = torch.empty(batch_size + (self.value_size,),
-                                                                        device=self.device)
-
         # Data for computing gradient should be passed as a tensor_list (post-processing uses tensor_list)
         self.tensor_list += ['latent']
         self.experience_buffer.tensor_dict['latent'] = torch.empty(batch_size + (self._latent_dim,), device=self.device)
@@ -133,6 +130,16 @@ class SkillAlgorithm(StyleAlgorithm):
         self._write_stat(enc_loss=likelihood_loss.detach())
         return likelihood_loss
 
+    def _calc_rollout_reward(self):
+        super()._calc_rollout_reward()
+        skill_reward = enc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'],
+                                  self.experience_buffer.tensor_dict['latent'])
+        self.experience_buffer.tensor_dict['rewards'] += skill_reward * self._enc_rew_scale
+        self._write_stat(
+            enc_reward_mean=skill_reward.mean().item(),
+            enc_reward_std=skill_reward.std().item(),
+        )
+
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
 
@@ -152,14 +159,6 @@ class SkillAlgorithm(StyleAlgorithm):
         self._color_projector = torch.rand((self._latent_dim, 3), device=self.device)
         self._z = sample_latent(self.vec_env.num, self._latent_dim, self.device)
 
-    def _post_rollout(self, batch_dict):
-        super()._post_rollout(batch_dict)
-        skill_reward = self.experience_buffer.tensor_dict['enc_rewards']
-        self._write_stat(
-            enc_reward_mean=skill_reward.mean(),
-            enc_reward_std=skill_reward.std(),
-        )
-
     def _pre_step(self, n: int):
         super()._pre_step(n)
 
@@ -167,11 +166,6 @@ class SkillAlgorithm(StyleAlgorithm):
         super()._post_step(n)
         self.experience_buffer.update_data('latent', n, self._z)
         self._remain_latent_steps -= 1
-
-        disc_obs = self._disc_obs_buf.history
-        skill_reward = enc_reward(self.model, disc_obs, self._z)
-        self.experience_buffer.update_data('enc_rewards', n, skill_reward)
-        self.reward += self._enc_rew_scale * skill_reward
 
     def _unpack_input(self, input_dict):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,

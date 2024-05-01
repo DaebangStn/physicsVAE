@@ -54,11 +54,6 @@ class CorePlayer(PpoPlayerContinuous):
         sum_game_res = 0
         n_games = n_games * n_game_life
         self._games_played = 0
-        has_masks = False
-        has_masks_func = getattr(self.env, "has_action_mask", None) is not None
-
-        if has_masks_func:
-            has_masks = self.env.has_action_mask()
 
         self.wait_for_checkpoint()
 
@@ -70,10 +65,6 @@ class CorePlayer(PpoPlayerContinuous):
             self.obses = self.env_reset(self.env)
             batch_size = 1
             batch_size = self.get_batch_size(self.obses['obs'], batch_size)
-
-            if need_init_rnn:
-                self.init_rnn()
-                need_init_rnn = False
 
             cr = torch.zeros(batch_size, dtype=torch.float32)
             steps = torch.zeros(batch_size, dtype=torch.float32)

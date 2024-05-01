@@ -40,20 +40,14 @@ class SkillPlayer(StylePlayer):
         return obs
 
     def get_action(self, obs, is_deterministic=False):
-        if not self.has_batch_dimension:
-            obs = unsqueeze_obs(obs)
-        obs = self._preproc_obs(obs)
         with torch.no_grad():
-            mu, sigma = self.model.actor_latent(obs, self._z)
-            sigma = torch.exp(sigma)
+            normed_obs = self.model.norm_obs(obs)
+            mu, sigma = self.model.actor_latent(normed_obs, self._z)
 
         if is_deterministic:
             current_action = mu
         else:
             current_action = torch.normal(mu, sigma)
-
-        if not self.has_batch_dimension:
-            current_action = torch.squeeze(current_action.detach())
 
         if self.clip_actions:
             return rescale_actions(self.actions_low, self.actions_high, torch.clamp(current_action, -1.0, 1.0))
