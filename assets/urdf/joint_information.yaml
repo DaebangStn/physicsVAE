@@ -15,3 +15,10 @@ amp_humanoid_sword_shield:
     [0, 3, 6, 9, 10, 13, 16, 17, 20, 21, 24, 27, 28, 31]
   key_body_names:
     ["right_hand", "left_hand", "right_foot", "left_foot", "sword", "shield"]
+amp_humanoid_no_sword_shield:
+  dof_body_ids:  # Maybe indices of movable body
+    [1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 14, 15, 16]
+  dof_offsets:  # Each joints starting dof indices
+    [0, 3, 6, 9, 10, 13, 16, 17, 20, 21, 24, 27, 28, 31]
+  key_body_names:
+    ["right_hand", "left_hand", "right_foot", "left_foot", "sword", "shield"]

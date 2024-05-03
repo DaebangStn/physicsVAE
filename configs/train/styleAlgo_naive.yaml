@@ -2,24 +2,19 @@ test: False
 debug: False
 
 algo:
-  name: skillAlgo
+  name: styleAlgo
   memo:
   motion_file:
-#    assets/motions/dataset_humanoid.yaml
-#    assets/motions/amp_humanoid_run.npy
-    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/amp_humanoid_run.npy
 
 model:
-  name: skill
+  name: style
 
 network:
-  name: skill
+  name: style
   separate: True
 
   space:
-    latent_dim: 64
-#    latent_dim: 32
-
     continuous:
       mu_activation: None
       sigma_activation: None
@@ -29,42 +24,31 @@ network:
         name: const_initializer
         val: -2.9
       fixed_sigma: True
-      learn_sigma: False
 
   mlp:
-    units: [1024, 1024, 512]
-    activation: relu
-    initializer:
-      name: default
-
-  latent:
-    build: True
-    units: [512, 256]
-
-  disc:  # discriminator and encoder shares the network
-    units: [1024, 1024, 512]
-    activation: relu
-    initializer:
-      name: default
-
-  enc:
     units: [1024, 512]
     activation: relu
-    separate: False
-
     initializer:
       name: default
 
+  disc:
+    units: [1024, 512]
+    activation: relu
+    initializer:
+      name: default
+
+
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
+#  runs/keypointMaxObsTask_styleAlgo_01-14-58-59_fixed_norm/nn/keypointMaxObsTask.pth
 
-  runs/Humanoid_00013600_converted.pth
+#  runs/Humanoid_00010000_converted.pth
 
-checkpoint_disc:
-#  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
+checkpoint_disc:  # from the project root
+#  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
+
 
 hparam:
-#  max_frames: 1500
+#  max_frames: 100000
 
   normalize_input: True
   normalize_value: True
@@ -72,13 +56,12 @@ hparam:
   clip_value: False
   reward_shaper: {}
   save_frequency: 1000
-  intermediate_save_frequency: 100
 
   logger:
     motion_match_length: 4
     show_matcher_out: False
     action: False
-    motion: False
+    motion: True
     latent_motion_id: False
     motion_transition: False
     jitter: True
@@ -105,10 +88,7 @@ hparam:
 
   reward:
     task_scale: 0.0
-    disc_scale: 1.0
-    enc_scale: 1.0
-
-    show_on_player: False
+    disc_scale: 2.0
 
   style:
     replay_buf:
@@ -117,28 +97,14 @@ hparam:
       num_demo_update: 128
 
     disc:
+      # denominator for collected data within the rollout
       input_divisor: 16
-      num_obs: 140
-#      num_obs: 125
-#      obs_traj_len: 4
-      obs_traj_len: 10
+      num_obs: 125
+      obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
       grad_penalty_scale: 5
       log_hist: False
-
-  skill:
-    div_loss_coef: 0.01
-    enc:
-      loss_coef: 5
-
-    latent:
-      update_freq_max: 150
-      update_freq_min: 1
-
-#  jitter:
-#    loss_coef: 0.02
-#    input_divisor: 16
 
 seed: 1

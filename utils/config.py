@@ -27,6 +27,8 @@ def build_args() -> Namespace:
          "help": "Number of environments to run in parallel"},
         {"name": "--wandb_proj", "type": str, "required": False, "default": None,
          "help": "Wandb project name. If this flag is set, wandb will be enabled."},
+        {"name": "--memo", "type": str, "required": False, "default": None,
+         "help": "postfix to the experiment name"},
         {"name": "--sweep", "type": bool, "default": False,
          "help": "Enable the wandb sweep."},
     ]
@@ -59,7 +61,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_train["network"]["disc"]["num_inputs"] = (config_train["hparam"]["style"]["disc"]["obs_traj_len"] *
                                                          config_train["hparam"]["style"]["disc"]["num_obs"])
 
-        # Preprocess MotionLib config
+    # Preprocess MotionLib config
     if config_train["algo"]["name"] in ["styleAlgo", "skillAlgo", "highLevelAlgo"]:
         assert "joint_information_path" in config_env["env"], "Joint information not found in config"
         joint_info_path = Path(config_env["env"]['joint_information_path'])
@@ -72,16 +74,13 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
             config_train["algo"]["joint_information"] = joint_info[asset_filename]
         config_env["env"]["joint_information"] = joint_info[asset_filename]
 
-    # # Compute latent related values
-    # if config_train["algo"]["name"] in ["skillAlgo"]:
-    #     latent_dim = config_train["network"]["space"]["latent_dim"]
-    #     config_env["env"]["num_obs"] += latent_dim
-
     # Overriding parameters passed on the cli
     if args.test:
         config_train["test"] = args.test
     if args.num_envs:
         config_env["env"]["num_envs"] = args.num_envs
+    if args.memo:
+        config_train["algo"]["memo"] = args.memo
 
     full_experiment_name = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] + "_" +
                             datetime.now().strftime("%d-%H-%M-%S") + "_" + str(config_train["algo"].get("memo", "")))

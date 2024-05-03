@@ -6,8 +6,7 @@ algo:
   memo:
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
-#    assets/motions/amp_humanoid_run.npy
-    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/amp_humanoid_run.npy
 
 model:
   name: skill
@@ -18,7 +17,6 @@ network:
 
   space:
     latent_dim: 64
-#    latent_dim: 32
 
     continuous:
       mu_activation: None
@@ -58,7 +56,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
-  runs/Humanoid_00013600_converted.pth
+#  runs/keypointMaxObsTask_ep_8100_rew_7475.084_8100.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -93,7 +91,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -118,10 +116,8 @@ hparam:
 
     disc:
       input_divisor: 16
-      num_obs: 140
-#      num_obs: 125
-#      obs_traj_len: 4
-      obs_traj_len: 10
+      num_obs: 125
+      obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
