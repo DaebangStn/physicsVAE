@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: my_net
+  memo: share
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -93,7 +93,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 2e-5
