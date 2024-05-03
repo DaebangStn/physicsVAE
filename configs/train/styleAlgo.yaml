@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: fixed_norm
+  memo: compare_amp
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -78,7 +78,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 32768
+  minibatch_size: 8192
   mini_epochs: 6
 
   learning_rate: 2e-5
