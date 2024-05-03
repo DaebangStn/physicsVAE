@@ -1,6 +1,6 @@
 env:
   name: cartTask
-  num_envs: 32768
+  num_envs: 1024
   spacing: 4
 
   cart_asset_filename:  # from the project root
@@ -12,6 +12,6 @@ env:
 
 
 sim:
-  headless: True
+  headless: False
   device_id: 0
   engine: PHYSX

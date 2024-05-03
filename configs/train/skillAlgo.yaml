@@ -56,7 +56,7 @@ network:
       name: default
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
+  runs/ASE_Humanoid_13-22-35-27_loco_getup_failed/nn/Humanoid_converted.pth
 
 #  runs/keypointMaxObsTask_ep_8100_rew_7475.084_8100.pth
 

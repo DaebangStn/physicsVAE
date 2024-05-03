@@ -240,12 +240,12 @@ class StyleAlgorithm(CoreAlgorithm):
         return env.key_body_ids(key_body_names)
 
 
-@torch.jit.script
+# @torch.jit.script
 def disc_obs_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int]) -> torch.Tensor:
     aPos, aRot, dPos, aVel, aAnVel, dVel, keyPos = state
-    hPos = aPos[..., 2].unsqueeze(-1)
+    hPos = aPos[..., 2:3]
     inv_head_rot = calc_heading_quat_inv(aRot)
     aRot = quat_to_tan_norm(aRot)
 
@@ -307,7 +307,7 @@ def obs_transform(body_pos: torch.Tensor, body_rot: torch.Tensor, body_vel: torc
     return obs
 
 
-@torch.jit.script
+# @torch.jit.script
 def keyp_task_obs_angle_transform(
         obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
@@ -319,7 +319,7 @@ def keyp_task_obs_angle_transform(
     return obs, disc_obs
 
 
-@torch.jit.script
+# @torch.jit.script
 def motion_lib_angle_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int], traj_len: int) -> torch.Tensor:

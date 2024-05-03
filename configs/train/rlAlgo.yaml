@@ -31,7 +31,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/rlTask.pth
+  runs/cartTask_rlAlgo_03-15-21-05_overriden_rl_games_disc/nn/cartTask.pth
 
 
 hparam:
@@ -49,8 +49,11 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 65536
+  minibatch_size: 8192
   mini_epochs: 6
+
+  reward:
+    task_scale: 1.0
 
   learning_rate: 5e-4
   lr_schedule: adaptive
