@@ -2,7 +2,7 @@ from copy import deepcopy as dc
 import torch
 
 
-amp_pth_path = 'runs/Humanoid_00000100.pth'
+amp_pth_path = 'runs/Humanoid_00010000.pth'
 
 amp_pth = torch.load(amp_pth_path)
 model = amp_pth['model']

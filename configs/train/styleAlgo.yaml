@@ -43,7 +43,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_styleAlgo_01-14-58-59_fixed_norm/nn/keypointMaxObsTask.pth
 
-#  runs/Humanoid_00000100_converted.pth
+  runs/Humanoid_00010000_converted.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
