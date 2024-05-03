@@ -108,7 +108,7 @@ hparam:
     disc_scale: 1.0
     enc_scale: 1.0
 
-    show_on_player: False
+    show_on_player: True
 
   style:
     replay_buf:

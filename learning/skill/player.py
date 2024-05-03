@@ -30,7 +30,6 @@ class SkillPlayer(StylePlayer):
     def env_step(self, env, actions):
         obs_raw, rew, done, info = super(StylePlayer, self).env_step(env, actions)
         obs = self._post_process_obs(obs_raw)
-
         return obs, rew, done, info
 
     def env_reset(self, env):

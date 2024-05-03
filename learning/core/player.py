@@ -152,7 +152,7 @@ class CorePlayer(PpoPlayerContinuous):
         return {'obs': obs}, rew, done, info
 
     def env_reset(self, env):
-        return {'obs': super().env_reset(env)}
+        return {'obs': env.reset()}
 
     def get_action(self, obs, is_deterministic=False):
         obs = self.model.norm_obs(obs)
