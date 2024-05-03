@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: compare_amp
+  memo: ref_init
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -43,7 +43,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_styleAlgo_01-14-58-59_fixed_norm/nn/keypointMaxObsTask.pth
 
-#  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
+  runs/Humanoid_00000100_converted.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth

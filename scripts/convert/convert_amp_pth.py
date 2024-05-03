@@ -7,14 +7,14 @@ amp_pth_path = 'runs/Humanoid_00000100.pth'
 amp_pth = torch.load(amp_pth_path)
 model = amp_pth['model']
 
-model['a2c_network.disc.0.0.weight'] = dc(model['a2c_network._disc_mlp.0.weight'])
-model['a2c_network.disc.0.0.bias'] = dc(model['a2c_network._disc_mlp.0.bias'])
+model['a2c_network._disc.0.0.weight'] = dc(model['a2c_network._disc_mlp.0.weight'])
+model['a2c_network._disc.0.0.bias'] = dc(model['a2c_network._disc_mlp.0.bias'])
 
-model['a2c_network.disc.1.weight'] = dc(model['a2c_network._disc_logits.weight'])
-model['a2c_network.disc.1.bias'] = dc(model['a2c_network._disc_logits.bias'])
+model['a2c_network._disc.1.weight'] = dc(model['a2c_network._disc_logits.weight'])
+model['a2c_network._disc.1.bias'] = dc(model['a2c_network._disc_logits.bias'])
 
-model['a2c_network.disc.0.2.weight'] = dc(model['a2c_network._disc_mlp.2.weight'])
-model['a2c_network.disc.0.2.bias'] = dc(model['a2c_network._disc_mlp.2.bias'])
+model['a2c_network._disc.0.2.weight'] = dc(model['a2c_network._disc_mlp.2.weight'])
+model['a2c_network._disc.0.2.bias'] = dc(model['a2c_network._disc_mlp.2.bias'])
 
 model['a2c_network._disc_logistics.weight'] = dc(model['a2c_network._disc_logits.weight'])
 model['a2c_network._disc_logistics.bias'] = dc(model['a2c_network._disc_logits.bias'])
