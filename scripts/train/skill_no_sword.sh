@@ -1,8 +1,8 @@
 #!/bin/bash
 
 
-CFG_TRAIN="configs/train/skillAlgo_no_sword.yaml"
-CFG_ENV="configs/env/keypointMaxObsTask_sword.yaml"
+CFG_TRAIN="configs/train/skillAlgo_sword.yaml"
+CFG_ENV="configs/env/keypointMaxObsTask_no_sword.yaml"
 
 # Initialize variables
 MEMO=""
