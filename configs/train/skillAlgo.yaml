@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: debug
+  memo:
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -56,7 +56,7 @@ network:
       name: default
 
 checkpoint:  # from the project root
-#  runs/Humanoid_00013600_converted.pth
+#  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
 #  runs/keypointMaxObsTask_ep_8100_rew_7475.084_8100.pth
 
@@ -93,7 +93,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 16384
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -108,7 +108,7 @@ hparam:
     disc_scale: 1.0
     enc_scale: 1.0
 
-    show_on_player: True
+    show_on_player: False
 
   style:
     replay_buf:
