@@ -3,11 +3,11 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: share
+  memo: share_naive
   motion_file:
-#    assets/motions/dataset_humanoid.yaml
+    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
-    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: skill
@@ -118,8 +118,8 @@ hparam:
 
     disc:
       input_divisor: 16
-      num_obs: 140
-#      num_obs: 125
+#      num_obs: 140
+      num_obs: 125
 #      obs_traj_len: 4
       obs_traj_len: 10
       loss_coef: 5
