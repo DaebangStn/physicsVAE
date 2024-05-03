@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: skillAlgo
-  memo: my_net
+  memo: debug
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
@@ -56,7 +56,7 @@ network:
       name: default
 
 checkpoint:  # from the project root
-  runs/Humanoid_00013600_converted.pth
+#  runs/Humanoid_00013600_converted.pth
 
 #  runs/keypointMaxObsTask_ep_8100_rew_7475.084_8100.pth
 

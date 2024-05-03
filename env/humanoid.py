@@ -97,7 +97,7 @@ class HumanoidTask(VecTask):
             None
         """
         num_rigid_body, num_shape = self._compute_aggregate_option()
-        self_collision = False
+        self_collision = True
 
         sensor_install_sight = ["right_foot", "left_foot"]
         self._contact_body_ids = torch.tensor(create_sensors(self._gym, self._humanoid_asset, sensor_install_sight),
