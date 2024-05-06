@@ -363,11 +363,11 @@ class CoreAlgorithm(A2CAgent):
 
     def _calc_rollout_reward(self):
         task_reward = self.experience_buffer.tensor_dict['rewards'] * self._task_rew_scale
+        self.experience_buffer.tensor_dict['rewards'] *= self._task_rew_w
         self._write_stat(
             task_reward_mean=task_reward.mean().item(),
             task_reward_std=task_reward.std().item(),
         )
-        self.experience_buffer.tensor_dict['rewards'] *= self._task_rew_w
 
     def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
         if self.has_value_loss:

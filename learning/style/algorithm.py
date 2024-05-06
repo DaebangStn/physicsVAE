@@ -199,8 +199,8 @@ class StyleAlgorithm(CoreAlgorithm):
     def _calc_rollout_reward(self):
         super()._calc_rollout_reward()
         style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'], self.device)
-                        * self._disc_rew_w)
-        self.experience_buffer.tensor_dict['rewards'] += style_reward * self._disc_rew_scale
+                        * self._disc_rew_scale)
+        self.experience_buffer.tensor_dict['rewards'] += style_reward * self._disc_rew_w
         self._write_stat(
             disc_reward_mean=style_reward.mean().item(),
             disc_reward_std=style_reward.std().item(),
