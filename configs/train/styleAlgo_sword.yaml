@@ -89,6 +89,8 @@ hparam:
   entropy_coef: 0.0
 
   reward:
+    task_weight: 0.0
+    disc_weight: 1.0
     task_scale: 0.0
     disc_scale: 2.0
 
