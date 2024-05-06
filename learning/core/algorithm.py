@@ -42,6 +42,7 @@ class CoreAlgorithm(A2CAgent):
         self._jitter_input_divisor = None
 
         # Reward related
+        self._task_rew_w = None
         self._task_rew_scale = None
 
         # Loggers
@@ -361,12 +362,12 @@ class CoreAlgorithm(A2CAgent):
         return b_loss
 
     def _calc_rollout_reward(self):
-        task_reward = self.experience_buffer.tensor_dict['rewards']
+        task_reward = self.experience_buffer.tensor_dict['rewards'] * self._task_rew_scale
         self._write_stat(
             task_reward_mean=task_reward.mean().item(),
             task_reward_std=task_reward.std().item(),
         )
-        self.experience_buffer.tensor_dict['rewards'] *= self._task_rew_scale
+        self.experience_buffer.tensor_dict['rewards'] *= self._task_rew_w
 
     def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
         if self.has_value_loss:
@@ -409,6 +410,7 @@ class CoreAlgorithm(A2CAgent):
 
         # reward related
         config_rew = config_hparam['reward']
+        self._task_rew_w = config_rew['task_weight']
         self._task_rew_scale = config_rew['task_scale']
 
         # Loggers

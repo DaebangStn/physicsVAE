@@ -58,7 +58,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
-  runs/Humanoid_00013600_converted.pth
+  runs/keypointMaxObsTask_ep_15000_rew_7124.5435_15000.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -104,8 +104,11 @@ hparam:
   entropy_coef: 0.0
 
   reward:
+    task_weight: 0.0
+    disc_weight: 0.5
+    enc_weight: 0.5
     task_scale: 0.0
-    disc_scale: 1.0
+    disc_scale: 2.0
     enc_scale: 1.0
 
     show_on_player: False

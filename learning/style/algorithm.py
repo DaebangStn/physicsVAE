@@ -23,7 +23,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_size_mb = None
 
         # reward related
-        self._task_rew_scale = None
+        self._disc_rew_w = None
         self._disc_rew_scale = None
 
         # env related
@@ -163,6 +163,7 @@ class StyleAlgorithm(CoreAlgorithm):
 
         # reward related
         config_rew = config_hparam['reward']
+        self._disc_rew_w = config_rew['disc_weight']
         self._disc_rew_scale = config_rew['disc_scale']
 
     def _prepare_data(self, **kwargs):
@@ -197,7 +198,8 @@ class StyleAlgorithm(CoreAlgorithm):
 
     def _calc_rollout_reward(self):
         super()._calc_rollout_reward()
-        style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'], self.device)
+        style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'], self.device)
+                        * self._disc_rew_w)
         self.experience_buffer.tensor_dict['rewards'] += style_reward * self._disc_rew_scale
         self._write_stat(
             disc_reward_mean=style_reward.mean().item(),

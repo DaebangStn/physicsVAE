@@ -18,6 +18,7 @@ class SkillAlgorithm(StyleAlgorithm):
         self._latent_update_freq_min = None
 
         # reward related
+        self._enc_rew_w = None
         self._enc_rew_scale = None
 
         # placeholders for the current episode
@@ -110,7 +111,7 @@ class SkillAlgorithm(StyleAlgorithm):
     def _calc_rollout_reward(self):
         super()._calc_rollout_reward()
         skill_reward = enc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'],
-                                  self.experience_buffer.tensor_dict['latent'])
+                                  self.experience_buffer.tensor_dict['latent']) * self._enc_rew_w
         self.experience_buffer.tensor_dict['rewards'] += skill_reward * self._enc_rew_scale
         self._write_stat(
             enc_reward_mean=skill_reward.mean().item(),
@@ -128,6 +129,7 @@ class SkillAlgorithm(StyleAlgorithm):
         self._latent_update_freq_max = config_skill['latent']['update_freq_max']
         self._latent_update_freq_min = config_skill['latent']['update_freq_min']
         self._remain_latent_steps = torch.zeros(self.vec_env.num, dtype=torch.int32)
+        self._enc_rew_w = config_hparam['reward']['enc_weight']
         self._enc_rew_scale = config_hparam['reward']['enc_scale']
 
         # latent related

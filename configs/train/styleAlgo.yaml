@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: debug
+  memo: amp_reset
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -43,7 +43,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_styleAlgo_01-14-58-59_fixed_norm/nn/keypointMaxObsTask.pth
 
-  runs/Humanoid_00010000_converted.pth
+#  runs/Humanoid_00010000_converted.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
@@ -89,6 +89,8 @@ hparam:
   entropy_coef: 0.0
 
   reward:
+    task_weight: 0.0
+    disc_weight: 1.0
     task_scale: 0.0
     disc_scale: 2.0
 

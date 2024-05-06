@@ -188,24 +188,24 @@ class HumanoidTask(VecTask):
         #  dof and actor root state is used for observation
         self._buf["obs"] = torch.cat([self._buf["dPos"], self._buf["dVel"], self._buf["actor"]], dim=-1)
 
-    def _compute_reset(self):
-        height_criteria = 0.8
-        force_criteria = 1.0
-
-        actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
-        actor_down = actor_height < height_criteria
-        self._buf["recoveryCounter"] = torch.where(actor_down, self._buf["recoveryCounter"] + 1, 0)
-        self._buf["terminate"] = self._buf["recoveryCounter"] > self._recovery_limit
-        # contact_off = (self._buf["sensor"] ** 2).sum(dim=1) < force_criteria
-        # self._buf["terminate"] = actor_down  # & contact_off
-        tooLongEpisode = self._buf["elapsedStep"] > self._max_episode_steps
-        self._buf["reset"] = tooLongEpisode | self._buf["terminate"]
+    # def _compute_reset(self):
+    #     height_criteria = 0.8
+    #     force_criteria = 1.0
+    #
+    #     actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
+    #     actor_down = actor_height < height_criteria
+    #     self._buf["recoveryCounter"] = torch.where(actor_down, self._buf["recoveryCounter"] + 1, 0)
+    #     self._buf["terminate"] = self._buf["recoveryCounter"] > self._recovery_limit
+    #     # contact_off = (self._buf["sensor"] ** 2).sum(dim=1) < force_criteria
+    #     # self._buf["terminate"] = actor_down  # & contact_off
+    #     tooLongEpisode = self._buf["elapsedStep"] > self._max_episode_steps
+    #     self._buf["reset"] = tooLongEpisode | self._buf["terminate"]
 
     # AMP version reset
-    # def _compute_reset(self):
-    #     self._buf["reset"][:], self._buf["terminate"][:] = \
-    #         compute_amp_humanoid_reset(self._buf["reset"], self._buf["elapsedStep"], self._buf["contact"],
-    #                                    self._contact_body_ids, self._buf["rPos"], self._max_episode_steps, 0.15)
+    def _compute_reset(self):
+        self._buf["reset"][:], self._buf["terminate"][:] = \
+            compute_amp_humanoid_reset(self._buf["reset"], self._buf["elapsedStep"], self._buf["contact"],
+                                       self._contact_body_ids, self._buf["rPos"], self._max_episode_steps, 0.15)
 
     def _compute_reward(self):
         reset_reward = -100.0
