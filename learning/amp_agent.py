@@ -210,23 +210,12 @@ class AMPAgent(common_agent.CommonAgent):
         input_dict = {
             'is_train': False,
             'prev_actions': None,
-            'obs': processed_obs,
+            'obs': self.model.norm_obs(processed_obs),
             'rnn_states': self.rnn_states
         }
 
         with torch.no_grad():
             res_dict = self.model(input_dict)
-            if self.has_central_value:
-                states = obs_dict['states']
-                input_dict = {
-                    'is_train': False,
-                    'states': states,
-                }
-                value = self.get_central_value(input_dict)
-                res_dict['values'] = value
-
-        if self.normalize_value:
-            res_dict['values'] = self.value_mean_std(res_dict['values'], True)
 
         rand_action_mask = torch.bernoulli(rand_action_probs)
         det_action_mask = rand_action_mask == 0.0
@@ -339,6 +328,7 @@ class AMPAgent(common_agent.CommonAgent):
         actions_batch = input_dict['actions']
         obs_batch = input_dict['obs']
         obs_batch = self._preproc_obs(obs_batch)
+        obs_batch = self.model.norm_obs(obs_batch)
 
         amp_obs = input_dict['amp_obs'][0:self._amp_minibatch_size]
         amp_obs = self._preproc_amp_obs(amp_obs)
@@ -643,22 +633,6 @@ class AMPAgent(common_agent.CommonAgent):
             # self.writer.add_histogram('disc_rew', disc_r, self.frame)
 
         return disc_r
-
-    def _store_replay_amp_obs(self, amp_obs):
-        buf_size = self._amp_replay_buffer.get_buffer_size()
-        buf_total_count = self._amp_replay_buffer.get_total_count()
-        if (buf_total_count > buf_size):
-            keep_probs = to_torch(np.array([self._amp_replay_keep_prob] * amp_obs.shape[0]), device=self.ppo_device)
-            keep_mask = torch.bernoulli(keep_probs) == 1.0
-            amp_obs = amp_obs[keep_mask]
-
-        if (amp_obs.shape[0] > buf_size):
-            rand_idx = torch.randperm(amp_obs.shape[0])
-            rand_idx = rand_idx[:buf_size]
-            amp_obs = amp_obs[rand_idx]
-
-        self._amp_replay_buffer.store({'amp_obs': amp_obs})
-        return
 
     def _update_replay_buffer(self, amp_obs):
         demo_obs = self._demo_fetcher.fetch_traj(self._replay_num_demo_update)

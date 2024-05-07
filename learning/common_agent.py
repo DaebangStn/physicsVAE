@@ -535,6 +535,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
         self.model.eval()
         obs = obs_dict['obs']
         processed_obs = self._preproc_obs(obs)
+        processed_obs = self.model.norm_obs(processed_obs)
         value = self.model.critic(processed_obs)
         return value
 
