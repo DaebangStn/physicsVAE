@@ -62,7 +62,7 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
                                                          config_train["hparam"]["style"]["disc"]["num_obs"])
 
     # Preprocess MotionLib config
-    if config_train["algo"]["name"] in ["styleAlgo", "skillAlgo", "highLevelAlgo"]:
+    if config_train["algo"]["name"] in ["styleAlgo", "skillAlgo", "highLevelAlgo", "amp"]:
         assert "joint_information_path" in config_env["env"], "Joint information not found in config"
         joint_info_path = Path(config_env["env"]['joint_information_path'])
         assert joint_info_path.exists(), f"Config path {joint_info_path} does not exist"

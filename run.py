@@ -32,6 +32,8 @@ def build_runner():
     from learning.skill.algorithm import SkillAlgorithm
     from learning.skill.hPlayer import HighLevelPlayer
     from learning.skill.hAlgorithm import HighLevelAlgorithm
+    from learning.amp_agent import AMPAgent
+    from learning.amp_players import AMPPlayerContinuous
 
     from utils.rl_games import register_env_rl_games, register_algo_n_player, register_net_n_model
 
@@ -54,6 +56,7 @@ def build_runner():
     register_algo_n_player('styleAlgo', _runner, StyleAlgorithm, StylePlayer)
     register_algo_n_player('skillAlgo', _runner, SkillAlgorithm, SkillPlayer)
     register_algo_n_player('highLevelAlgo', _runner, HighLevelAlgorithm, HighLevelPlayer)
+    register_algo_n_player('amp', _runner, AMPAgent, AMPPlayerContinuous)
 
     return _runner
 

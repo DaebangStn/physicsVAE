@@ -29,7 +29,6 @@
 from matplotlib import pyplot
 from gym import spaces
 
-
 from rl_games.algos_torch.running_mean_std import RunningMeanStd
 from rl_games.algos_torch import torch_ext
 from rl_games.common import a2c_common
@@ -42,13 +41,16 @@ import time
 from datetime import datetime
 import numpy as np
 from torch import optim
-import torch 
+import torch
 from torch import nn
 
 import learning.replay_buffer as replay_buffer
-import learning.common_agent as common_agent 
+import learning.common_agent as common_agent
+from learning.style.algorithm import motion_lib_angle_transform, keyp_task_obs_angle_transform
+from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
 from tensorboardX import SummaryWriter
+
 
 class AMPAgent(common_agent.CommonAgent):
     def __init__(self, base_name, params):
@@ -57,13 +59,49 @@ class AMPAgent(common_agent.CommonAgent):
         if self._normalize_amp_input:
             self._amp_input_mean_std = RunningMeanStd(self._amp_observation_space.shape).to(self.ppo_device)
 
+        self._disc_obs_traj_len = 4
+
+        env_conf = params['config']['env_config']['env']
+        algo_conf = params['algo']
+        self._key_body_ids = self.find_key_body_ids(self.vec_env, algo_conf['joint_information']['key_body_names'])
+        self._dof_offsets = algo_conf['joint_information']['dof_offsets']
+        self._demo_fetcher = MotionLibFetcher(self._disc_obs_traj_len, self.vec_env.dt, self.device,
+                                              algo_conf['motion_file'], algo_conf['joint_information']['dof_body_ids'],
+                                              self._dof_offsets, self._key_body_ids)
+        if "reference_state_init_prob" in env_conf:
+            self.vec_env.set_motion_fetcher(self._demo_fetcher)
+
+        # build replay buffer
+        buf_size = params['hparam']['amp_obs_demo_buffer_size']
+        self._replay_buffer = {
+            'demo': SingleTensorBuffer(buf_size, self.device),
+            'rollout': SingleTensorBuffer(buf_size, self.device),
+        }
+        demo_obs = self._demo_fetcher.fetch_traj(buf_size // self._disc_obs_traj_len)
+        demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
+        self._replay_buffer['demo'].store(demo_obs)
+        self._replay_store_prob = params['hparam']['amp_replay_keep_prob']
+        self._replay_num_demo_update = int(params['hparam']['amp_batch_size'])
+        self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+
+        self.is_tensor_obses = True
         return
+
+    def env_reset(self, env_ids=None):
+        obs = super().env_reset(env_ids)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        return {'obs': obs, 'disc_obs': disc_obs}
+
+    def env_step(self, actions):
+        obs, rew, done, info = super().env_step(actions)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+        return {'obs': obs, 'disc_obs': disc_obs}, rew, done, info
 
     def init_tensors(self):
         super().init_tensors()
         self._build_amp_buffers()
         return
-    
+
     def set_eval(self):
         super().set_eval()
         if self._normalize_amp_input:
@@ -80,21 +118,21 @@ class AMPAgent(common_agent.CommonAgent):
         state = super().get_stats_weights()
         if self._normalize_amp_input:
             state['amp_input_mean_std'] = self._amp_input_mean_std.state_dict()
-        
+
         return state
 
     def set_stats_weights(self, weights):
         super().set_stats_weights(weights)
         if self._normalize_amp_input:
             self._amp_input_mean_std.load_state_dict(weights['amp_input_mean_std'])
-        
+
         return
 
     def play_steps(self):
         self.set_eval()
 
         epinfos = []
-        done_indices = []
+        done_indices = None
         update_list = self.update_list
 
         for n in range(self.horizon_length):
@@ -105,17 +143,19 @@ class AMPAgent(common_agent.CommonAgent):
             res_dict = self.get_action_values(self.obs, self._rand_action_probs)
 
             for k in update_list:
-                self.experience_buffer.update_data(k, n, res_dict[k]) 
+                self.experience_buffer.update_data(k, n, res_dict[k])
 
             if self.has_central_value:
                 self.experience_buffer.update_data('states', n, self.obs['states'])
 
+            self._pre_step(n)
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
+            self._post_step(n)
+
             shaped_rewards = self.rewards_shaper(rewards)
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
             self.experience_buffer.update_data('next_obses', n, self.obs['obs'])
             self.experience_buffer.update_data('dones', n, self.dones)
-            self.experience_buffer.update_data('amp_obs', n, infos['amp_obs'])
             self.experience_buffer.update_data('rand_action_mask', n, res_dict['rand_action_mask'])
 
             terminated = infos['terminate'].float()
@@ -128,7 +168,7 @@ class AMPAgent(common_agent.CommonAgent):
             self.current_lengths += 1
             all_done_indices = self.dones.nonzero(as_tuple=False)
             done_indices = all_done_indices[::self.num_agents]
-  
+
             self.game_rewards.update(self.current_rewards[done_indices])
             self.game_lengths.update(self.current_lengths[done_indices])
             self.algo_observer.process_infos(infos, done_indices)
@@ -137,10 +177,9 @@ class AMPAgent(common_agent.CommonAgent):
 
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
-            
-            if (self.vec_env.env.task.viewer):
-                # self._amp_debug(infos)
-                pass
+
+            if self.vec_env._viewer:
+                self._amp_debug(infos)
             done_indices = done_indices[:, 0]
 
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
@@ -163,16 +202,16 @@ class AMPAgent(common_agent.CommonAgent):
             batch_dict[k] = a2c_common.swap_and_flatten01(v)
 
         return batch_dict
-    
+
     def get_action_values(self, obs_dict, rand_action_probs):
         processed_obs = self._preproc_obs(obs_dict['obs'])
 
         self.model.eval()
         input_dict = {
             'is_train': False,
-            'prev_actions': None, 
-            'obs' : processed_obs,
-            'rnn_states' : self.rnn_states
+            'prev_actions': None,
+            'obs': processed_obs,
+            'rnn_states': self.rnn_states
         }
 
         with torch.no_grad():
@@ -181,14 +220,14 @@ class AMPAgent(common_agent.CommonAgent):
                 states = obs_dict['states']
                 input_dict = {
                     'is_train': False,
-                    'states' : states,
+                    'states': states,
                 }
                 value = self.get_central_value(input_dict)
                 res_dict['values'] = value
 
         if self.normalize_value:
             res_dict['values'] = self.value_mean_std(res_dict['values'], True)
-        
+
         rand_action_mask = torch.bernoulli(rand_action_probs)
         det_action_mask = rand_action_mask == 0.0
         res_dict['actions'][det_action_mask] = res_dict['mus'][det_action_mask]
@@ -199,11 +238,14 @@ class AMPAgent(common_agent.CommonAgent):
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
         self.dataset.values_dict['amp_obs'] = batch_dict['amp_obs']
-        self.dataset.values_dict['amp_obs_demo'] = batch_dict['amp_obs_demo']
-        self.dataset.values_dict['amp_obs_replay'] = batch_dict['amp_obs_replay']
-        
+        self.dataset.values_dict['amp_obs_demo'] = (
+            self._replay_buffer['rollout'].sample(self.batch_size)
+            if self._replay_buffer['rollout'].count > 0 else batch_dict['amp_obs'])
+        self.dataset.values_dict['amp_obs_replay'] = self._replay_buffer['demo'].sample(self.batch_size)
+
         rand_action_mask = batch_dict['rand_action_mask']
         self.dataset.values_dict['rand_action_mask'] = rand_action_mask
+        self._update_replay_buffer(batch_dict['amp_obs'])
         return
 
     def train_epoch(self):
@@ -213,21 +255,11 @@ class AMPAgent(common_agent.CommonAgent):
             if self.is_rnn:
                 batch_dict = self.play_steps_rnn()
             else:
-                batch_dict = self.play_steps() 
+                batch_dict = self.play_steps()
 
         play_time_end = time.time()
         update_time_start = time.time()
         rnn_masks = batch_dict.get('rnn_masks', None)
-        
-        self._update_amp_demos()
-        num_obs_samples = batch_dict['amp_obs'].shape[0]
-        amp_obs_demo = self._amp_obs_demo_buffer.sample(num_obs_samples)['amp_obs']
-        batch_dict['amp_obs_demo'] = amp_obs_demo
-
-        if (self._amp_replay_buffer.get_total_count() == 0):
-            batch_dict['amp_obs_replay'] = batch_dict['amp_obs']
-        else:
-            batch_dict['amp_obs_replay'] = self._amp_replay_buffer.sample(num_obs_samples)['amp_obs']
 
         self.set_train()
 
@@ -248,11 +280,13 @@ class AMPAgent(common_agent.CommonAgent):
             ep_kls = []
             for i in range(len(self.dataset)):
                 curr_train_info = self.train_actor_critic(self.dataset[i])
-                
-                if self.schedule_type == 'legacy':  
+
+                if self.schedule_type == 'legacy':
                     if self.multi_gpu:
                         curr_train_info['kl'] = self.hvd.average_value(curr_train_info['kl'], 'ep_kls')
-                    self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, curr_train_info['kl'].item())
+                    self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef,
+                                                                            self.epoch_num, 0,
+                                                                            curr_train_info['kl'].item())
                     self.update_lr(self.last_lr)
 
                 if (train_info is None):
@@ -262,19 +296,21 @@ class AMPAgent(common_agent.CommonAgent):
                 else:
                     for k, v in curr_train_info.items():
                         train_info[k].append(v)
-            
+
             av_kls = torch_ext.mean_list(train_info['kl'])
 
             if self.schedule_type == 'standard':
                 if self.multi_gpu:
                     av_kls = self.hvd.average_value(av_kls, 'ep_kls')
-                self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
+                self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num,
+                                                                        0, av_kls.item())
                 self.update_lr(self.last_lr)
 
         if self.schedule_type == 'standard_epoch':
             if self.multi_gpu:
                 av_kls = self.hvd.average_value(torch_ext.mean_list(kls), 'ep_kls')
-            self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
+            self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0,
+                                                                    av_kls.item())
             self.update_lr(self.last_lr)
 
         update_time_end = time.time()
@@ -282,7 +318,7 @@ class AMPAgent(common_agent.CommonAgent):
         update_time = update_time_end - update_time_start
         total_time = update_time_end - play_time_start
 
-        self._store_replay_amp_obs(batch_dict['amp_obs'])
+        # self._store_replay_amp_obs(batch_dict['amp_obs'])
 
         train_info['play_time'] = play_time
         train_info['update_time'] = update_time
@@ -312,7 +348,7 @@ class AMPAgent(common_agent.CommonAgent):
         amp_obs_demo = input_dict['amp_obs_demo'][0:self._amp_minibatch_size]
         amp_obs_demo = self._preproc_amp_obs(amp_obs_demo)
         amp_obs_demo.requires_grad_(True)
-        
+
         rand_action_mask = input_dict['rand_action_mask']
         rand_action_sum = torch.sum(rand_action_mask)
 
@@ -323,11 +359,11 @@ class AMPAgent(common_agent.CommonAgent):
 
         batch_dict = {
             'is_train': True,
-            'prev_actions': actions_batch, 
-            'obs' : obs_batch,
-            'amp_obs' : amp_obs,
-            'amp_obs_replay' : amp_obs_replay,
-            'amp_obs_demo' : amp_obs_demo
+            'prev_actions': actions_batch,
+            'obs': obs_batch,
+            'normalized_rollout_disc_obs': amp_obs,
+            'normalized_replay_disc_obs': amp_obs_replay,
+            'normalized_demo_disc_obs': amp_obs_demo
         }
 
         rnn_masks = None
@@ -343,9 +379,9 @@ class AMPAgent(common_agent.CommonAgent):
             entropy = res_dict['entropy']
             mu = res_dict['mus']
             sigma = res_dict['sigmas']
-            disc_agent_logit = res_dict['disc_agent_logit']
-            disc_agent_replay_logit = res_dict['disc_agent_replay_logit']
-            disc_demo_logit = res_dict['disc_demo_logit']
+            disc_agent_logit = res_dict['rollout_disc_logit']
+            disc_agent_replay_logit = res_dict['replay_disc_logit']
+            disc_demo_logit = res_dict['demo_disc_logit']
 
             a_info = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
             a_loss = a_info['actor_loss']
@@ -355,7 +391,7 @@ class AMPAgent(common_agent.CommonAgent):
             c_loss = c_info['critic_loss']
 
             b_loss = self.bound_loss(mu)
-            
+
             c_loss = torch.mean(c_loss)
             a_loss = torch.sum(rand_action_mask * a_loss) / rand_action_sum
             entropy = torch.sum(rand_action_mask * entropy) / rand_action_sum
@@ -367,8 +403,8 @@ class AMPAgent(common_agent.CommonAgent):
             disc_loss = disc_info['disc_loss']
 
             loss = a_loss + self.critic_coef * c_loss - self.entropy_coef * entropy + self.bounds_loss_coef * b_loss \
-                 + self._disc_coef * disc_loss
-            
+                   + self._disc_coef * disc_loss
+
             a_info['actor_loss'] = a_loss
             a_info['actor_clip_frac'] = a_clip_frac
             c_info['critic_loss'] = c_loss
@@ -393,7 +429,7 @@ class AMPAgent(common_agent.CommonAgent):
                 self.scaler.unscale_(self.optimizer)
                 nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_norm)
                 self.scaler.step(self.optimizer)
-                self.scaler.update()    
+                self.scaler.update()
         else:
             self.scaler.step(self.optimizer)
             self.scaler.update()
@@ -403,8 +439,8 @@ class AMPAgent(common_agent.CommonAgent):
         self.train_result = {
             'entropy': entropy,
             'kl': self._policy_kl(mu, sigma, old_mu_batch, old_sigma_batch),
-            'last_lr': self.last_lr, 
-            'lr_mul': lr_mul, 
+            'last_lr': self.last_lr,
+            'lr_mul': lr_mul,
             'b_loss': b_loss
         }
         self.train_result.update(a_info)
@@ -422,7 +458,7 @@ class AMPAgent(common_agent.CommonAgent):
     def _load_config_params(self, config):
         config = config["hparam"]
         super()._load_config_params(config)
-        
+
         # when eps greedy is enabled, rollouts will be generated using a mixture of
         # a deterministic and stochastic actions. The deterministic actions help to
         # produce smoother, less noisy, motions that can be used to train a better
@@ -438,7 +474,7 @@ class AMPAgent(common_agent.CommonAgent):
             spaces.Box(low=-np.Inf, high=np.Inf, shape=(500,), dtype=np.float32))
         self._amp_batch_size = int(config['amp_batch_size'])
         self._amp_minibatch_size = int(config['amp_minibatch_size'])
-        assert(self._amp_minibatch_size <= self.minibatch_size)
+        assert (self._amp_minibatch_size <= self.minibatch_size)
 
         self._disc_coef = config['disc_coef']
         self._disc_logit_reg = config['disc_logit_reg']
@@ -452,7 +488,7 @@ class AMPAgent(common_agent.CommonAgent):
         config = super()._build_net_config()
         config['amp_input_shape'] = self._amp_observation_space.shape
         return config
-    
+
     def _build_rand_action_probs(self):
         num_envs = self.vec_env.num
         env_ids = to_torch(np.arange(num_envs), dtype=torch.float32, device=self.ppo_device)
@@ -469,7 +505,7 @@ class AMPAgent(common_agent.CommonAgent):
 
     def _init_train(self):
         super()._init_train()
-        self._init_amp_demo_buf()
+        # self._init_amp_demo_buf()
         return
 
     def _disc_loss(self, disc_agent_logit, disc_demo_logit, obs_demo):
@@ -480,7 +516,7 @@ class AMPAgent(common_agent.CommonAgent):
         pred_loss = disc_loss.clone().detach()
 
         # logit reg
-        logit_weights = self.model.a2c_network.get_disc_logit_weights()
+        logit_weights = self.model.disc_logistics_weights
         disc_logit_loss = torch.sum(torch.square(logit_weights))
         disc_loss += self._disc_logit_reg * disc_logit_loss
 
@@ -494,7 +530,7 @@ class AMPAgent(common_agent.CommonAgent):
 
         # weight decay
         if (self._disc_weight_decay != 0):
-            disc_weights = self.model.a2c_network.get_disc_weights()
+            disc_weights = self.model.disc_weights
             disc_weights = torch.cat(disc_weights, dim=-1)
             disc_weight_decay = torch.sum(torch.square(disc_weights))
             disc_loss += self._disc_weight_decay * disc_weight_decay
@@ -517,7 +553,7 @@ class AMPAgent(common_agent.CommonAgent):
         bce = torch.nn.BCEWithLogitsLoss()
         loss = bce(disc_logits, torch.zeros_like(disc_logits))
         return loss
-    
+
     def _disc_loss_pos(self, disc_logits):
         bce = torch.nn.BCEWithLogitsLoss()
         loss = bce(disc_logits, torch.ones_like(disc_logits))
@@ -538,17 +574,10 @@ class AMPAgent(common_agent.CommonAgent):
         batch_shape = self.experience_buffer.obs_base_shape
         self.experience_buffer.tensor_dict['amp_obs'] = torch.zeros(batch_shape + self._amp_observation_space.shape,
                                                                     device=self.ppo_device)
-        self.experience_buffer.tensor_dict['rand_action_mask'] = torch.zeros(batch_shape, dtype=torch.float32, device=self.ppo_device)
-        
-        amp_obs_demo_buffer_size = int(self.config['amp_obs_demo_buffer_size'])
-        self._amp_obs_demo_buffer = replay_buffer.ReplayBuffer(amp_obs_demo_buffer_size, self.ppo_device)
-
-        self._amp_replay_keep_prob = self.config['amp_replay_keep_prob']
-        replay_buffer_size = int(self.config['amp_replay_buffer_size'])
-        self._amp_replay_buffer = replay_buffer.ReplayBuffer(replay_buffer_size, self.ppo_device)
-        
+        self.experience_buffer.tensor_dict['rand_action_mask'] = torch.zeros(batch_shape, dtype=torch.float32,
+                                                                             device=self.ppo_device)
         self._build_rand_action_probs()
-        
+
         self.tensor_list += ['amp_obs', 'rand_action_mask']
         return
 
@@ -561,7 +590,7 @@ class AMPAgent(common_agent.CommonAgent):
             self._amp_obs_demo_buffer.store({'amp_obs': curr_samples})
 
         return
-    
+
     def _update_amp_demos(self):
         new_amp_obs_demo = self._fetch_amp_obs_demo(self._amp_batch_size)
         self._amp_obs_demo_buffer.store({'amp_obs': new_amp_obs_demo})
@@ -574,15 +603,15 @@ class AMPAgent(common_agent.CommonAgent):
 
     def _combine_rewards(self, task_rewards, amp_rewards):
         disc_r = amp_rewards['disc_rewards']
-        
+
         combined_rewards = self._task_reward_w * task_rewards + \
-                         + self._disc_reward_w * disc_r
+                           + self._disc_reward_w * disc_r
         return combined_rewards
 
     def _eval_disc(self, amp_obs):
         proc_amp_obs = self._preproc_amp_obs(amp_obs)
-        return self.model.a2c_network.eval_disc(proc_amp_obs)
-    
+        return self.model.disc(proc_amp_obs)
+
     def _calc_advs(self, batch_dict):
         returns = batch_dict['returns']
         values = batch_dict['values']
@@ -605,7 +634,7 @@ class AMPAgent(common_agent.CommonAgent):
     def _calc_disc_rewards(self, amp_obs):
         with torch.no_grad():
             disc_logits = self._eval_disc(amp_obs)
-            prob = 1 / (1 + torch.exp(-disc_logits)) 
+            prob = 1 / (1 + torch.exp(-disc_logits))
             disc_r = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
             disc_r *= self._disc_reward_scale
             # print("disc_pred: ", disc_logits, disc_r)
@@ -631,7 +660,20 @@ class AMPAgent(common_agent.CommonAgent):
         self._amp_replay_buffer.store({'amp_obs': amp_obs})
         return
 
-    
+    def _update_replay_buffer(self, amp_obs):
+        demo_obs = self._demo_fetcher.fetch_traj(self._replay_num_demo_update)
+        demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
+        self._replay_buffer['demo'].store(demo_obs)
+
+        rollout_buf = self._replay_buffer['rollout']
+        if rollout_buf.count == rollout_buf.size:
+            mask = torch.rand(amp_obs.shape[0]) < self._replay_store_prob
+            amp_obs = amp_obs[mask]
+        elif amp_obs.shape[0] > rollout_buf.size:
+            amp_obs = amp_obs[-rollout_buf.size:]
+
+        rollout_buf.store(amp_obs)
+
     def _record_train_batch_info(self, batch_dict, train_info):
         super()._record_train_batch_info(batch_dict, train_info)
         train_info['disc_rewards'] = batch_dict['disc_rewards']
@@ -644,14 +686,24 @@ class AMPAgent(common_agent.CommonAgent):
 
         self.writer.add_scalar('info/disc_agent_acc', torch_ext.mean_list(train_info['disc_agent_acc']).item(), frame)
         self.writer.add_scalar('info/disc_demo_acc', torch_ext.mean_list(train_info['disc_demo_acc']).item(), frame)
-        self.writer.add_scalar('info/disc_agent_logit', torch_ext.mean_list(train_info['disc_agent_logit']).item(), frame)
+        self.writer.add_scalar('info/disc_agent_logit', torch_ext.mean_list(train_info['disc_agent_logit']).item(),
+                               frame)
         self.writer.add_scalar('info/disc_demo_logit', torch_ext.mean_list(train_info['disc_demo_logit']).item(), frame)
-        self.writer.add_scalar('info/disc_grad_penalty', torch_ext.mean_list(train_info['disc_grad_penalty']).item(), frame)
+        self.writer.add_scalar('info/disc_grad_penalty', torch_ext.mean_list(train_info['disc_grad_penalty']).item(),
+                               frame)
         self.writer.add_scalar('info/disc_logit_loss', torch_ext.mean_list(train_info['disc_logit_loss']).item(), frame)
 
         disc_reward_std, disc_reward_mean = torch.std_mean(train_info['disc_rewards'])
         self.writer.add_scalar('info/disc_reward_mean', disc_reward_mean.item(), frame)
         self.writer.add_scalar('info/disc_reward_std', disc_reward_std.item(), frame)
+        return
+
+    def _pre_step(self, n):
+        self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)  # TODO; check done is correct
+
+    def _post_step(self, n):
+        self._disc_obs_buf.push(self.obs['disc_obs'])
+        self.experience_buffer.update_data('amp_obs', n, self._disc_obs_buf.history)
         return
 
     def _amp_debug(self, info):

@@ -206,6 +206,7 @@ class HumanoidTask(VecTask):
         self._buf["reset"][:], self._buf["terminate"][:] = \
             compute_amp_humanoid_reset(self._buf["reset"], self._buf["elapsedStep"], self._buf["contact"],
                                        self._contact_body_ids, self._buf["rPos"], self._max_episode_steps, 0.15)
+        self._buf["info"]["terminate"] = self._buf["terminate"]
 
     def _compute_reward(self):
         reset_reward = -100.0

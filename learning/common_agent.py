@@ -47,8 +47,6 @@ import torch
 from torch import optim
 
 import learning.amp_datasets as amp_datasets
-from learning.style.algorithm import motion_lib_angle_transform
-from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
 from tensorboardX import SummaryWriter
 
@@ -61,7 +59,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
         self.is_discrete = False
         self._setup_action_space()
-        self.bounds_loss_coef = config.get('bounds_loss_coef', None)
+        self.bounds_loss_coef = config.get('bounds_loss_coef', 10)
         self.clip_actions = config.get('clip_actions', True)
         self._save_intermediate = config.get('save_intermediate', False)
         self.seq_len = config.get('seq_length', 1)
@@ -103,6 +101,8 @@ class CommonAgent(a2c_continuous.A2CAgent):
         self.dataset = amp_datasets.AMPDataset(self.batch_size, self.minibatch_size, self.is_discrete, self.is_rnn,
                                                self.ppo_device, self.seq_len)
         self.algo_observer.after_init(self)
+        if self.normalize_value:
+            self.value_mean_std = self.model.value_mean_std
 
         return
 
@@ -139,55 +139,52 @@ class CommonAgent(a2c_continuous.A2CAgent):
             sum_time = train_info['total_time']
             total_time += sum_time
             frame = self.frame
-            if self.multi_gpu:
-                self.hvd.sync_stats(self)
 
-            if self.rank == 0:
-                scaled_time = sum_time
-                scaled_play_time = train_info['play_time']
-                curr_frames = self.curr_frames
-                self.frame += curr_frames
-                if self.print_stats:
-                    fps_step = curr_frames / scaled_play_time
-                    fps_total = curr_frames / scaled_time
-                    print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
+            scaled_time = sum_time
+            scaled_play_time = train_info['play_time']
+            curr_frames = self.curr_frames
+            self.frame += curr_frames
+            if self.print_stats:
+                fps_step = curr_frames / scaled_play_time
+                fps_total = curr_frames / scaled_time
+                print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
 
-                self.writer.add_scalar('performance/total_fps', curr_frames / scaled_time, frame)
-                self.writer.add_scalar('performance/step_fps', curr_frames / scaled_play_time, frame)
-                self.writer.add_scalar('info/epochs', epoch_num, frame)
-                self._log_train_info(train_info, frame)
+            self.writer.add_scalar('performance/total_fps', curr_frames / scaled_time, frame)
+            self.writer.add_scalar('performance/step_fps', curr_frames / scaled_play_time, frame)
+            self.writer.add_scalar('info/epochs', epoch_num, frame)
+            self._log_train_info(train_info, frame)
 
-                self.algo_observer.after_print_stats(frame, epoch_num, total_time)
+            self.algo_observer.after_print_stats(frame, epoch_num, total_time)
 
-                if self.game_rewards.current_size > 0:
-                    mean_rewards = self._get_mean_rewards()
-                    mean_lengths = self.game_lengths.get_mean()
+            if self.game_rewards.current_size > 0:
+                mean_rewards = self._get_mean_rewards()
+                mean_lengths = self.game_lengths.get_mean()
 
-                    for i in range(self.value_size):
-                        self.writer.add_scalar('rewards{0}/frame'.format(i), mean_rewards[i], frame)
-                        self.writer.add_scalar('rewards{0}/iter'.format(i), mean_rewards[i], epoch_num)
-                        self.writer.add_scalar('rewards{0}/time'.format(i), mean_rewards[i], total_time)
+                for i in range(self.value_size):
+                    self.writer.add_scalar('rewards/frame'.format(i), mean_rewards[i], frame)
+                    self.writer.add_scalar('rewards/iter'.format(i), mean_rewards[i], epoch_num)
+                    self.writer.add_scalar('rewards/time'.format(i), mean_rewards[i], total_time)
 
-                    self.writer.add_scalar('episode_lengths/frame', mean_lengths, frame)
-                    self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
+                self.writer.add_scalar('episode_lengths/frame', mean_lengths, frame)
+                self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
 
-                    if self.has_self_play_config:
-                        self.self_play_manager.update(self)
+                if self.has_self_play_config:
+                    self.self_play_manager.update(self)
 
-                if self.save_freq > 0:
-                    if (epoch_num % self.save_freq == 0):
-                        self.save(model_output_file)
-
-                        if (self._save_intermediate):
-                            int_model_output_file = model_output_file + '_' + str(epoch_num).zfill(8)
-                            self.save(int_model_output_file)
-
-                if epoch_num > self.max_epochs:
+            if self.save_freq > 0:
+                if (epoch_num % self.save_freq == 0):
                     self.save(model_output_file)
-                    print('MAX EPOCHS NUM!')
-                    return self.last_mean_rewards, epoch_num
 
-                update_time = 0
+                    if (self._save_intermediate):
+                        int_model_output_file = model_output_file + '_' + str(epoch_num).zfill(8)
+                        self.save(int_model_output_file)
+
+            if epoch_num > self.max_epochs:
+                self.save(model_output_file)
+                print('MAX EPOCHS NUM!')
+                return self.last_mean_rewards, epoch_num
+
+            update_time = 0
         return
 
     def set_full_state_weights(self, weights):
@@ -490,7 +487,6 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
     def env_reset(self, env_ids=None):
         obs = self.vec_env.reset(env_ids)
-        obs = self.obs_to_tensors(obs)
         return obs
 
     def bound_loss(self, mu):
@@ -539,10 +535,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
         self.model.eval()
         obs = obs_dict['obs']
         processed_obs = self._preproc_obs(obs)
-        value = self.model.a2c_network.eval_critic(processed_obs)
-
-        if self.normalize_value:
-            value = self.value_mean_std(value, True)
+        value = self.model.critic(processed_obs)
         return value
 
     def _actor_loss(self, old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip):
