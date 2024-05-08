@@ -99,7 +99,10 @@ class AMPAgent(common_agent.CommonAgent):
 
     def init_tensors(self):
         super().init_tensors()
-        self._build_amp_buffers()
+        batch_shape = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['amp_obs'] = torch.zeros(batch_shape + self._amp_observation_space.shape,
+                                                                    device=self.ppo_device)
+        self.tensor_list += ['amp_obs']
         return
 
     def set_eval(self):
@@ -130,13 +133,10 @@ class AMPAgent(common_agent.CommonAgent):
 
     def play_steps(self):
         self.set_eval()
-
-        epinfos = []
         done_indices = None
         update_list = self.update_list
 
         for n in range(self.horizon_length):
-
             self.obs = self.env_reset(done_indices)
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
 
@@ -145,16 +145,12 @@ class AMPAgent(common_agent.CommonAgent):
             for k in update_list:
                 self.experience_buffer.update_data(k, n, res_dict[k])
 
-            if self.has_central_value:
-                self.experience_buffer.update_data('states', n, self.obs['states'])
-
             self._pre_step(n)
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
             self._post_step(n)
 
             shaped_rewards = self.rewards_shaper(rewards)
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
-            self.experience_buffer.update_data('next_obses', n, self.obs['obs'])
             self.experience_buffer.update_data('dones', n, self.dones)
 
             terminated = infos['terminate'].float()
@@ -176,9 +172,6 @@ class AMPAgent(common_agent.CommonAgent):
 
             self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
-
-            if self.vec_env._viewer:
-                self._amp_debug(infos)
             done_indices = done_indices[:, 0]
 
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
@@ -203,13 +196,11 @@ class AMPAgent(common_agent.CommonAgent):
         return batch_dict
 
     def get_action_values(self, obs_dict):
-        processed_obs = self._preproc_obs(obs_dict['obs'])
-
         self.model.eval()
         input_dict = {
             'is_train': False,
             'prev_actions': None,
-            'obs': self.model.norm_obs(processed_obs),
+            'obs': self.model.norm_obs(obs_dict['obs']),
             'rnn_states': self.rnn_states
         }
 
@@ -239,22 +230,13 @@ class AMPAgent(common_agent.CommonAgent):
 
         play_time_end = time.time()
         update_time_start = time.time()
-        rnn_masks = batch_dict.get('rnn_masks', None)
-
         self.set_train()
 
         self.curr_frames = batch_dict.pop('played_frames')
         self.prepare_dataset(batch_dict)
         self.algo_observer.after_steps()
 
-        if self.has_central_value:
-            self.train_central_value()
-
         train_info = None
-
-        if self.is_rnn:
-            frames_mask_ratio = rnn_masks.sum().item() / (rnn_masks.nelement())
-            print(frames_mask_ratio)
 
         for _ in range(0, self.mini_epochs_num):
             for i in range(len(self.dataset)):
@@ -309,7 +291,6 @@ class AMPAgent(common_agent.CommonAgent):
         return_batch = input_dict['returns']
         actions_batch = input_dict['actions']
         obs_batch = input_dict['obs']
-        obs_batch = self._preproc_obs(obs_batch)
         obs_batch = self.model.norm_obs(obs_batch)
 
         amp_obs = input_dict['amp_obs'][0:self._amp_minibatch_size]
@@ -370,11 +351,8 @@ class AMPAgent(common_agent.CommonAgent):
             a_info['actor_clip_frac'] = a_clip_frac
             c_info['critic_loss'] = c_loss
 
-            if self.multi_gpu:
-                self.optimizer.zero_grad()
-            else:
-                for param in self.model.parameters():
-                    param.grad = None
+            for param in self.model.parameters():
+                param.grad = None
 
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
@@ -404,14 +382,6 @@ class AMPAgent(common_agent.CommonAgent):
     def _load_config_params(self, config):
         config = config["hparam"]
         super()._load_config_params(config)
-
-        # when eps greedy is enabled, rollouts will be generated using a mixture of
-        # a deterministic and stochastic actions. The deterministic actions help to
-        # produce smoother, less noisy, motions that can be used to train a better
-        # discriminator. If the discriminator is only trained with jittery motions
-        # from noisy actions, it can learn to phone in on the jitteriness to
-        # differential between real and fake samples.
-        self._enable_eps_greedy = bool(config['enable_eps_greedy'])
 
         self._task_reward_w = config['task_reward_w']
         self._disc_reward_w = config['disc_reward_w']
@@ -493,13 +463,6 @@ class AMPAgent(common_agent.CommonAgent):
         demo_acc = torch.mean(demo_acc.float())
         return agent_acc, demo_acc
 
-    def _build_amp_buffers(self):
-        batch_shape = self.experience_buffer.obs_base_shape
-        self.experience_buffer.tensor_dict['amp_obs'] = torch.zeros(batch_shape + self._amp_observation_space.shape,
-                                                                    device=self.ppo_device)
-        self.tensor_list += ['amp_obs']
-        return
-
     def _combine_rewards(self, task_rewards, amp_rewards):
         disc_r = amp_rewards['disc_rewards']
 
@@ -510,16 +473,6 @@ class AMPAgent(common_agent.CommonAgent):
     def _eval_disc(self, amp_obs):
         proc_amp_obs = self.model.norm_disc_obs(amp_obs)
         return self.model.disc(proc_amp_obs)
-
-    def _calc_advs(self, batch_dict):
-        returns = batch_dict['returns']
-        values = batch_dict['values']
-        advantages = returns - values
-        advantages = torch.sum(advantages, axis=1)
-        if self.normalize_advantage:
-            advantages = torch_ext.normalization_with_masks(advantages, None)
-
-        return advantages
 
     def _calc_amp_rewards(self, amp_obs):
         disc_r = self._calc_disc_rewards(amp_obs)
@@ -534,11 +487,6 @@ class AMPAgent(common_agent.CommonAgent):
             prob = 1 / (1 + torch.exp(-disc_logits))
             disc_r = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=self.ppo_device)))
             disc_r *= self._disc_reward_scale
-            # print("disc_pred: ", disc_logits, disc_r)
-
-            # self.writer.add_histogram('disc', disc_logits, self.frame)
-            # self.writer.add_histogram('disc_rew', disc_r, self.frame)
-
         return disc_r
 
     def _update_replay_buffer(self, amp_obs):

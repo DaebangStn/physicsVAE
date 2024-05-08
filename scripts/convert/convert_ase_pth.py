@@ -2,7 +2,7 @@ from copy import deepcopy as dc
 import torch
 
 
-ase_pth_path = 'runs/Humanoid_00001800.pth'
+ase_pth_path = 'runs/Humanoid_00005000.pth'
 
 ase_pth = torch.load(ase_pth_path)
 model = ase_pth['model']

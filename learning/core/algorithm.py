@@ -77,18 +77,14 @@ class CoreAlgorithm(A2CAgent):
             res_dict = self.model(batch_dict)
             action_log_probs = res_dict['prev_neglogp']
             normalized_values = res_dict['values']
-            entropy = res_dict['entropy']
+            entropy = res_dict['entropy'].mean()
             mu = res_dict['mus']
             sigma = res_dict['sigmas']
 
             # 3. Calculate the loss
-            a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
-            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values)
-            b_loss = self._bound_loss(mu)
-
-            losses, _ = torch_ext.apply_masks(  # vestige of RNN
-                [a_loss.unsqueeze(1), c_loss, entropy.unsqueeze(1), b_loss.unsqueeze(1)])
-            a_loss, c_loss, entropy, b_loss = losses
+            a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip).mean()
+            c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values).mean()
+            b_loss = self._bound_loss(mu).mean()
 
             loss = (a_loss
                     + c_loss * self.critic_coef
@@ -100,17 +96,14 @@ class CoreAlgorithm(A2CAgent):
             self._write_stat(total_loss=loss.detach())
 
             # 4. Zero the gradients
-            if self.multi_gpu:
-                self.optimizer.zero_grad()
-            else:
-                for param in self.model.parameters():
-                    param.grad = None
+            for param in self.model.parameters():
+                param.grad = None
 
         # 5. Back propagate the loss
         self.scaler.scale(loss).backward()
-        # self.trancate_gradients_and_step()
-        self.scaler.step(self.optimizer)
-        self.scaler.update()
+        self.trancate_gradients_and_step()
+        # self.scaler.step(self.optimizer)
+        # self.scaler.update()
 
         # 6. Store the results
         self.diagnostics.mini_batch(
@@ -336,10 +329,8 @@ class CoreAlgorithm(A2CAgent):
             2. Add or sample custom observation
         """
         super().prepare_dataset(batch_dict)
-        dataset_dict = self.dataset.values_dict
-        dataset_dict['obs'] = self.model.norm_obs(dataset_dict['obs'])
-
         if self._jitter_obs_buf is not None:
+            dataset_dict = self.dataset.values_dict
             jitter_input_size = max(batch_dict['jitter_obs'].shape[0] // self._jitter_input_divisor, 2)
             dataset_dict['jitter_obs'] = batch_dict['jitter_obs'][0:jitter_input_size]
 
@@ -453,6 +444,7 @@ class CoreAlgorithm(A2CAgent):
         old_sigma_batch = input_dict['sigma']
         return_batch = input_dict['returns']
         actions_batch = input_dict['actions']
+        obs_batch = self.model.norm_obs(input_dict['obs'])
 
         lr_mul = self._last_last_lr / self.last_lr
         self._last_last_lr = self.last_lr
@@ -461,8 +453,8 @@ class CoreAlgorithm(A2CAgent):
         batch_dict = {
             'is_train': True,
             'prev_actions': actions_batch,
+            'obs': obs_batch,
         }
-        batch_dict.update(input_dict)
 
         return (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch, old_sigma_batch,
                 return_batch, value_preds_batch)

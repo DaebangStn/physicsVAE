@@ -112,8 +112,8 @@ class VecTask:
     def _create_ground(self):
         param = gymapi.PlaneParams()
         param.normal = gymapi.Vec3(0.0, 0.0, 1.0)
-        param.dynamic_friction = 0.5
-        param.static_friction = 0.5
+        param.dynamic_friction = 1
+        param.static_friction = 1
         param.restitution = 0.0
         self._gym.add_ground(self._sim, param)
 

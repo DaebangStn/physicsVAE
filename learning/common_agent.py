@@ -108,11 +108,8 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
     def init_tensors(self):
         super().init_tensors()
-        self.experience_buffer.tensor_dict['next_obses'] = torch.zeros_like(self.experience_buffer.tensor_dict['obses'])
         self.experience_buffer.tensor_dict['next_values'] = torch.zeros_like(
             self.experience_buffer.tensor_dict['values'])
-
-        self.tensor_list += ['next_obses']
         return
 
     def train(self):
@@ -304,7 +301,6 @@ class CommonAgent(a2c_continuous.A2CAgent):
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
             shaped_rewards = self.rewards_shaper(rewards)
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
-            self.experience_buffer.update_data('next_obses', n, self.obs['obs'])
             self.experience_buffer.update_data('dones', n, self.dones)
 
             terminated = infos['terminate'].float()
