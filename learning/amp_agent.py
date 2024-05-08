@@ -514,12 +514,10 @@ class AMPAgent(common_agent.CommonAgent):
     def _calc_advs(self, batch_dict):
         returns = batch_dict['returns']
         values = batch_dict['values']
-        rand_action_mask = torch.ones_like(values)
-
         advantages = returns - values
         advantages = torch.sum(advantages, axis=1)
         if self.normalize_advantage:
-            advantages = torch_ext.normalization_with_masks(advantages, rand_action_mask)
+            advantages = torch_ext.normalization_with_masks(advantages, None)
 
         return advantages
 
