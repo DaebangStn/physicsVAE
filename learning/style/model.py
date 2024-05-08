@@ -33,7 +33,6 @@ class StyleModel(CoreModel):
 
         def disc(self, normalized_obs):
             return self.a2c_network.disc(normalized_obs)
-            # return self.a2c_network.eval_disc(normalized_obs)
 
         def disc_load_state_dict(self, state_dict):
             self.a2c_network.disc_load_state_dict(state_dict)
@@ -48,10 +47,8 @@ class StyleModel(CoreModel):
 
         @property
         def disc_logistics_weights(self):
-            # return self.a2c_network.get_disc_logit_weights()
             return self.a2c_network.disc_logistics_weights
 
         @property
         def disc_weights(self):
-            # return self.a2c_network.get_disc_weights()
             return self.a2c_network.disc_weights

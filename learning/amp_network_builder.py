@@ -108,15 +108,17 @@ class AMPBuilder(network_builder.A2CBuilder):
             value = self.value_act(self.value(c_out))
             return value
 
-        def eval_disc(self, amp_obs):
+        def disc(self, amp_obs):
             disc_mlp_out = self._disc_mlp(amp_obs)
             disc_logits = self._disc_logits(disc_mlp_out)
             return disc_logits
 
-        def get_disc_logit_weights(self):
+        @property
+        def disc_logistics_weights(self):
             return torch.flatten(self._disc_logits.weight)
 
-        def get_disc_weights(self):
+        @property
+        def disc_weights(self):
             weights = []
             for m in self._disc_mlp.modules():
                 if isinstance(m, nn.Linear):

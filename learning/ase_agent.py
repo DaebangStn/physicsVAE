@@ -175,8 +175,6 @@ class ASEAgent(amp_agent.AMPAgent):
 
         ase_latents = input_dict['ase_latents']
 
-        lr = self.last_lr
-        kl = 1.0
         lr_mul = 1.0
         curr_e_clip = lr_mul * self.e_clip
 
@@ -247,31 +245,17 @@ class ASEAgent(amp_agent.AMPAgent):
         self.scaler.scale(loss).backward()
         #TODO: Refactor this ugliest code of the year
         if self.truncate_grads:
-            if self.multi_gpu:
-                self.optimizer.synchronize()
-                self.scaler.unscale_(self.optimizer)
-                nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_norm)
-                with self.optimizer.skip_synchronize():
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-            else:
-                self.scaler.unscale_(self.optimizer)
-                nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_norm)
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
+            self.scaler.unscale_(self.optimizer)
+            nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_norm)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
         else:
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-        with torch.no_grad():
-            reduce_kl = not self.is_rnn
-            kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
-            if self.is_rnn:
-                kl_dist = (kl_dist * rnn_masks).sum() / rnn_masks.numel()  #/ sum_mask
-
         self.train_result = {
             'entropy': entropy,
-            'kl': kl_dist,
+            'kl': self._policy_kl(mu, sigma, old_mu_batch, old_sigma_batch),
             'last_lr': self.last_lr,
             'lr_mul': lr_mul,
             'b_loss': b_loss

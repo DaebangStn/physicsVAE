@@ -175,6 +175,7 @@ class ASEBuilder(amp_network_builder.AMPBuilder):
                 return mu, logstd
             return
 
+        @property
         def get_enc_weights(self):
             weights = []
             for m in self._enc_mlp.modules():
@@ -243,7 +244,7 @@ class ASEBuilder(amp_network_builder.AMPBuilder):
 
             return
 
-        def eval_enc(self, amp_obs):
+        def enc(self, amp_obs):
             enc_mlp_out = self._enc_mlp(amp_obs)
             enc_output = self._enc(enc_mlp_out)
             enc_output = torch.nn.functional.normalize(enc_output, dim=-1)
