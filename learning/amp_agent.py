@@ -54,12 +54,12 @@ from tensorboardX import SummaryWriter
 
 class AMPAgent(common_agent.CommonAgent):
     def __init__(self, base_name, params):
+        self._disc_obs_traj_len = params['hparam']['obs_traj_len']
+
         super().__init__(base_name, params)
 
         if self._normalize_amp_input:
             self._amp_input_mean_std = RunningMeanStd(self._amp_observation_space.shape).to(self.ppo_device)
-
-        self._disc_obs_traj_len = 4
 
         env_conf = params['config']['env_config']['env']
         algo_conf = params['algo']
@@ -387,7 +387,7 @@ class AMPAgent(common_agent.CommonAgent):
         self._disc_reward_w = config['disc_reward_w']
 
         self._amp_observation_space = self.env_info['amp_observation_space'] = (
-            spaces.Box(low=-np.Inf, high=np.Inf, shape=(500,), dtype=np.float32))
+            spaces.Box(low=-np.Inf, high=np.Inf, shape=(self._disc_obs_traj_len * config['num_disc_obs'],), dtype=np.float32))
         self._amp_batch_size = int(config['amp_batch_size'])
         self._amp_minibatch_size = int(config['amp_minibatch_size'])
         assert (self._amp_minibatch_size <= self.minibatch_size)

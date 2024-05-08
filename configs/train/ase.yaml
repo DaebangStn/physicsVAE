@@ -18,6 +18,7 @@ network:
   separate: True
 
   space:
+    latent_dim: 32
     continuous:
       mu_activation: None
       sigma_activation: None
@@ -34,9 +35,21 @@ network:
     initializer:
       name: default
 
+  latent:
+    build: True
+    units: [512, 256]
+
   disc:
     units: [1024, 512]
     activation: relu
+    initializer:
+      name: default
+
+  enc:
+    units: [1024, 512]
+    activation: relu
+    separate: False
+
     initializer:
       name: default
 
@@ -50,8 +63,6 @@ checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
 
 hparam:
-  multi_gpu: False
-  ppo: True
   mixed_precision: False
   normalize_input: True
   normalize_value: True
@@ -63,10 +74,9 @@ hparam:
   learning_rate: 2e-5
   lr_schedule: constant
   score_to_win: 20000
-  max_epochs: 10000
+  max_epochs: 100000
   save_best_after: 50
   save_frequency: 100
-  save_intermediate: True
   print_stats: True
   grad_norm: 1.0
   entropy_coef: 0.0
@@ -79,21 +89,40 @@ hparam:
   clip_value: False
   seq_len: 4
   bounds_loss_coef: 10
-  amp_obs_demo_buffer_size: 200000
-  amp_replay_buffer_size: 200000
+  amp_obs_demo_buffer_size: 75000
+  amp_replay_buffer_size: 75000
   amp_replay_keep_prob: 0.01
   amp_batch_size: 128
-  amp_minibatch_size: 512
+  amp_minibatch_size: 256
   disc_coef: 5
   disc_logit_reg: 0.01
   disc_grad_penalty: 5
   disc_reward_scale: 2
   disc_weight_decay: 0.0001
   normalize_amp_input: True
-  enable_eps_greedy: False
+  enable_eps_greedy: True
+
+  latent_dim: 32
+  latent_steps_min: 1
+  latent_steps_max: 150
+
+  amp_latent_grad_bonus: 0.00
+  amp_latent_grad_bonus_max: 100.0
+  amp_diversity_bonus: 0.01
+  amp_diversity_tar: 1.0
+
+  enc_coef: 5
+  enc_weight_decay: 0.0000
+  enc_reward_scale: 1
+  enc_grad_penalty: 0
 
   task_reward_w: 0.0
-  disc_reward_w: 1.0
+  disc_reward_w: 0.5
+  enc_reward_w: 0.5
+
+
+  obs_traj_len: 10
+  num_disc_obs: 140
 
 
 seed: 1

@@ -201,7 +201,7 @@ class HumanoidTask(VecTask):
     #     tooLongEpisode = self._buf["elapsedStep"] > self._max_episode_steps
     #     self._buf["reset"] = tooLongEpisode | self._buf["terminate"]
 
-    # AMP version reset
+    # # AMP version reset
     def _compute_reset(self):
         self._buf["reset"][:], self._buf["terminate"][:] = \
             compute_amp_humanoid_reset(self._buf["reset"], self._buf["elapsedStep"], self._buf["contact"],
