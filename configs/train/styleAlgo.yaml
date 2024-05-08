@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_styleAlgo_01-14-58-59_fixed_norm/nn/keypointMaxObsTask.pth
+  runs/keypointMaxObsTask_amp_08-10-13-08_my_net/nn/keypointMaxObsTask.pth
 
 #  runs/Humanoid_00010000_converted.pth
 

@@ -571,25 +571,11 @@ class AMPAgent(common_agent.CommonAgent):
         self.tensor_list += ['amp_obs', 'rand_action_mask']
         return
 
-    def _init_amp_demo_buf(self):
-        buffer_size = self._amp_obs_demo_buffer.get_buffer_size()
-        num_batches = int(np.ceil(buffer_size / self._amp_batch_size))
-
-        for i in range(num_batches):
-            curr_samples = self._fetch_amp_obs_demo(self._amp_batch_size)
-            self._amp_obs_demo_buffer.store({'amp_obs': curr_samples})
-
-        return
-
-    def _update_amp_demos(self):
-        new_amp_obs_demo = self._fetch_amp_obs_demo(self._amp_batch_size)
-        self._amp_obs_demo_buffer.store({'amp_obs': new_amp_obs_demo})
-        return
-
     def _preproc_amp_obs(self, amp_obs):
-        if self._normalize_amp_input:
-            amp_obs = self._amp_input_mean_std(amp_obs)
-        return amp_obs
+        # if self._normalize_amp_input:
+        #     amp_obs = self._amp_input_mean_std(amp_obs)
+        # return amp_obs
+        return self.model.norm_disc_obs(amp_obs)
 
     def _combine_rewards(self, task_rewards, amp_rewards):
         disc_r = amp_rewards['disc_rewards']
