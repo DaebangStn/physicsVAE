@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: ase
-  memo:
+  memo: ref_net
   motion_file:
 #    assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -28,6 +28,7 @@ network:
         name: const_initializer
         val: -2.9
       fixed_sigma: True
+      learn_sigma: False
 
   mlp:
     units: [1024, 1024, 512]
