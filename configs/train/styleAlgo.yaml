@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: amp_reset
+  memo: no_grad_truncate
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -41,7 +41,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/keypointMaxObsTask_amp_08-10-13-08_my_net/nn/keypointMaxObsTask.pth
+#  runs/keypointMaxObsTask_amp_08-10-13-08_my_net/nn/keypointMaxObsTask.pth
 
 #  runs/Humanoid_00010000_converted.pth
 
