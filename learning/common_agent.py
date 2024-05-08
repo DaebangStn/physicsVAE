@@ -374,17 +374,6 @@ class CommonAgent(a2c_continuous.A2CAgent):
         dataset_dict['sigma'] = sigmas
 
         self.dataset.update_values_dict(dataset_dict)
-
-        if self.has_central_value:
-            dataset_dict = {}
-            dataset_dict['old_values'] = values
-            dataset_dict['advantages'] = advantages
-            dataset_dict['returns'] = returns
-            dataset_dict['actions'] = actions
-            dataset_dict['obs'] = batch_dict['states']
-            dataset_dict['rnn_masks'] = rnn_masks
-            self.central_value_net.update_dataset(dataset_dict)
-
         return
 
     def calc_gradients(self, input_dict):
