@@ -7,7 +7,8 @@ algo:
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
-    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/reallusion_sword_shield/locomotion2.yaml
 
 model:
   name: skill
@@ -17,8 +18,8 @@ network:
   separate: True
 
   space:
-    latent_dim: 64
-#    latent_dim: 32
+#    latent_dim: 64
+    latent_dim: 32
 
     continuous:
       mu_activation: None
@@ -32,7 +33,7 @@ network:
       learn_sigma: False
 
   mlp:
-    units: [1024, 1024, 512]
+    units: [1024, 512]
     activation: relu
     initializer:
       name: default
@@ -42,7 +43,7 @@ network:
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
-    units: [1024, 1024, 512]
+    units: [1024, 512]
     activation: relu
     initializer:
       name: default
@@ -115,7 +116,7 @@ hparam:
 
   style:
     replay_buf:
-      size: 200000
+      size: 75000
       store_prob: 0.01
       num_demo_update: 128
 
