@@ -77,7 +77,7 @@ hparam:
   score_to_win: 20000
   max_epochs: 100000
   save_best_after: 50
-  save_frequency: 100
+  save_frequency: 500
   print_stats: True
   grad_norm: 1.0
   entropy_coef: 0.0
