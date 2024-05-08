@@ -227,10 +227,10 @@ class AMPAgent(common_agent.CommonAgent):
     def prepare_dataset(self, batch_dict):
         super().prepare_dataset(batch_dict)
         self.dataset.values_dict['amp_obs'] = batch_dict['amp_obs']
-        self.dataset.values_dict['amp_obs_demo'] = (
+        self.dataset.values_dict['amp_obs_replay'] = (
             self._replay_buffer['rollout'].sample(self.batch_size)
             if self._replay_buffer['rollout'].count > 0 else batch_dict['amp_obs'])
-        self.dataset.values_dict['amp_obs_replay'] = self._replay_buffer['demo'].sample(self.batch_size)
+        self.dataset.values_dict['amp_obs_demo'] = self._replay_buffer['demo'].sample(self.batch_size)
 
         rand_action_mask = batch_dict['rand_action_mask']
         self.dataset.values_dict['rand_action_mask'] = rand_action_mask
