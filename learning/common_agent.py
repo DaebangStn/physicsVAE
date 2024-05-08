@@ -104,6 +104,9 @@ class CommonAgent(a2c_continuous.A2CAgent):
         if self.normalize_value:
             self.value_mean_std = self.model.value_mean_std
 
+        self.int_save_freq = self.config.get('intermediate_save_frequency', 100)
+        self._prev_int_ckpt_path = None
+
         return
 
     def init_tensors(self):
@@ -123,9 +126,6 @@ class CommonAgent(a2c_continuous.A2CAgent):
         self.curr_frames = self.batch_size_envs
 
         model_output_file = os.path.join(self.nn_dir, self.config['name'])
-
-        if self.multi_gpu:
-            self.hvd.setup_algo(self)
 
         self._init_train()
 
@@ -153,6 +153,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
             self.algo_observer.after_print_stats(frame, epoch_num, total_time)
 
+            mean_rewards = 0
             if self.game_rewards.current_size > 0:
                 mean_rewards = self._get_mean_rewards()
                 mean_lengths = self.game_lengths.get_mean()
@@ -168,13 +169,23 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 if self.has_self_play_config:
                     self.self_play_manager.update(self)
 
-            if self.save_freq > 0:
-                if (epoch_num % self.save_freq == 0):
-                    self.save(model_output_file)
+            checkpoint_name = self.config['name'] + '_ep_' + str(epoch_num) + '_rew_' + str(mean_rewards[0])
 
-                    if (self._save_intermediate):
-                        int_model_output_file = model_output_file + '_' + str(epoch_num).zfill(8)
-                        self.save(int_model_output_file)
+            if self.save_freq > 0:
+                if epoch_num % self.save_freq == 0:
+                    self.save(os.path.join(self.nn_dir, 'last_' + checkpoint_name))
+                if epoch_num % self.int_save_freq == 0:
+                    if self._prev_int_ckpt_path is not None:
+                        os.remove(self._prev_int_ckpt_path + '.pth')
+                    self._prev_int_ckpt_path = os.path.join(self.nn_dir, checkpoint_name + f'_{epoch_num}')
+                    self.save(self._prev_int_ckpt_path)
+
+            if mean_rewards[0] > self.last_mean_rewards and epoch_num >= self.save_best_after:
+                print('saving next best rewards: ', mean_rewards)
+                self.last_mean_rewards = mean_rewards[0]
+                self.save(os.path.join(self.nn_dir, self.config['name']))
+
+
 
             if epoch_num > self.max_epochs:
                 self.save(model_output_file)
