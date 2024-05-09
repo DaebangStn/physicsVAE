@@ -31,7 +31,7 @@ network:
       learn_sigma: False
 
   mlp:
-    units: [1024, 512]
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
@@ -41,7 +41,7 @@ network:
     units: [512, 256]
 
   disc:
-    units: [1024, 512]
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
