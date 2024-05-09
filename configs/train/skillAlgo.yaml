@@ -19,7 +19,7 @@ network:
 
   space:
 #    latent_dim: 64
-    latent_dim: 2
+    latent_dim: 32
 
     continuous:
       mu_activation: None
@@ -90,13 +90,13 @@ hparam:
 #      junk
 
   # learning hyperparameters
-  horizon_length: 4
+  horizon_length: 32
   gamma: 0.99
   tau: 0.95
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 2
+  minibatch_size: 24000
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -140,7 +140,7 @@ hparam:
       loss_coef: 5
 
     latent:
-      update_freq_max: 2
+      update_freq_max: 150
       update_freq_min: 1
 
 #  jitter:
