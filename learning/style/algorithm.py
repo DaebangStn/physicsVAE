@@ -246,7 +246,7 @@ class StyleAlgorithm(CoreAlgorithm):
         return env.key_body_ids(key_body_names)
 
 
-# @torch.jit.script
+@torch.jit.script
 def disc_obs_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int]) -> torch.Tensor:
@@ -325,7 +325,7 @@ def keyp_task_obs_angle_transform(
     return obs, disc_obs
 
 
-# @torch.jit.script
+@torch.jit.script
 def motion_lib_angle_transform(
         state: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         dof_offsets: List[int], traj_len: int) -> torch.Tensor:
