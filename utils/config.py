@@ -79,11 +79,14 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_train["test"] = args.test
     if args.num_envs:
         config_env["env"]["num_envs"] = args.num_envs
-    if args.memo:
+    if args.memo is not None:
         config_train["algo"]["memo"] = args.memo
 
-    full_experiment_name = (config_env["env"]["name"] + "_" + config_train["algo"]["name"] + "_" +
-                            datetime.now().strftime("%d-%H-%M-%S") + "_" + str(config_train["algo"].get("memo", "")))
+    full_experiment_name = (datetime.now().strftime("%d-%H-%M-%S")
+                            + "_" + config_train["algo"]["name"]
+                            + "_" + str(config_train["algo"].get("memo", ""))
+                            + "_" + config_env["env"]["name"]
+                            )
 
     config_train["config"] = {}
 
