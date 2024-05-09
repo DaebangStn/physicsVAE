@@ -19,7 +19,7 @@ network:
 
   space:
 #    latent_dim: 64
-    latent_dim: 32
+    latent_dim: 2
 
     continuous:
       mu_activation: None
@@ -33,7 +33,7 @@ network:
       learn_sigma: False
 
   mlp:
-    units: [1024, 512]
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
@@ -43,7 +43,7 @@ network:
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
-    units: [1024, 512]
+    units: [1024, 1024, 512]
     activation: relu
     initializer:
       name: default
@@ -59,7 +59,7 @@ network:
 checkpoint:  # from the project root
 #  runs/Humanoid_converted2.pth
 
-#  runs/keypointMaxObsTask_ase_08-22-04-29_ref_net/nn/keypointMaxObsTask.pth
+#  runs/keypointMaxObsTask_skillAlgo_08-21-26-09_ref_net/nn/last_keypointMaxObsTask_ep_14000_rew_7124.6562.pth
 
 checkpoint_disc:
 #  runs/Humanoid_converted2.pth
@@ -90,7 +90,7 @@ hparam:
 #      junk
 
   # learning hyperparameters
-  horizon_length: 2
+  horizon_length: 4
   gamma: 0.99
   tau: 0.95
   e_clip: 0.2
@@ -118,16 +118,16 @@ hparam:
 
   style:
     replay_buf:
-      size: 20
+      size: 100000
       store_prob: 0.01
-      num_demo_update: 2
+      num_demo_update: 128
 
     disc:
       input_divisor: 16
       num_obs: 140
 #      num_obs: 125
+      obs_traj_len: 10
 #      obs_traj_len: 4
-      obs_traj_len: 3
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
@@ -140,7 +140,7 @@ hparam:
       loss_coef: 5
 
     latent:
-      update_freq_max: 150
+      update_freq_max: 2
       update_freq_min: 1
 
 #  jitter:

@@ -306,11 +306,13 @@ class CoreAlgorithm(A2CAgent):
             self.current_lengths = self.current_lengths * not_dones
 
         self._calc_rollout_reward()
+        mb_rewards = self.experience_buffer.tensor_dict['rewards']
+        self._write_stat(total_reward=mb_rewards.mean().item())
 
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
         mb_values = self.experience_buffer.tensor_dict['values']
         mb_next_values = self.experience_buffer.tensor_dict['next_values']
-        mb_rewards = self.experience_buffer.tensor_dict['rewards']
+
         mb_advs = self._discount_values(mb_fdones, mb_values, mb_rewards, mb_next_values)
         mb_returns = mb_advs + mb_values
 
