@@ -9,7 +9,8 @@ def main_with_args():
         'run.py',
         '--cfg_train', 'configs/train/styleAlgo.yaml',
         '--cfg_env', 'configs/env/keypointMaxObsTask.yaml',
-        '--wandb_proj', 'ase'
+        '--wandb_proj', 'ase',
+        '--sweep', 'True',
     ]
     main()
     sys.argv = orig_argv
@@ -20,11 +21,11 @@ sweep_config = {
     "name": "test_sweep",
     "method": "grid",
     "parameters": {
-        "max_frames": {
-            "values": [200000]
-        },
-        "input_divisor": {
-            1, 4, 16, 64, 256
+        # "max_frames": {
+        #     "values": [100000]
+        # },
+        "pred_scale": {
+            "values": [4, 1, 0.5, 0.25, 0.05]
         }
     }
 }

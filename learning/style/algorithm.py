@@ -14,6 +14,7 @@ class StyleAlgorithm(CoreAlgorithm):
         self._disc_obs_buf = None
         self._disc_obs_traj_len = None
         self._disc_loss_coef = None
+        self._disc_pred_scale = None
         self._disc_logit_reg_scale = None
         self._disc_reg_scale = None
         self._disc_grad_penalty_scale = None
@@ -119,7 +120,7 @@ class StyleAlgorithm(CoreAlgorithm):
                                         grad_outputs=torch.ones_like(demo_disc_logit))[0]
         penalty_loss = torch.mean(torch.sum(torch.square(demo_grad), dim=-1))
 
-        loss = (pred_loss * 0.5 +
+        loss = (self._disc_pred_scale * pred_loss +
                 self._disc_logit_reg_scale * logit_weights_loss +
                 self._disc_reg_scale * disc_weights_loss +
                 self._disc_grad_penalty_scale * penalty_loss)
@@ -152,6 +153,7 @@ class StyleAlgorithm(CoreAlgorithm):
         config_disc = config_hparam['style']['disc']
         self._disc_obs_traj_len = config_disc['obs_traj_len']
         self._disc_loss_coef = config_disc['loss_coef']
+        self._disc_pred_scale = config_disc['pred_scale']
         self._disc_logit_reg_scale = config_disc['logit_reg_scale']
         self._disc_reg_scale = config_disc['reg_scale']
         self._disc_grad_penalty_scale = config_disc['grad_penalty_scale']

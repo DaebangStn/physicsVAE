@@ -54,6 +54,8 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
             config_train["hparam"]["max_frames"] = wandb.config.max_frames
         if "input_divisor" in wandb.config:
             config_train["hparam"]["style"]["disc"]["input_divisor"] = wandb.config.input_divisor
+        if "pred_scale" in wandb.config:
+            config_train["hparam"]["style"]["disc"]["pred_scale"] = wandb.config.pred_scale
 
     # Compute discriminator related values
     if config_train["algo"]["name"] in ["styleAlgo", "skillAlgo"]:

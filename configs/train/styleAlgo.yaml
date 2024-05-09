@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: no_grad_truncate
+  memo: debug
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -50,7 +50,7 @@ checkpoint_disc:  # from the project root
 
 
 hparam:
-#  max_frames: 100000
+  max_frames: 100000000  # 100M
 
   normalize_input: True
   normalize_value: True
@@ -78,7 +78,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 24000
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -96,7 +96,7 @@ hparam:
 
   style:
     replay_buf:
-      size: 200000
+      size: 100000
       store_prob: 0.01
       num_demo_update: 128
 
@@ -108,6 +108,7 @@ hparam:
       obs_traj_len: 4
 #      obs_traj_len: 10
       loss_coef: 5
+      pred_scale: 0.5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
       grad_penalty_scale: 5
