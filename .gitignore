@@ -7,3 +7,4 @@ wandb
 *.hdf5
 *.pth
 events.out.tfevents.*
+archived_ckpt

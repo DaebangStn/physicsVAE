@@ -3,11 +3,11 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: debug
+  memo: multi_motion
   motion_file:
-    assets/motions/amp_humanoid_run.npy
+#    assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
-#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: style
@@ -50,7 +50,7 @@ checkpoint_disc:  # from the project root
 
 
 hparam:
-  max_frames: 100000000  # 100M
+#  max_frames: 100000000  # 100M
 
   normalize_input: True
   normalize_value: True
@@ -103,10 +103,10 @@ hparam:
     disc:
       # denominator for collected data within the rollout
       input_divisor: 16
-#      num_obs: 140
-      num_obs: 125
-      obs_traj_len: 4
-#      obs_traj_len: 10
+      num_obs: 140
+#      num_obs: 125
+#      obs_traj_len: 4
+      obs_traj_len: 10
       loss_coef: 5
       pred_scale: 0.5
       logit_reg_scale: 0.01
