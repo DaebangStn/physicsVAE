@@ -1,11 +1,8 @@
 from typing import Optional
 
-import torch
-
-from learning.style.algorithm import StyleAlgorithm, disc_reward
+from learning.style.algorithm import StyleAlgorithm
 from utils.angle import *
 from utils.env import sample_color
-from utils.buffer import TensorHistoryFIFO
 
 
 class SkillAlgorithm(StyleAlgorithm):

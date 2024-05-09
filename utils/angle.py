@@ -1,7 +1,5 @@
 from typing import List, Tuple
-import torch
 from torch import Tensor
-import numpy as np
 from isaacgym.torch_utils import *
 
 

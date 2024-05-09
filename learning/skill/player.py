@@ -1,6 +1,7 @@
 import torch
 
-from rl_games.algos_torch.players import rescale_actions, unsqueeze_obs
+from rl_games.algos_torch.players import rescale_actions
+from rl_games.algos_torch import torch_ext
 
 from learning.style.player import StylePlayer
 from learning.skill.algorithm import sample_latent, enc_reward
@@ -37,6 +38,15 @@ class SkillPlayer(StylePlayer):
         obs_raw = super(StylePlayer, self).env_reset(env)
         obs = self._post_process_obs(obs_raw)
         return obs
+
+    def restore(self, fn):
+        try:
+            super().restore(fn)
+        except Exception as e:
+            print(f"There was an error while restoring the player: {e}")
+        if self._checkpoint_disc is not None:
+            ckpt = torch_ext.load_checkpoint(self._checkpoint_disc)
+            self.model.enc_load_state_dict(ckpt['model'])
 
     def get_action(self, obs, is_deterministic=False):
         with torch.no_grad():
@@ -86,8 +96,7 @@ class SkillPlayer(StylePlayer):
     def _enc_debug(self, disc_obs):
         reward = enc_reward(self.model, disc_obs, self._z).mean().item()
         print(f"enc_reward {reward:.3f}")
-        if self._games_played == 0:
-            self._writer.add_scalar("player/reward_enc", reward, self._n_step)
+        self._write_stat(reward_enc=reward)
 
     def _post_step(self):
         super()._post_step()

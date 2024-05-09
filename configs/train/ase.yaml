@@ -77,7 +77,8 @@ hparam:
   score_to_win: 20000
   max_epochs: 100000
   save_best_after: 50
-  save_frequency: 500
+  save_frequency: 1000
+  intermediate_save_frequency: 100
   print_stats: True
   grad_norm: 1.0
   entropy_coef: 0.0
@@ -120,7 +121,6 @@ hparam:
   task_reward_w: 0.0
   disc_reward_w: 0.5
   enc_reward_w: 0.5
-
 
   obs_traj_len: 10
   num_disc_obs: 140

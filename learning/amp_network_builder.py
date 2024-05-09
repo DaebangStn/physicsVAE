@@ -113,6 +113,21 @@ class AMPBuilder(network_builder.A2CBuilder):
             disc_logits = self._disc_logits(disc_mlp_out)
             return disc_logits
 
+        def disc_load_state_dict(self, state_dict):
+            for name, param in self._disc_mlp.named_parameters():
+                key = 'a2c_network._disc_mlp.' + name
+                if key in state_dict:
+                    param.data = state_dict[key].data
+                else:
+                    raise KeyError(f'{key} is not found in the disc checkpoint state_dict')
+
+            for name, param in self._disc_logits.named_parameters():
+                key = 'a2c_network._disc_logits.' + name
+                if key in state_dict:
+                    param.data = state_dict[key].data
+                else:
+                    raise KeyError(f'{key} is not found in the disc checkpoint state_dict')
+
         @property
         def disc_logistics_weights(self):
             return torch.flatten(self._disc_logits.weight)

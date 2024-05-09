@@ -257,6 +257,14 @@ class ASEBuilder(amp_network_builder.AMPBuilder):
             z = torch.nn.functional.normalize(z, dim=-1)
             return z
 
+        def enc_load_state_dict(self, state_dict):
+            for name, param in self._enc.named_parameters():
+                key = 'a2c_network._enc.' + name
+                if key in state_dict:
+                    param.data = state_dict[key].data
+                else:
+                    raise KeyError(f'{key} is not found in the enc checkpoint state_dict')
+
     def build(self, placeholeder, **kwargs):
         net = ASEBuilder.Network(self.params, **kwargs)
         return net

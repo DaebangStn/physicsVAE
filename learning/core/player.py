@@ -199,3 +199,8 @@ class CorePlayer(PpoPlayerContinuous):
 
     def _post_step(self):
         pass
+
+    def _write_stat(self, **kwargs):
+        if self._games_played < 10:
+            for k, v in kwargs.items():
+                self._writer.add_scalar(f"player/{k}", v, self._n_step)

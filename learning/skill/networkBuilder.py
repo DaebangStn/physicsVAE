@@ -59,6 +59,14 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
                 return self._latent_enc_mlp(latent)
             return latent
 
+        def enc_load_state_dict(self, state_dist):
+            for name, param in self._enc_linear.named_parameters():
+                key = 'a2c_network._enc_linear.' + name
+                if key in state_dist:
+                    param.data = state_dist[key].data
+                else:
+                    raise KeyError(f'{key} is not found in the enc checkpoint state_dict')
+
         @property
         def enc_weights(self):
             weights = []

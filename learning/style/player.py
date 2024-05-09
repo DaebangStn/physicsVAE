@@ -45,10 +45,10 @@ class StylePlayer(CorePlayer):
         except Exception as e:
             print(f"There was an error while restoring the player: {e}")
         if self._checkpoint_disc is not None:
-            self._checkpoint_disc = torch_ext.load_checkpoint(self._checkpoint_disc)
-            self.model.disc_load_state_dict(self._checkpoint_disc['model'])
+            ckpt = torch_ext.load_checkpoint(self._checkpoint_disc)
+            self.model.disc_load_state_dict(ckpt['model'])
             if self.normalize_input:
-                self.model.disc_running_mean_load_state_dict(self._checkpoint_disc['model'])
+                self.model.disc_running_mean_load_state_dict(ckpt['model'])
 
     def _post_process_obs(self, obs_raw):
         if self._show_reward:
@@ -110,8 +110,7 @@ class StylePlayer(CorePlayer):
     def _disc_debug(self, disc_obs):
         reward = disc_reward(self.model, disc_obs, self.device).mean().item()
         print(f"disc_reward {reward:.3f}")
-        if self._games_played == 0:
-            self._writer.add_scalar("player/reward_disc", reward, self._n_step)
+        self._write_stat(reward_disc=reward)
 
     def _pre_step(self):
         super()._pre_step()
