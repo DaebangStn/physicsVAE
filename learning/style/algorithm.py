@@ -182,7 +182,7 @@ class StyleAlgorithm(CoreAlgorithm):
             'demo': SingleTensorBuffer(buf_size, self.device),
             'rollout': SingleTensorBuffer(buf_size, self.device),
         }
-        demo_obs = self._demo_fetcher.fetch_traj(buf_size // self._disc_obs_traj_len)
+        demo_obs = self._demo_fetcher.fetch_traj(buf_size)
         demo_obs = motion_lib_angle_transform(demo_obs, self._dof_offsets, self._disc_obs_traj_len)
         self._replay_buffer['demo'].store(demo_obs)
         self._replay_store_prob = config_buffer['store_prob']
