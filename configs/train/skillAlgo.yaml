@@ -57,11 +57,13 @@ network:
       name: default
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
+#  runs/Humanoid_converted2.pth
 
-#  runs/keypointMaxObsTask_ep_1800_rew_6389.2905_1800.pth
+#  runs/keypointMaxObsTask_ase_08-22-04-29_ref_net/nn/keypointMaxObsTask.pth
 
 checkpoint_disc:
+#  runs/Humanoid_converted2.pth
+
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 
 hparam:
@@ -88,13 +90,13 @@ hparam:
 #      junk
 
   # learning hyperparameters
-  horizon_length: 32
+  horizon_length: 2
   gamma: 0.99
   tau: 0.95
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 2
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -112,20 +114,20 @@ hparam:
     disc_scale: 2.0
     enc_scale: 1.0
 
-    show_on_player: False
+    show_on_player: True
 
   style:
     replay_buf:
-      size: 75000
+      size: 20
       store_prob: 0.01
-      num_demo_update: 128
+      num_demo_update: 2
 
     disc:
       input_divisor: 16
       num_obs: 140
 #      num_obs: 125
 #      obs_traj_len: 4
-      obs_traj_len: 10
+      obs_traj_len: 3
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001

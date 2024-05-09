@@ -178,7 +178,7 @@ class TensorHistoryFIFO:
 
     @property
     def history(self):
-        return torch.cat(self._q.list, dim=1)
+        return torch.cat(self._q.list, dim=-1)
 
     def __len__(self):
         return len(self._q)

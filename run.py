@@ -1,4 +1,4 @@
-import isaacgym
+from isaacgym import gymapi, gymtorch
 from utils.config import load_config, build_args, set_seed
 
 
@@ -19,8 +19,7 @@ def build_runner():
     from learning.style.model import StyleModel
     from learning.style.networkBuilder import StyleNetworkBuilder
     from learning.skill.model import SkillModel
-    from learning.skill.networkBuilder import SkillNetworkBuilder
-    from learning.skill.ase_network_builder import ASEBuilder
+    from learning.ase_network_builder import ASEBuilder
 
     from learning.simple.player import SimplePlayer
     from learning.simple.algorithm import SimpleAlgorithm
