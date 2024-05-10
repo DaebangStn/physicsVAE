@@ -109,7 +109,7 @@ hparam:
     disc_weight: 0.5
     enc_weight: 0.5
     task_scale: 0.0
-    disc_scale: 2.0
+    disc_scale: 4.0
     enc_scale: 1.0
 
     show_on_player: False
