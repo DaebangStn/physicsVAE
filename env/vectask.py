@@ -31,6 +31,8 @@ class VecTask:
         self._num_obs = None
         self._num_actions = None
         self._num_states = None
+        self._static_fric = None
+        self._kinetic_fric = None
 
         self._parse_env_param(**kwargs)
 
@@ -112,8 +114,8 @@ class VecTask:
     def _create_ground(self):
         param = gymapi.PlaneParams()
         param.normal = gymapi.Vec3(0.0, 0.0, 1.0)
-        param.dynamic_friction = 1
-        param.static_friction = 1
+        param.dynamic_friction = self._kinetic_fric
+        param.static_friction = self._static_fric
         param.restitution = 0.0
         self._gym.add_ground(self._sim, param)
 
@@ -189,6 +191,9 @@ class VecTask:
         self._num_obs = env_cfg['num_obs']
         self._num_actions = env_cfg['num_act']
         self._num_states = env_cfg['num_states']
+
+        self._static_fric = env_cfg.get('static_fric', 1.0)
+        self._kinetic_fric = env_cfg.get('kinetic_fric', 1.0)
 
         return env_cfg
 

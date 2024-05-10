@@ -18,6 +18,8 @@ env:
 
   stiffness_coef: 1.0
   damping_coef: 1.0
+  static_fric: 1.0
+  kinetic_fric: 1.0
 
   recovery_limit: 0
   drop_on_reset_prob: 0

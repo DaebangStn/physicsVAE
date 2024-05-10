@@ -7,8 +7,8 @@ algo:
   motion_file:
 #    assets/motions/dataset_humanoid.yaml
 #    assets/motions/amp_humanoid_run.npy
-#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
-    assets/motions/reallusion_sword_shield/locomotion2.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+#    assets/motions/reallusion_sword_shield/locomotion2.yaml
 
 model:
   name: skill
@@ -18,8 +18,8 @@ network:
   separate: True
 
   space:
-#    latent_dim: 64
-    latent_dim: 32
+    latent_dim: 64
+#    latent_dim: 32
 
     continuous:
       mu_activation: None

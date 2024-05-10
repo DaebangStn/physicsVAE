@@ -19,6 +19,7 @@ def build_runner():
     from learning.style.model import StyleModel
     from learning.style.networkBuilder import StyleNetworkBuilder
     from learning.skill.model import SkillModel
+    from learning.skill.networkBuilder import SkillNetworkBuilder
     from learning.ase_network_builder import ASEBuilder
 
     from learning.simple.player import SimplePlayer
@@ -48,8 +49,8 @@ def build_runner():
 
     register_net_n_model('core', CoreNetworkBuilder, CoreModel)
     register_net_n_model('style', StyleNetworkBuilder, StyleModel)
-    # register_net_n_model('skill', SkillNetworkBuilder, SkillModel)
-    register_net_n_model('skill', ASEBuilder, SkillModel)
+    register_net_n_model('skill', SkillNetworkBuilder, SkillModel)
+    # register_net_n_model('skill', ASEBuilder, SkillModel)
 
     _runner = Runner(algo_observer=IsaacAlgoObserver())
     register_algo_n_player('simpleAlgo', _runner, SimpleAlgorithm, SimplePlayer)
