@@ -33,7 +33,7 @@ network:
       learn_sigma: False
 
   mlp:
-    units: [1024, 1024, 512]
+    units: [1024, 512]
     activation: relu
     initializer:
       name: default
@@ -57,13 +57,11 @@ network:
       name: default
 
 checkpoint:  # from the project root
-#  runs/Humanoid_converted2.pth
+#  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
-#  runs/keypointMaxObsTask_skillAlgo_08-21-26-09_ref_net/nn/last_keypointMaxObsTask_ep_14000_rew_7124.6562.pth
+#  runs/keypointMaxObsTask_ep_1800_rew_6389.2905_1800.pth
 
 checkpoint_disc:
-#  runs/Humanoid_converted2.pth
-
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
 
 hparam:
@@ -114,7 +112,7 @@ hparam:
     disc_scale: 2.0
     enc_scale: 1.0
 
-    show_on_player: True
+    show_on_player: False
 
   style:
     replay_buf:
