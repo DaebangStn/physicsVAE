@@ -37,8 +37,9 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
             )
             for m in self._latent_enc_mlp.modules():
                 if isinstance(m, nn.Linear):
-                    nn.init.uniform_(m.weight, -0.1, 0.1)
+                    # nn.init.uniform_(m.weight, -1, 1)
                     nn.init.zeros_(m.bias)
+            nn.init.uniform_(self._latent_enc_mlp[2].weight, -1, 1)
 
         def _build_enc(self):
             self._enc_linear = nn.Linear(self._disc_logistics.in_features, self._latent_dim)
