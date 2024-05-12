@@ -20,7 +20,7 @@ class SkillModelASE(StyleModel):
         def forward(self, input_dict):
             normed_obs = input_dict['obs']
             ase_latents = input_dict['latent']
-            use_hidden_latents = input_dict.get('use_hidden_latents', True)
+            use_hidden_latents = input_dict.get('use_hidden_latents', False)
 
             mu, logstd = self.a2c_network.eval_actor(normed_obs, ase_latents, use_hidden_latents)
             sigma = torch.exp(logstd)

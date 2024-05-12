@@ -29,9 +29,14 @@ def check_model(name: str, net1, net2, *net_input):
 
     if isinstance(net1_out, dict):
         for k, v in net1_out.items():
-            assert torch.allclose(v, net2_out[k], atol=1e-5), \
-                f"{name}: {k} mismatch!. [Mean] mine: {v.mean()}, ref: {net2_out[k].mean()}"
-            print(f"{name}: {k} match!")
+            if k in ["neglogpacs", "actions"]:
+                continue
+            if isinstance(v, torch.Tensor):
+                assert torch.allclose(v, net2_out[k], atol=1e-5), \
+                    f"{name}: {k} mismatch!. [Mean] mine: {v.mean()}, ref: {net2_out[k].mean()}"
+                print(f"{name}: {k} match!")
+            else:
+                print(f"{name}: {k} is not tensor!")
     elif isinstance(net1_out, tuple):
         for i in range(len(net1_out)):
             assert torch.allclose(net1_out[i], net2_out[i], atol=1e-5), f"{name}: {i} mismatch!"
@@ -55,6 +60,7 @@ def main():
     disc_obs_dim = 140
     num_env = 32
     disc_traj_len = 10
+    total_disc_obs_dim = disc_obs_dim * disc_traj_len
 
     args = build_args()
     cfg_run, cfg_train = load_config(args)
@@ -84,7 +90,7 @@ def main():
 
     latent = torch.rand(num_env, latent_dim)
     obs = torch.rand(num_env, obs_dim)
-    disc_obs = torch.rand(num_env, disc_obs_dim * disc_traj_len)
+    disc_obs = torch.rand(num_env, total_disc_obs_dim)
     in_317 = torch.rand(num_env, 317)
     in_512 = torch.rand(num_env, 512)
     in_1024 = torch.rand(num_env, 1024)
@@ -126,6 +132,23 @@ def main():
     check_model('Critic', net.critic_latent, ref_net.critic_latent, obs, latent)
     check_model('Disc', net.disc, ref_net.disc, disc_obs)
     check_model('Enc', net.enc, ref_net.enc, disc_obs)
+
+    input_dict = {
+        'obs': obs,
+        'latent': latent,
+        'is_train': False,
+    }
+
+    check_model('Forward[Test]', net, ref_net, input_dict)
+
+    input_dict['is_train'] = True
+    input_dict['prev_actions'] = torch.rand(num_env, 31)
+    input_dict['normalized_rollout_disc_obs'] = torch.rand(num_env, total_disc_obs_dim)
+    input_dict['normalized_replay_disc_obs'] = torch.rand(num_env, total_disc_obs_dim)
+    input_dict['normalized_demo_disc_obs'] = torch.rand(num_env, total_disc_obs_dim)
+    net.train()
+    ref_net.train()
+    check_model('Forward[Train]', net, ref_net, input_dict)
 
 
 if __name__ == "__main__":
