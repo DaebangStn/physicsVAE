@@ -94,38 +94,38 @@ def main():
     net.eval()
     ref_net.eval()
 
-    check_model('Latent Feature', net.a2c_network.latent_feature, ref_net.a2c_network.actor_mlp.eval_style, latent)
-    check_model('Mu', net.a2c_network.mu, ref_net.a2c_network.mu, in_512)
-    check_model('Actor1', net.a2c_network.actor_mlp[0], ref_net.a2c_network.actor_mlp._dense_layers[0], in_317)
-    check_model('Actor2', net.a2c_network.actor_mlp[2], ref_net.a2c_network.actor_mlp._dense_layers[1], in_1024)
-    check_model('Actor3', net.a2c_network.actor_mlp[4], ref_net.a2c_network.actor_mlp._dense_layers[2], in_1024)
+    # check_model('Latent Feature', net.a2c_network.latent_feature, ref_net.a2c_network.actor_mlp.eval_style, latent)
+    # check_model('Mu', net.a2c_network.mu, ref_net.a2c_network.mu, in_512)
+    # check_model('Actor1', net.a2c_network.actor_mlp[0], ref_net.a2c_network.actor_mlp._dense_layers[0], in_317)
+    # check_model('Actor2', net.a2c_network.actor_mlp[2], ref_net.a2c_network.actor_mlp._dense_layers[1], in_1024)
+    # check_model('Actor3', net.a2c_network.actor_mlp[4], ref_net.a2c_network.actor_mlp._dense_layers[2], in_1024)
 
-    obs_feature, obs_naive = net.attach_latent(obs, latent)
-    actor1 = net.a2c_network.actor_mlp(obs_naive)
-    actor2 = ref_net.a2c_network.actor_mlp(obs, latent, True)
-    assert torch.allclose(actor1, actor2, atol=1e-5), "Naive actor mismatch!"
-
-    actor1 = net.a2c_network.actor_mlp(obs_feature)
-    actor2 = ref_net.a2c_network.actor_mlp(obs, latent, False)
-    assert torch.allclose(actor1, actor2, atol=1e-5), "Feature actor mismatch!"
-
-    actor1, _ = net.actor_module(obs_naive)
-    actor2, _ = ref_net.a2c_network.eval_actor(obs, latent, True)
-    assert torch.allclose(actor1, actor2, atol=1e-5), "Naive actor mismatch!"
-
-    actor1, _ = net.actor_module(obs_feature)
-    actor2, _ = ref_net.a2c_network.eval_actor(obs, latent, False)
-    assert torch.allclose(actor1, actor2, atol=1e-5), "Feature actor mismatch!"
+    # obs_feature, obs_naive = net.attach_latent(obs, latent)
+    # actor1 = net.a2c_network.actor_mlp(obs_naive)
+    # actor2 = ref_net.a2c_network.actor_mlp(obs, latent, True)
+    # assert torch.allclose(actor1, actor2, atol=1e-5), "Naive actor mismatch!"
+    #
+    # actor1 = net.a2c_network.actor_mlp(obs_feature)
+    # actor2 = ref_net.a2c_network.actor_mlp(obs, latent, False)
+    # assert torch.allclose(actor1, actor2, atol=1e-5), "Feature actor mismatch!"
+    #
+    # actor1, _ = net.actor_module(obs_naive)
+    # actor2, _ = ref_net.a2c_network.eval_actor(obs, latent, True)
+    # assert torch.allclose(actor1, actor2, atol=1e-5), "Naive actor mismatch!"
+    #
+    # actor1, _ = net.actor_module(obs_feature)
+    # actor2, _ = ref_net.a2c_network.eval_actor(obs, latent, False)
+    # assert torch.allclose(actor1, actor2, atol=1e-5), "Feature actor mismatch!"
 
     # g1 = make_dot(actor1, params=dict(net.a2c_network.actor_mlp.named_parameters()))
     # g2 = make_dot(actor2, params=dict(ref_net.a2c_network.actor_mlp.named_parameters()))
     # g1.render('actor1', format='png', cleanup=True)
     # g2.render('actor2', format='png', cleanup=True)
 
-    # check_model('Actor', net.actor_latent, ref_net.actor_latent, obs, latent)
-    # check_model('Critic', net.critic_latent, ref_net.critic_latent, obs, latent)
-    # check_model('Disc', net.disc, ref_net.disc, disc_obs)
-    # check_model('Enc', net.enc, ref_net.enc, disc_obs)
+    check_model('Actor', net.actor_latent, ref_net.actor_latent, obs, latent)
+    check_model('Critic', net.critic_latent, ref_net.critic_latent, obs, latent)
+    check_model('Disc', net.disc, ref_net.disc, disc_obs)
+    check_model('Enc', net.enc, ref_net.enc, disc_obs)
 
 
 if __name__ == "__main__":
