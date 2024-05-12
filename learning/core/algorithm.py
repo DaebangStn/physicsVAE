@@ -219,7 +219,7 @@ class CoreAlgorithm(A2CAgent):
                     if self.has_self_play_config:
                         self.self_play_manager.update(self)
 
-                    checkpoint_name = self.config['name'] + '_ep_' + str(epoch_num) + '_rew_' + str(mean_rewards[0])
+                    checkpoint_name = 'ep_' + str(epoch_num) + '_rew_' + str(mean_rewards[0])
 
                     if self.save_freq > 0:
                         if epoch_num % self.save_freq == 0:

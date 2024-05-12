@@ -3,12 +3,12 @@ debug: False
 
 algo:
   name: ase
-  memo: ref_net
+  memo:
   motion_file:
 #    assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
-#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
-    assets/motions/reallusion_sword_shield/locomotion2.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+#    assets/motions/reallusion_sword_shield/locomotion2.yaml
 
 model:
   name: skill
@@ -18,7 +18,7 @@ network:
   separate: True
 
   space:
-    latent_dim: 32
+    latent_dim: 64
     continuous:
       mu_activation: None
       sigma_activation: None
@@ -58,7 +58,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_styleAlgo_01-14-58-59_fixed_norm/nn/keypointMaxObsTask.pth
 
-#  runs/Humanoid_00010000_converted.pth
+#  runs/Humanoid_ep_16600_rew_1163.3795_16600.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
@@ -104,7 +104,7 @@ hparam:
   normalize_amp_input: True
   enable_eps_greedy: True
 
-  latent_dim: 32
+  latent_dim: 64
   latent_steps_min: 1
   latent_steps_max: 150
 
