@@ -3,8 +3,9 @@ import random
 import sys
 
 import yaml
-from typing import Tuple
+from typing import Tuple, Optional
 from datetime import datetime
+from git import Repo
 
 import wandb
 from pathlib import Path
@@ -12,6 +13,7 @@ import torch
 import numpy as np
 from argparse import Namespace
 
+from utils import *
 from .fixed_gymutil import parse_arguments
 
 
@@ -35,6 +37,15 @@ def build_args() -> Namespace:
 
     args = parse_arguments(custom_parameters=custom_params)
     return args
+
+
+def get_current_git_hash(reduce: Optional[int] = None) -> str:
+    repo = Repo(PROJECT_ROOT)
+    branch = repo.active_branch
+    commit_hash = str(branch.commit.hexsha)
+    if reduce is not None:
+        commit_hash = commit_hash[:reduce]
+    return commit_hash
 
 
 def load_config(args: Namespace) -> Tuple[dict, dict]:
@@ -81,10 +92,16 @@ def load_config(args: Namespace) -> Tuple[dict, dict]:
         config_env["env"]["num_envs"] = args.num_envs
     if args.memo is not None:
         config_train["algo"]["memo"] = args.memo
+    memo = config_train["algo"].get("memo")
+    if memo is not None:
+        memo_str = "_" + memo
+    else:
+        memo_str = ""
 
     full_experiment_name = (datetime.now().strftime("%d-%H-%M-%S")
                             + "_" + config_train["algo"]["name"]
-                            + "_" + str(config_train["algo"].get("memo", ""))
+                            + memo_str
+                            + "_" + "git_" + get_current_git_hash(4)
                             + "_" + config_env["env"]["name"]
                             )
 

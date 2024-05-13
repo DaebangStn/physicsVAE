@@ -59,7 +59,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
-#  runs/ep_12400_rew_7171.831_12400.pth
+  runs/ep_5400_rew_7173.4185_5400.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -124,8 +124,8 @@ hparam:
       input_divisor: 16
       num_obs: 140
 #      num_obs: 125
-#      obs_traj_len: 10
-      obs_traj_len: 4
+      obs_traj_len: 10
+#      obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
