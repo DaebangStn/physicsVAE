@@ -17,7 +17,7 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
             self._latent_dim = int(kwargs['space']['latent_dim'])
             super().__init__(param, **kwargs)  # build action/value/disc network
 
-            self._build_enc()
+            self._build_enc(**kwargs)
 
             self._build_latent_net = kwargs['latent']['build']
             if self._build_latent_net:
@@ -41,8 +41,20 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
                     nn.init.zeros_(m.bias)
             nn.init.uniform_(self._latent_enc_mlp[2].weight, -1, 1)
 
-        def _build_enc(self):
-            self._enc_linear = nn.Linear(self._disc_logistics.in_features, self._latent_dim)
+        def _build_enc(self, **kwargs):
+            if kwargs['enc']['separate']:
+                units = kwargs['enc']['units']
+                assert len(units) == 2, 'enc_mlp requires 2 hidden layers'
+                self._enc_mlp = nn.Sequential(
+                    nn.Linear(self._disc_mlp[0].in_features, units[0]),
+                    nn.ReLU(),
+                    nn.Linear(units[0], units[1]),
+                    nn.ReLU(),
+                )
+            else:
+                self._enc_mlp = self._disc_mlp
+
+            self._enc_linear = nn.Linear(self._enc_mlp[2].out_features, self._latent_dim)
             nn.init.uniform_(self._enc_linear.weight, -0.1, 0.1)
             nn.init.zeros_(self._enc_linear.bias)
 
@@ -51,7 +63,7 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
             return input_shape[0] + self._latent_dim
 
         def enc(self, normalized_obs):
-            out = self._disc_mlp(normalized_obs)
+            out = self._enc_mlp(normalized_obs)
             out = self._enc_linear(out)
             return torch.nn.functional.normalize(out, dim=-1)
 
