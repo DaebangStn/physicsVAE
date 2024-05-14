@@ -40,7 +40,7 @@ class CorePlayer(PpoPlayerContinuous):
 
         # placeholder for rollout
         self.dones = None
-        self.obses = None
+        self.obs = None
 
         self._init_variables(**kwargs)
 
@@ -62,9 +62,9 @@ class CorePlayer(PpoPlayerContinuous):
             if self._games_played >= n_games:
                 break
 
-            self.obses = self.env_reset(self.env)
+            self.obs = self.env_reset(self.env)
             batch_size = 1
-            batch_size = self.get_batch_size(self.obses['obs'], batch_size)
+            batch_size = self.get_batch_size(self.obs['obs'], batch_size)
 
             cr = torch.zeros(batch_size, dtype=torch.float32)
             steps = torch.zeros(batch_size, dtype=torch.float32)
@@ -72,14 +72,14 @@ class CorePlayer(PpoPlayerContinuous):
             print_game_res = False
 
             for self._n_step in range(self.max_steps):
-                self.obses = self.env_reset(self.env)
+                self.obs = self.env_reset(self.env)
                 if self.evaluation and self._n_step % self.update_checkpoint_freq == 0:
                     self.maybe_load_new_checkpoint()
 
-                action = self.get_action(self.obses['obs'], is_deterministic)
+                action = self.get_action(self.obs['obs'], is_deterministic)
 
                 self._pre_step()
-                self.obses, r, self.done, info = self.env_step(self.env, action)
+                self.obs, r, self.done, info = self.env_step(self.env, action)
                 self._post_step()
                 cr += r
                 steps += 1

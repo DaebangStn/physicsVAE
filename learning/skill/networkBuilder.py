@@ -51,10 +51,11 @@ class SkillNetworkBuilder(StyleNetworkBuilder):
                     nn.Linear(units[0], units[1]),
                     nn.ReLU(),
                 )
+                self._enc_linear = nn.Linear(units[1], self._latent_dim)
             else:
                 self._enc_mlp = self._disc_mlp
+                self._enc_linear = nn.Linear(self._disc_logistics.in_features, self._latent_dim)
 
-            self._enc_linear = nn.Linear(self._enc_mlp[2].out_features, self._latent_dim)
             nn.init.uniform_(self._enc_linear.weight, -0.1, 0.1)
             nn.init.zeros_(self._enc_linear.bias)
 

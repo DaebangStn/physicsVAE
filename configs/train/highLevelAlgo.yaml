@@ -1,9 +1,14 @@
 test: False
-debug: True
+debug: False
 
 algo:
   name: highLevelAlgo
   memo:
+  motion_file:
+#    assets/motions/dataset_humanoid.yaml
+#    assets/motions/amp_humanoid_run.npy
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+#    assets/motions/reallusion_sword_shield/locomotion2.yaml
 
 model:
   name: core
@@ -13,6 +18,17 @@ network:
   separate: True
 
   # config for space is the same as low-level policy
+  space:
+    continuous:
+      mu_activation: None
+      sigma_activation: None
+      mu_init:
+        name: default
+      sigma_init:
+        name: const_initializer
+        val: -2.9
+      fixed_sigma: True
+      learn_sigma: False
 
   mlp:
     units: [1024, 512]
@@ -22,6 +38,7 @@ network:
 
 
 checkpoint:  # from the project root
+#  runs/ep_3100_rew_6916.521_3100.pth
 
 
 hparam:
@@ -30,7 +47,7 @@ hparam:
   normalize_advantage: True
   clip_value: False
   reward_shaper: {}
-  save_frequency: 200
+  save_frequency: 10000
 
   # learning hyperparameters
   horizon_length: 32
@@ -39,12 +56,11 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 16384
+  minibatch_size: 20000
   mini_epochs: 6
 
-  learning_rate: 5e-4
-  lr_schedule: adaptive
-  kl_threshold: 0.008
+  learning_rate: 2e-5
+  lr_schedule: constant
 
   bound_loss_type: bound
   bounds_loss_coef: 10
@@ -52,15 +68,15 @@ hparam:
   entropy_coef: 0.0
 
   reward:
-    task_scale: 0.0
+    task_weight: 1.0
+    task_scale: 0.5
     disc_scale: 2.0
+    show_on_player: False
 
   llc:
     steps: 5
-    cfg: runs/keypointMaxObsTask_skillAlgo_07-06-04-58_rsi/algo_config.yaml
-    ckpt: runs/keypointMaxObsTask_skillAlgo_07-06-04-58_rsi/nn/last_keypointMaxObsTask_ep_11800_rew_7218.0073.pth
-  hlc:
-    demo_buf_size: 200000
+    cfg: archived_ckpt/ASE_Humanoid_11-16-57-18_loco4/algo_config_from_other.yaml
+    ckpt: archived_ckpt/ASE_Humanoid_11-16-57-18_loco4/Humanoid_ep_18500_rew_1155.2125_18500_converted.pth
 
 
 seed: 1

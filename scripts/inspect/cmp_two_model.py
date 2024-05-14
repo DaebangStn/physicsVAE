@@ -1,13 +1,11 @@
-from isaacgym import gymapi, gymtorch
 import torch
-from torchviz import make_dot
 from rl_games.algos_torch.model_builder import ModelBuilder
-from rl_games.algos_torch import torch_ext
 
 from learning.skill.model import SkillModel
 from learning.skill.networkBuilder import SkillNetworkBuilder
 from learning.ase_model_mine import SkillModelASE
 from learning.ase_network_builder import ASEBuilder
+from utils import load_checkpoint_to_network
 from utils.rl_games import register_net_n_model
 from utils.config import load_config, build_args, set_seed
 
@@ -44,14 +42,6 @@ def check_model(name: str, net1, net2, *net_input):
     elif isinstance(net1_out, torch.Tensor):
         assert torch.allclose(net1_out, net2_out, atol=1e-5), f"{name} mismatch!"
     print(f"{name} match!")
-
-
-def load_checkpoint_to_network(net, ckpt_path):
-    ckpt = torch_ext.load_checkpoint(ckpt_path)
-    try:
-        net.load_state_dict(ckpt['model'])
-    except RuntimeError as e:
-        print(f"Error: {e}")
 
 
 def main():

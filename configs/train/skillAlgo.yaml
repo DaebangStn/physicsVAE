@@ -59,7 +59,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
-  runs/ep_5400_rew_7173.4185_5400.pth
+  runs/ep_17500_rew_7094.7534_17500.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -111,7 +111,6 @@ hparam:
     task_scale: 0.0
     disc_scale: 4.0
     enc_scale: 1.0
-
     show_on_player: False
 
   style:

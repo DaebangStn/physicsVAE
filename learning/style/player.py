@@ -107,25 +107,25 @@ class StylePlayer(CorePlayer):
                                 show_matcher_out)
         self._matcher_obs_buf = TensorHistoryFIFO(motion_match_length)
 
-    def _disc_debug(self, disc_obs):
-        reward = disc_reward(self.model, disc_obs, self.device).mean().item()
+    def _calc_disc_rew(self, disc_obs):
+        reward = disc_reward(self.model, disc_obs).mean().item()
         print(f"disc_reward {reward:.3f}")
         self._write_stat(reward_disc=reward)
 
     def _pre_step(self):
         super()._pre_step()
         if self._show_reward:
-            self._disc_obs_buf.push_on_reset(self.obses['disc_obs'], self.dones)
+            self._disc_obs_buf.push_on_reset(self.obs['disc_obs'], self.dones)
         if self._matcher is not None:
-            self._matcher_obs_buf.push_on_reset(self.obses['matcher'], self.dones)
+            self._matcher_obs_buf.push_on_reset(self.obs['matcher'], self.dones)
 
     def _post_step(self):
         if self._show_reward:
-            self._disc_obs_buf.push(self.obses['disc_obs'])
-            self._disc_debug(self._disc_obs_buf.history)
+            self._disc_obs_buf.push(self.obs['disc_obs'])
+            self._calc_disc_rew(self._disc_obs_buf.history)
 
         if self._matcher is not None:
-            self._matcher_obs_buf.push(self.obses['matcher'])
+            self._matcher_obs_buf.push(self.obs['matcher'])
 
             if self._motion_logger is not None:
                 motion_id = self._matcher.match(self._matcher_obs_buf.history)

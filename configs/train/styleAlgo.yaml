@@ -3,7 +3,7 @@ debug: False
 
 algo:
   name: styleAlgo
-  memo: no_grad_truncate
+  memo:
   motion_file:
     assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
@@ -93,6 +93,7 @@ hparam:
     disc_weight: 1.0
     task_scale: 0.0
     disc_scale: 2.0
+    show_on_player: False
 
   style:
     replay_buf:

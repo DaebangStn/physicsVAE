@@ -1,6 +1,9 @@
 from typing import Optional
 
+import torch
+
 from learning.core.algorithm import CoreAlgorithm
+from utils import model_device
 from utils.angle import *
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
@@ -194,8 +197,7 @@ class StyleAlgorithm(CoreAlgorithm):
 
     def _calc_rollout_reward(self):
         super()._calc_rollout_reward()
-        style_reward = (disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'], self.device)
-                        * self._disc_rew_scale)
+        style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs']) * self._disc_rew_scale
         self.experience_buffer.tensor_dict['rewards'] += style_reward * self._disc_rew_w
         self._write_stat(
             disc_reward_mean=style_reward.mean().item(),
@@ -329,9 +331,9 @@ def motion_lib_angle_transform(
     return obs.view(num_steps, -1)
 
 
-def disc_reward(model, disc_obs, device):
+def disc_reward(model: torch.nn.Module, disc_obs: torch.Tensor):
     with torch.no_grad():
         disc = model.disc(model.norm_disc_obs(disc_obs))
         prob = 1 / (1 + torch.exp(-disc))
-        reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=device)))
+        reward = -torch.log(torch.maximum(1 - prob, torch.tensor(0.0001, device=disc_obs.device)))
         return reward
