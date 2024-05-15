@@ -10,7 +10,7 @@ from rl_games.common.datasets import PPODataset
 from rl_games.common import common_losses
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.a2c_continuous import A2CAgent
-from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase, print_statistics
+from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase
 
 from learning.logger.jitter import JitterLogger
 from utils.buffer import TensorHistoryFIFO
@@ -72,6 +72,8 @@ class CoreAlgorithm(A2CAgent):
         (advantage, batch_dict, curr_e_clip, lr_mul, old_action_log_probs_batch, old_mu_batch,
          old_sigma_batch, return_batch, value_preds_batch) = self._unpack_input(input_dict)
 
+        curr_train_result = {}
+
         with ((torch.cuda.amp.autocast(enabled=self.mixed_precision))):
             # 2. Run the model
             res_dict = self.model(batch_dict)
@@ -91,7 +93,9 @@ class CoreAlgorithm(A2CAgent):
                     - entropy * self.entropy_coef
                     + b_loss * self.bounds_loss_coef)
 
-            loss += self._additional_loss(batch_dict, res_dict)
+            more_loss, more_train_result = self._additional_loss(batch_dict, res_dict)
+            loss += more_loss
+            curr_train_result.update(more_train_result)
 
             self._write_stat(total_loss=loss.detach())
 
@@ -114,10 +118,16 @@ class CoreAlgorithm(A2CAgent):
                 'old_neglogp': old_action_log_probs_batch,
             }, curr_e_clip, 0)
 
-        mu = mu.detach()
-        sigma = sigma.detach()
-        kl = self._policy_kl(mu, sigma, old_mu_batch, old_sigma_batch)
-        self.train_result = (a_loss, c_loss, entropy, kl, self.last_lr, lr_mul, mu, sigma, b_loss)
+        curr_train_result.update({
+            'a_loss': a_loss,
+            'c_loss': c_loss,
+            'b_loss': b_loss,
+            'entropy': entropy,
+            'kl': self._policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch),
+            'lr': self.last_lr,
+            'lr_mul': lr_mul,
+        })
+        return curr_train_result
 
     def _discount_values(self, mb_fdones, mb_values, mb_rewards, mb_next_values):
         lastgaelam = 0
@@ -173,97 +183,83 @@ class CoreAlgorithm(A2CAgent):
 
         while True:
             epoch_num = self.update_epoch()
-            step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul \
-                = self.train_epoch()
-            total_time += sum_time
+            train_info = self.train_epoch()
+            total_time += train_info['total_time']
             frame = self.frame // self.num_agents
 
             # cleaning memory to optimize space
             self.dataset.update_values_dict(None)
-            should_exit = False
 
-            if self.global_rank == 0:
-                self.diagnostics.epoch(self, current_epoch=epoch_num)
-                # do we need scaled_time?
-                scaled_time = self.num_agents * sum_time
-                scaled_play_time = self.num_agents * play_time
-                curr_frames = self.curr_frames * self.world_size if self.multi_gpu else self.curr_frames
-                self.frame += curr_frames
+            self.diagnostics.epoch(self, current_epoch=epoch_num)
+            self.frame += self.curr_frames
+            self.write_tensorboard(train_info)
+            self.print_console(epoch_num, frame, train_info)
 
-                print_statistics(self.print_stats, curr_frames, step_time, scaled_play_time, scaled_time,
-                                 epoch_num, self.max_epochs, frame, self.max_frames)
+            if self.game_rewards.current_size > 0:
+                self.print_game(frame, epoch_num, total_time)
+                self.save_ckpt(epoch_num)
 
-                self.write_stats(total_time, epoch_num, step_time, play_time, update_time,
-                                 a_losses, c_losses, entropies, kls, last_lr, lr_mul, frame,
-                                 scaled_time, scaled_play_time, curr_frames)
-
-                if len(b_losses) > 0:
-                    self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(b_losses).item(), frame)
-
-                mean_rewards = 0
-                if self.game_rewards.current_size > 0:
-                    mean_rewards = self.game_rewards.get_mean()
-                    mean_lengths = self.game_lengths.get_mean()
-                    self.mean_rewards = mean_rewards[0]
-
-                    for i in range(self.value_size):
-                        rewards_name = 'rewards' if i == 0 else 'rewards{0}'.format(i)
-                        self.writer.add_scalar(rewards_name + '/step'.format(i), mean_rewards[i], frame)
-                        self.writer.add_scalar(rewards_name + '/iter'.format(i), mean_rewards[i], epoch_num)
-                        self.writer.add_scalar(rewards_name + '/time'.format(i), mean_rewards[i], total_time)
-
-                    self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
-                    self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
-                    self.writer.add_scalar('episode_lengths/time', mean_lengths, total_time)
-
-                    if self.has_self_play_config:
-                        self.self_play_manager.update(self)
-
-                    checkpoint_name = 'ep_' + str(epoch_num) + '_rew_' + str(mean_rewards[0])
-
-                    if self.save_freq > 0:
-                        if epoch_num % self.save_freq == 0:
-                            self.save(os.path.join(self.nn_dir, 'last_' + checkpoint_name))
-                        if epoch_num % self.int_save_freq == 0:
-                            if self._prev_int_ckpt_path is not None:
-                                os.remove(self._prev_int_ckpt_path + '.pth')
-                            self._prev_int_ckpt_path = os.path.join(self.nn_dir, checkpoint_name + f'_{epoch_num}')
-                            self.save(self._prev_int_ckpt_path)
-
-                    if mean_rewards[0] > self.last_mean_rewards and epoch_num >= self.save_best_after:
-                        print('saving next best rewards: ', mean_rewards)
-                        self.last_mean_rewards = mean_rewards[0]
-                        self.save(os.path.join(self.nn_dir, self.config['name']))
-
-                        if 'score_to_win' in self.config:
-                            if self.last_mean_rewards > self.config['score_to_win']:
-                                print('Maximum reward achieved. Network won!')
-                                self.save(os.path.join(self.nn_dir, checkpoint_name))
-                                should_exit = True
-
-                if epoch_num >= self.max_epochs != -1:
-                    if self.game_rewards.current_size == 0:
-                        print('WARNING: Max epochs reached before any env terminated at least once')
-                        mean_rewards = -np.inf
-
-                    self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_ep_' + str(epoch_num)
-                                           + '_rew_' + str(mean_rewards).replace('[', '_').replace(']', '_')))
-                    print('MAX EPOCHS NUM!')
-                    should_exit = True
-
-                if self.frame >= self.max_frames != -1:
-                    if self.game_rewards.current_size == 0:
-                        print('WARNING: Max frames reached before any env terminated at least once')
-                        mean_rewards = -np.inf
-
-                    self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_frame_' + str(self.frame)
-                                           + '_rew_' + str(mean_rewards).replace('[', '_').replace(']', '_')))
-                    print('MAX FRAMES NUM!')
-                    should_exit = True
-
-            if should_exit:
+            if self.check_exit(epoch_num):
                 self._cleanup()
                 return self.last_mean_rewards, epoch_num
+
+    def train_epoch(self):
+        super(ContinuousA2CBase, self).train_epoch()
+
+        self.set_eval()
+        play_time_start = time.time()
+        with torch.no_grad():
+            batch_dict = self.play_steps()
+        play_time_end = time.time()
+
+        update_time_start = time.time()
+
+        self.set_train()
+        self.curr_frames = batch_dict.pop('played_frames')
+        self.prepare_dataset(batch_dict)
+        self.algo_observer.after_steps()
+        if self.has_central_value:
+            self.train_central_value()
+
+        train_info = {}
+
+        for mini_ep in range(0, self.mini_epochs_num):
+            ep_kls = []
+            for i in range(len(self.dataset)):
+                curr_train_info = self.calc_gradients(self.dataset[i])
+                for k, v in curr_train_info.items():
+                    if k in train_info:
+                        train_info[k].append(v)
+                    else:
+                        train_info[k] = [v]
+
+                if self.schedule_type == 'legacy':
+                    kl = curr_train_info['kl']
+                    ep_kls.append(kl)
+                    self.last_lr, self.entropy_coef = (
+                        self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, kl))
+                    self.update_lr(self.last_lr)
+
+            av_kls = torch_ext.mean_list(ep_kls)
+            if self.schedule_type == 'standard':
+                self.last_lr, self.entropy_coef = (
+                    self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item()))
+                self.update_lr(self.last_lr)
+
+            self.diagnostics.mini_epoch(self, mini_ep)
+            if self.normalize_input:
+                self.model.running_mean_std.eval()
+
+        update_time_end = time.time()
+
+        train_info.update({
+            'play_time': play_time_end - play_time_start,
+            'update_time': update_time_end - update_time_start,
+            'total_time': update_time_end - play_time_start,
+        })
+
+        return train_info
+
 
     def play_steps(self):
         step_time = 0.0
@@ -324,6 +320,104 @@ class CoreAlgorithm(A2CAgent):
         self._post_rollout(batch_dict)
 
         return batch_dict
+
+    def check_exit(self, epoch_num):
+        mean_rewards = self.game_rewards.get_mean()[0]
+
+        if epoch_num >= self.max_epochs != -1:
+            if self.game_rewards.current_size == 0:
+                print('WARNING: Max epochs reached before any env terminated at least once')
+                mean_rewards = -np.inf
+
+            self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_ep_' + str(epoch_num)
+                                   + '_rew_' + str(mean_rewards).replace('[', '_').replace(']', '_'))
+                      )
+            print('MAX EPOCHS NUM!')
+            return True
+
+        if self.frame >= self.max_frames != -1:
+            if self.game_rewards.current_size == 0:
+                print('WARNING: Max frames reached before any env terminated at least once')
+                mean_rewards = -np.inf
+
+            self.save(os.path.join(self.nn_dir, 'last_' + self.config['name'] + '_frame_' + str(self.frame)
+                                   + '_rew_' + str(mean_rewards).replace('[', '_').replace(']', '_'))
+                      )
+            print('MAX FRAMES NUM!')
+            return True
+
+        return False
+
+    def save_ckpt(self, epoch_num):
+        mean_rewards = self.game_rewards.get_mean()[0]
+        checkpoint_name = 'ep_' + str(epoch_num) + '_rew_' + str(mean_rewards)
+
+        if self.save_freq > 0:
+            if epoch_num % self.save_freq == 0:
+                self.save(os.path.join(self.nn_dir, 'last_' + checkpoint_name))
+            if epoch_num % self.int_save_freq == 0:
+                if self._prev_int_ckpt_path is not None:
+                    os.remove(self._prev_int_ckpt_path + '.pth')
+                self._prev_int_ckpt_path = os.path.join(self.nn_dir, checkpoint_name + f'_{epoch_num}')
+                self.save(self._prev_int_ckpt_path)
+
+        if mean_rewards > self.last_mean_rewards and epoch_num >= self.save_best_after:
+            print('saving next best rewards: ', mean_rewards)
+            self.last_mean_rewards = mean_rewards
+            self.save(os.path.join(self.nn_dir, self.config['name']))
+
+    def print_game(self, frame, epoch_num, total_time):
+        mean_rewards = self.game_rewards.get_mean()
+        mean_lengths = self.game_lengths.get_mean()
+        self.mean_rewards = mean_rewards[0]
+
+        self.writer.add_scalar('rewards/step', mean_rewards[0], frame)
+        self.writer.add_scalar('rewards/iter', mean_rewards[0], epoch_num)
+        self.writer.add_scalar('rewards/time', mean_rewards[0], total_time)
+
+        self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
+        self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
+        self.writer.add_scalar('episode_lengths/time', mean_lengths, total_time)
+
+    def print_console(self, epoch_num: int, frame: int, train_info: dict):
+        step_time = max(train_info['step_time'], 1e-9)
+        fps_step = self.curr_frames / step_time
+        fps_step_inference = self.curr_frames / train_info['update_time']
+        fps_total = self.curr_frames / train_info['total_time']
+
+        if self.max_epochs == -1 and self.max_frames == -1:
+            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} '
+                  f'fps total: {fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}')
+        elif self.max_epochs == -1:
+            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: '
+                  f'{fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}/{self.max_frames:.0f}')
+        elif self.max_frames == -1:
+            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: '
+                  f'{fps_total:.0f} epoch: {epoch_num:.0f}/{self.max_epochs:.0f} frames: {frame:.0f}')
+        else:
+            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: '
+                  f'{fps_total:.0f} epoch: {epoch_num:.0f}/{self.max_epochs:.0f} '
+                  f'frames: {frame:.0f}/{self.max_frames:.0f}')
+
+    def write_tensorboard(self, train_info: dict):
+        info = {
+            'step_inference_rl_update_fps': self.curr_frames / train_info['update_time'],
+            'step_inference_fps': self.curr_frames / train_info['play_time'],
+            'step_fps': self.curr_frames / train_info['total_time'],
+            'rl_update_time': train_info['update_time'],
+            'step_inference_time': train_info['play_time'],
+
+            'a_loss': torch_ext.mean_list(train_info['a_loss']).item(),
+            'b_loss': torch_ext.mean_list(train_info['b_loss']).item(),
+            'c_loss': torch_ext.mean_list(train_info['c_loss']).item(),
+
+            'kl': torch_ext.mean_list(train_info['kl']).item(),
+            'entropy': torch_ext.mean_list(train_info['entropy']).item(),
+            'lr': sum(train_info['lr']) / len(train_info['lr']),
+            'lr_mul': sum(train_info['lr_mul']) / len(train_info['lr_mul']),
+        }
+
+        self._write_stat(**info)
 
     def prepare_dataset(self, batch_dict):
         """
@@ -464,8 +558,10 @@ class CoreAlgorithm(A2CAgent):
     def _write_stat(self, **kwargs):
         frame = self.frame // self.num_agents
         for k, v in kwargs.items():
-            if k.endswith("loss"):
+            if k.endswith("loss") or k == "entropy" or k != "disc_logit_loss":
                 self.writer.add_scalar(f'losses/{k}', v, frame)
+            elif k.endswith("fps") or k.endswith("time"):
+                self.writer.add_scalar(f'performance/{k}', v, frame)
             else:
                 self.writer.add_scalar(f'info/{k}', v, frame)
 
@@ -486,7 +582,7 @@ class CoreAlgorithm(A2CAgent):
         if self._jitter_obs_buf is not None:
             jitter_loss = self._jitter_loss(batch_dict)
             loss += jitter_loss * self._jitter_loss_coef
-        return loss
+        return loss, {}
 
     def _jitter_loss(self, batch_dict):
         jitter_obs = batch_dict['jitter_obs'].view(-1, self._JITTER_SIZE, self.model.input_size)

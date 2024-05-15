@@ -1,9 +1,9 @@
 from typing import Optional
 
 import torch
+from rl_games.algos_torch import torch_ext
 
 from learning.core.algorithm import CoreAlgorithm
-from utils import model_device
 from utils.angle import *
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
@@ -91,12 +91,29 @@ class StyleAlgorithm(CoreAlgorithm):
 
         self._update_replay_buffer(batch_dict['disc_obs'])
 
+    def write_tensorboard(self, train_info: dict):
+        super().write_tensorboard(train_info)
+        info = {
+            'disc_loss': torch_ext.mean_list(train_info['disc_loss']).item(),
+            'pred_loss': torch_ext.mean_list(train_info['pred_loss']).item(),
+            'disc_logit_loss': torch_ext.mean_list(train_info['disc_logit_loss']).item(),
+            'disc_grad_penalty': torch_ext.mean_list(train_info['disc_grad_penalty']).item(),
+            'disc_agent_acc': torch_ext.mean_list(train_info['disc_agent_acc']).item(),
+            'disc_demo_acc': torch_ext.mean_list(train_info['disc_demo_acc']).item(),
+            'disc_agent_logit': torch_ext.mean_list(train_info['disc_agent_logit']).item(),
+            'disc_demo_logit': torch_ext.mean_list(train_info['disc_demo_logit']).item(),
+        }
+        self._write_stat(**info)
+
     def _additional_loss(self, batch_dict, res_dict):
-        loss = super()._additional_loss(batch_dict, res_dict)
+        loss, train_result = super()._additional_loss(batch_dict, res_dict)
+
         agent_disc_logit = torch.cat([res_dict['rollout_disc_logit'], res_dict['replay_disc_logit']], dim=0)
-        d_loss = self._disc_loss(agent_disc_logit, res_dict['demo_disc_logit'], batch_dict)
+        d_loss, disc_train_result = self._disc_loss(agent_disc_logit, res_dict['demo_disc_logit'], batch_dict)
         loss += d_loss * self._disc_loss_coef
-        return loss
+        train_result.update(disc_train_result)
+
+        return loss, train_result
 
     def _disc_loss(self, agent_disc_logit, demo_disc_logit, batch_dict):
         # prediction
@@ -130,19 +147,18 @@ class StyleAlgorithm(CoreAlgorithm):
         agent_disc_logit = torch.mean(agent_disc_logit)
         demo_disc_logit = torch.mean(demo_disc_logit)
 
-        self._write_stat(
-            disc_loss=loss.detach(),
-            pred_loss=pred_loss.detach(),
-            disc_logit_loss=logit_weights_loss.detach(),
-            disc_weight_loss=disc_weights_loss.detach(),
-            disc_grad_penalty=penalty_loss.detach(),
-            disc_agent_acc=agent_acc.detach(),
-            disc_demo_acc=demo_acc.detach(),
-            disc_agent_logit=agent_disc_logit.detach(),
-            disc_demo_logit=demo_disc_logit.detach(),
-        )
+        train_result = {
+            'disc_loss': loss.detach(),
+            'pred_loss': pred_loss.detach(),
+            'disc_logit_loss': logit_weights_loss.detach(),
+            'disc_grad_penalty': penalty_loss.detach(),
+            'disc_agent_acc': agent_acc.detach(),
+            'disc_demo_acc': demo_acc.detach(),
+            'disc_agent_logit': agent_disc_logit.detach(),
+            'disc_demo_logit': demo_disc_logit.detach(),
+        }
 
-        return loss
+        return loss, train_result
 
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
