@@ -101,9 +101,9 @@ class CoreAlgorithm(A2CAgent):
 
         # 5. Back propagate the loss
         self.scaler.scale(loss).backward()
-        self.trancate_gradients_and_step()
-        # self.scaler.step(self.optimizer)
-        # self.scaler.update()
+        # self.trancate_gradients_and_step()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
 
         # 6. Store the results
         self.diagnostics.mini_batch(
