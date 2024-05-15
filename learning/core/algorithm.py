@@ -286,7 +286,7 @@ class CoreAlgorithm(A2CAgent):
             step_time += (step_time_end - step_time_start)
 
             next_vals = self.get_values(self.obs)
-            next_vals *= ~self.dones.unsqueeze(1)
+            next_vals *= ~infos['terminate'].unsqueeze(1)
             self.experience_buffer.update_data('next_values', n, next_vals)
             self.experience_buffer.update_data('rewards', n, rewards)
             self.experience_buffer.update_data('dones', n, self.dones)

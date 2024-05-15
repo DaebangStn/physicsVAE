@@ -5,9 +5,9 @@ algo:
   name: styleAlgo
   memo:
   motion_file:
-    assets/motions/amp_humanoid_run.npy
+#    assets/motions/amp_humanoid_run.npy
 #    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
-#    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
 
 model:
   name: style
@@ -43,7 +43,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_amp_08-10-13-08_my_net/nn/keypointMaxObsTask.pth
 
-#  runs/Humanoid_00010000_converted.pth
+#  runs/keypointMaxObsTask_ep_3500_rew_7166.2437_3500.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
@@ -104,10 +104,10 @@ hparam:
     disc:
       # denominator for collected data within the rollout
       input_divisor: 16
-#      num_obs: 140
-      num_obs: 125
-      obs_traj_len: 4
-#      obs_traj_len: 10
+      num_obs: 140
+#      num_obs: 125
+#      obs_traj_len: 4
+      obs_traj_len: 10
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001

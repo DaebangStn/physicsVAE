@@ -1,12 +1,6 @@
-from typing import Dict, Optional, Tuple
-
-import torch
-from isaacgym import gymtorch, gymapi
-
 from env.keypointMaxObs import KeypointMaxObsTask
 from utils import *
-from utils.env import *
-
+from utils.env import drop_transform
 
 
 class HeadingTask(KeypointMaxObsTask):

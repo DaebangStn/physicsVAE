@@ -12,6 +12,7 @@ def build_runner():
     from env.keypoint import KeypointTask
     from env.keypointMaxObs import KeypointMaxObsTask
     from env.keypointLocation import KeypointLocationTask
+    from env.location import LocationTask
     from env.cart import CartTask
 
     from learning.core.model import CoreModel
@@ -46,6 +47,7 @@ def build_runner():
     register_env_rl_games('keypointTask', KeypointTask)
     register_env_rl_games('keypointMaxObsTask', KeypointMaxObsTask)
     register_env_rl_games('keypointLocationTask', KeypointLocationTask)
+    register_env_rl_games('locationTask', LocationTask)
     register_env_rl_games('cartTask', CartTask)
 
     register_net_n_model('core', CoreNetworkBuilder, CoreModel)

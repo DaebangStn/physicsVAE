@@ -1,9 +1,6 @@
 import os
-import random
-import sys
 
 import yaml
-from typing import Tuple, Optional
 from datetime import datetime
 from git import Repo
 

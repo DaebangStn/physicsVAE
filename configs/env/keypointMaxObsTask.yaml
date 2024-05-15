@@ -1,6 +1,6 @@
 env:
   name: keypointMaxObsTask
-  num_envs: 2500
+  num_envs: 2048
   spacing: 4
 
   humanoid_asset_filename:  # from the project root

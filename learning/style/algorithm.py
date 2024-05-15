@@ -103,7 +103,7 @@ class StyleAlgorithm(CoreAlgorithm):
         bce = torch.nn.BCEWithLogitsLoss()
         agent_loss = bce(agent_disc_logit, torch.zeros_like(agent_disc_logit))
         demo_loss = bce(demo_disc_logit, torch.ones_like(demo_disc_logit))
-        pred_loss = agent_loss + demo_loss
+        pred_loss = (agent_loss + demo_loss) * 0.5
 
         # weights regularization
         # (logit)
@@ -119,7 +119,7 @@ class StyleAlgorithm(CoreAlgorithm):
                                         grad_outputs=torch.ones_like(demo_disc_logit))[0]
         penalty_loss = torch.mean(torch.sum(torch.square(demo_grad), dim=-1))
 
-        loss = (pred_loss * 0.5 +
+        loss = (pred_loss +
                 self._disc_logit_reg_scale * logit_weights_loss +
                 self._disc_reg_scale * disc_weights_loss +
                 self._disc_grad_penalty_scale * penalty_loss)

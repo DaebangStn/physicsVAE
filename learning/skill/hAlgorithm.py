@@ -42,8 +42,8 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
         z = torch.nn.functional.normalize(actions, dim=-1)
 
-        rew_step = torch.zeros(self.vec_env.num, device=self.device)
-        disc_rew_step = torch.zeros(self.vec_env.num, device=self.device)
+        rew_step = torch.zeros(self.vec_env.num, device=self.device).unsqueeze(1)
+        disc_rew_step = torch.zeros(self.vec_env.num, device=self.device).unsqueeze(1)
         obs_step = None
         for i in range(self._llc_steps):
             obs_step = self.env_reset(self.dones.nonzero()[:, 0])

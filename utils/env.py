@@ -1,8 +1,4 @@
-import math
-from typing import List
-import numpy as np
-import torch
-from isaacgym import gymapi
+from utils import *
 
 
 def default_asset_option():

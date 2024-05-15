@@ -61,7 +61,7 @@ class HumanoidTask(VecTask):
 
         self._dof_per_env = self._buf["dof"].shape[0] // self._num_envs
         dof_state_tensor_reshaped = ((self._buf["dof"].view(self._num_envs, self._dof_per_env, 2))
-        [:, :self._num_humanoid_dof])
+                                     [:, :self._num_humanoid_dof])
         # Caution! shape (num_envs, num_humanoid_dof, 2)
         self._buf["dofInit"] = torch.zeros_like(dof_state_tensor_reshaped)
         self._buf["dPos"] = dof_state_tensor_reshaped[..., 0]
@@ -234,7 +234,6 @@ class HumanoidTask(VecTask):
         return env_cfg
 
     def _pre_physics(self, actions: torch.Tensor):
-        actions = actions.to(self._compute_device).clone()
         pd_target = gymtorch.unwrap_tensor(actions * self._action_scale + self._action_ofs)
         self._gym.set_dof_position_target_tensor(self._sim, pd_target)
 
@@ -280,9 +279,6 @@ class HumanoidTask(VecTask):
             self._sim, gymtorch.unwrap_tensor(self._buf["actor"]), id_gym, len(env_ids))
         self._gym.set_dof_state_tensor_indexed(
             self._sim, gymtorch.unwrap_tensor(self._buf["dof"]), id_gym, len(env_ids))
-
-    def _reset_surroundings(self, env_ids: torch.Tensor):
-        pass
 
     def _update_viewer_env0(self):
         if self._viewer is None:
