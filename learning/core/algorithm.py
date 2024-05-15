@@ -1,18 +1,11 @@
-import os
-import time
-import yaml
-from typing import Optional
-
-import numpy as np
-import torch
 from torch.optim import Adam
 from rl_games.common.datasets import PPODataset
 from rl_games.common import common_losses
-from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common.a2c_common import swap_and_flatten01, ContinuousA2CBase
 
 from learning.logger.jitter import JitterLogger
+from utils import *
 from utils.buffer import TensorHistoryFIFO
 from utils.rl_games import rl_games_net_build_param
 
@@ -57,6 +50,7 @@ class CoreAlgorithm(A2CAgent):
         self._prepare_data(**kwargs)
 
         # placeholders for the current episode
+        self.play_info = {}
         self.train_result = None
         self.reward = None
         self.dones = None
@@ -84,7 +78,8 @@ class CoreAlgorithm(A2CAgent):
             sigma = res_dict['sigmas']
 
             # 3. Calculate the loss
-            a_loss = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip).mean()
+            a_loss, clip_frac = self._actor_loss(old_action_log_probs_batch, action_log_probs, advantage, curr_e_clip)
+            a_loss = a_loss.mean()
             c_loss = self._critic_loss(curr_e_clip, return_batch, value_preds_batch, normalized_values).mean()
             b_loss = self._bound_loss(mu).mean()
 
@@ -96,8 +91,7 @@ class CoreAlgorithm(A2CAgent):
             more_loss, more_train_result = self._additional_loss(batch_dict, res_dict)
             loss += more_loss
             curr_train_result.update(more_train_result)
-
-            self._write_stat(total_loss=loss.detach())
+            curr_train_result['total_loss'] = loss.detach()
 
             # 4. Zero the gradients
             for param in self.model.parameters():
@@ -120,6 +114,7 @@ class CoreAlgorithm(A2CAgent):
 
         curr_train_result.update({
             'a_loss': a_loss,
+            'clip_frac': clip_frac,
             'c_loss': c_loss,
             'b_loss': b_loss,
             'entropy': entropy,
@@ -206,10 +201,13 @@ class CoreAlgorithm(A2CAgent):
     def train_epoch(self):
         super(ContinuousA2CBase, self).train_epoch()
 
+        train_info = {}
+
         self.set_eval()
         play_time_start = time.time()
         with torch.no_grad():
             batch_dict = self.play_steps()
+        train_info.update(self.play_info)
         play_time_end = time.time()
 
         update_time_start = time.time()
@@ -220,8 +218,6 @@ class CoreAlgorithm(A2CAgent):
         self.algo_observer.after_steps()
         if self.has_central_value:
             self.train_central_value()
-
-        train_info = {}
 
         for mini_ep in range(0, self.mini_epochs_num):
             ep_kls = []
@@ -303,7 +299,7 @@ class CoreAlgorithm(A2CAgent):
 
         self._calc_rollout_reward()
         mb_rewards = self.experience_buffer.tensor_dict['rewards']
-        self._write_stat(total_reward=mb_rewards.mean().item())
+        self.play_info['total_reward'] = mb_rewards.mean()
 
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
         mb_values = self.experience_buffer.tensor_dict['values']
@@ -375,46 +371,52 @@ class CoreAlgorithm(A2CAgent):
         self.writer.add_scalar('rewards/iter', mean_rewards[0], epoch_num)
         self.writer.add_scalar('rewards/time', mean_rewards[0], total_time)
 
-        self.writer.add_scalar('episode_lengths/step', mean_lengths, frame)
+        self.writer.add_scalar('episode_lengths/frame', mean_lengths, frame)
         self.writer.add_scalar('episode_lengths/iter', mean_lengths, epoch_num)
         self.writer.add_scalar('episode_lengths/time', mean_lengths, total_time)
 
     def print_console(self, epoch_num: int, frame: int, train_info: dict):
-        step_time = max(train_info['step_time'], 1e-9)
+        step_time = max(train_info['total_time'], 1e-9)
         fps_step = self.curr_frames / step_time
         fps_step_inference = self.curr_frames / train_info['update_time']
         fps_total = self.curr_frames / train_info['total_time']
 
         if self.max_epochs == -1 and self.max_frames == -1:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} '
+            print(f'fps step: {fps_step:.0f} fps policy inference: {fps_step_inference:.0f} '
                   f'fps total: {fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}')
         elif self.max_epochs == -1:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: '
+            print(f'fps step: {fps_step:.0f} fps policy inference: {fps_step_inference:.0f} fps total: '
                   f'{fps_total:.0f} epoch: {epoch_num:.0f} frames: {frame:.0f}/{self.max_frames:.0f}')
         elif self.max_frames == -1:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: '
+            print(f'fps step: {fps_step:.0f} fps policy inference: {fps_step_inference:.0f} fps total: '
                   f'{fps_total:.0f} epoch: {epoch_num:.0f}/{self.max_epochs:.0f} frames: {frame:.0f}')
         else:
-            print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: '
+            print(f'fps step: {fps_step:.0f} fps policy inference: {fps_step_inference:.0f} fps total: '
                   f'{fps_total:.0f} epoch: {epoch_num:.0f}/{self.max_epochs:.0f} '
                   f'frames: {frame:.0f}/{self.max_frames:.0f}')
 
     def write_tensorboard(self, train_info: dict):
         info = {
-            'step_inference_rl_update_fps': self.curr_frames / train_info['update_time'],
+            'rl_update_fps': self.curr_frames / train_info['update_time'],
             'step_inference_fps': self.curr_frames / train_info['play_time'],
-            'step_fps': self.curr_frames / train_info['total_time'],
+            'total_fps': self.curr_frames / train_info['total_time'],
             'rl_update_time': train_info['update_time'],
             'step_inference_time': train_info['play_time'],
 
+            'total_reward': train_info['total_reward'].mean().item(),
+            'task_reward_mean': train_info['task_reward'].mean().item(),
+            'task_reward_std': train_info['task_reward'].std().item(),
+
+            'total_loss': torch_ext.mean_list(train_info['total_loss']).item(),
             'a_loss': torch_ext.mean_list(train_info['a_loss']).item(),
-            'b_loss': torch_ext.mean_list(train_info['b_loss']).item(),
+            'clip_frac': torch_ext.mean_list(train_info['clip_frac']).item(),
+            'bounds_loss': torch_ext.mean_list(train_info['b_loss']).item(),
             'c_loss': torch_ext.mean_list(train_info['c_loss']).item(),
 
             'kl': torch_ext.mean_list(train_info['kl']).item(),
             'entropy': torch_ext.mean_list(train_info['entropy']).item(),
-            'lr': sum(train_info['lr']) / len(train_info['lr']),
-            'lr_mul': sum(train_info['lr_mul']) / len(train_info['lr_mul']),
+            'lr': mean_list(train_info['lr']),
+            'lr_mul': mean_list(train_info['lr_mul']),
         }
 
         self._write_stat(**info)
@@ -437,9 +439,7 @@ class CoreAlgorithm(A2CAgent):
         a_loss = torch.max(-surr1, -surr2)
 
         clipped = torch.abs(ratio - 1.0) > curr_e_clip
-        self._write_stat(clip_frac=clipped.detach().float().mean().item())
-
-        return a_loss
+        return a_loss, clipped.float().mean()
 
     def _bound_loss(self, mu):
         if self.bound_loss_type == 'regularisation':
@@ -453,10 +453,7 @@ class CoreAlgorithm(A2CAgent):
     def _calc_rollout_reward(self):
         task_reward = self.experience_buffer.tensor_dict['rewards'] * self._task_rew_scale
         self.experience_buffer.tensor_dict['rewards'] *= self._task_rew_w
-        self._write_stat(
-            task_reward_mean=task_reward.mean().item(),
-            task_reward_std=task_reward.std().item(),
-        )
+        self.play_info['task_reward'] = task_reward
 
     def _critic_loss(self, curr_e_clip, return_batch, value_preds_batch, values):
         if self.has_value_loss:
@@ -558,7 +555,7 @@ class CoreAlgorithm(A2CAgent):
     def _write_stat(self, **kwargs):
         frame = self.frame // self.num_agents
         for k, v in kwargs.items():
-            if k.endswith("loss") or k == "entropy" or k != "disc_logit_loss":
+            if (k.endswith("loss") or k == "entropy") and k != "disc_logit_loss":
                 self.writer.add_scalar(f'losses/{k}', v, frame)
             elif k.endswith("fps") or k.endswith("time"):
                 self.writer.add_scalar(f'performance/{k}', v, frame)
@@ -594,7 +591,7 @@ class CoreAlgorithm(A2CAgent):
         return jitter_loss
 
     def _pre_rollout(self):
-        pass
+        self.play_info = {}
 
     def _post_rollout(self, batch_dict):
         if self._jitter_obs_buf is not None:

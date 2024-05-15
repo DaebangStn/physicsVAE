@@ -1,5 +1,7 @@
 import os
 import sys
+import time
+import yaml
 import math
 import random
 from typing import Tuple, Optional, List, Dict
@@ -32,3 +34,11 @@ def reshape_gym_box(box, shape: tuple):
     low = box.low[0]
     high = box.high[0]
     return Box(low, high, dtype=box.dtype, shape=shape)
+
+
+def mean_list(lst: List[float]) -> float:
+    return sum(lst) / len(lst)
+
+
+def std_tensor_list(lst: List[torch.Tensor]) -> torch.Tensor:
+    return torch.std(torch.stack(lst), dim=0)

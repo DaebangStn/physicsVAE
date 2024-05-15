@@ -1,9 +1,5 @@
-from typing import Optional
-
-import torch
-from rl_games.algos_torch import torch_ext
-
 from learning.core.algorithm import CoreAlgorithm
+from utils import *
 from utils.angle import *
 from utils.buffer import MotionLibFetcher, TensorHistoryFIFO, SingleTensorBuffer
 
@@ -94,6 +90,9 @@ class StyleAlgorithm(CoreAlgorithm):
     def write_tensorboard(self, train_info: dict):
         super().write_tensorboard(train_info)
         info = {
+            'disc_reward_mean': train_info['style_reward'].mean().item(),
+            'disc_reward_std': train_info['style_reward'].std().item(),
+
             'disc_loss': torch_ext.mean_list(train_info['disc_loss']).item(),
             'pred_loss': torch_ext.mean_list(train_info['pred_loss']).item(),
             'disc_logit_loss': torch_ext.mean_list(train_info['disc_logit_loss']).item(),
@@ -215,10 +214,7 @@ class StyleAlgorithm(CoreAlgorithm):
         super()._calc_rollout_reward()
         style_reward = disc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs']) * self._disc_rew_scale
         self.experience_buffer.tensor_dict['rewards'] += style_reward * self._disc_rew_w
-        self._write_stat(
-            disc_reward_mean=style_reward.mean().item(),
-            disc_reward_std=style_reward.std().item(),
-        )
+        self.play_info['style_reward'] = style_reward
 
     def _post_step(self, n: int):
         super()._post_step(n)

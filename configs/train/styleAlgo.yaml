@@ -6,8 +6,7 @@ algo:
   memo:
   motion_file:
 #    assets/motions/amp_humanoid_run.npy
-#    assets/motions/reallusion_sword_shield/RL_Avatar_Atk_Jump_Motion.npy
-    assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+    assets/motions/reallusion_sword_shield/locomotion4.yaml
 
 model:
   name: style
@@ -106,8 +105,8 @@ hparam:
       input_divisor: 16
       num_obs: 140
 #      num_obs: 125
-#      obs_traj_len: 4
       obs_traj_len: 10
+#      obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001

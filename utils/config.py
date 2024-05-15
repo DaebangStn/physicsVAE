@@ -38,8 +38,7 @@ def build_args() -> Namespace:
 
 def get_current_git_hash(reduce: Optional[int] = None) -> str:
     repo = Repo(PROJECT_ROOT)
-    branch = repo.active_branch
-    commit_hash = str(branch.commit.hexsha)
+    commit_hash = str(repo.head.commit.hexsha)
     if reduce is not None:
         commit_hash = commit_hash[:reduce]
     return commit_hash

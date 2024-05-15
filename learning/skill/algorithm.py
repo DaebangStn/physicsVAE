@@ -1,6 +1,7 @@
-from typing import Optional
+import torch
 
 from learning.style.algorithm import StyleAlgorithm
+from utils import *
 from utils.angle import *
 from utils.env import sample_color
 
@@ -61,13 +62,27 @@ class SkillAlgorithm(StyleAlgorithm):
         dataset_dict = self.dataset.values_dict
         dataset_dict['latent'] = batch_dict['latent']
 
+    def write_tensorboard(self, train_info: dict):
+        super().write_tensorboard(train_info)
+        info = {
+            'enc_reward_mean': self.play_info['skill_reward'].mean().item(),
+            'enc_reward_std': self.play_info['skill_reward'].std().item(),
+
+            'amp_diversity_loss': torch_ext.mean_list(train_info['amp_diversity_loss']).item(),
+            'enc_loss': torch_ext.mean_list(train_info['enc_loss']).item(),
+        }
+        self._write_stat(**info)
+
     def _additional_loss(self, batch_dict, res_dict):
-        loss = super()._additional_loss(batch_dict, res_dict)
-        e_loss = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
-        loss += e_loss * self._enc_loss_coef
-        div_loss = self._diversity_loss(batch_dict, res_dict['mus'])
+        loss, train_result = super()._additional_loss(batch_dict, res_dict)
+        # e_loss, enc_train_result = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
+        # loss += e_loss * self._enc_loss_coef
+        enc_train_result = {'enc_loss': torch.tensor(0.0, device=self.device)}
+        train_result.update(enc_train_result)
+        div_loss, div_train_result = self._diversity_loss(batch_dict, res_dict['mus'])
         loss += div_loss * self._div_loss_coef
-        return loss
+        train_result.update(div_train_result)
+        return loss, train_result
 
     def _diversity_loss(self, batch_dict, mu):
         rollout_z = batch_dict['latent']
@@ -92,8 +107,10 @@ class SkillAlgorithm(StyleAlgorithm):
         # My loss suggestion (2)
         # loss = (kl / (z_diff + 1e-5)).mean()
 
-        self._write_stat(amp_diversity_loss=loss.detach())
-        return loss
+        train_result = {
+            'amp_diversity_loss': loss.detach(),
+        }
+        return loss, train_result
 
     def _enc_loss(self, enc, rollout_z):
         # encoding
@@ -102,18 +119,18 @@ class SkillAlgorithm(StyleAlgorithm):
 
         # original code ignores the gradient penalty and regularization
 
-        self._write_stat(enc_loss=likelihood_loss.detach())
-        return likelihood_loss
+        train_result = {
+            'enc_loss': likelihood_loss.detach(),
+        }
+        return likelihood_loss, train_result
 
     def _calc_rollout_reward(self):
         super()._calc_rollout_reward()
-        skill_reward = enc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'],
-                                  self.experience_buffer.tensor_dict['latent']) * self._enc_rew_scale
-        self.experience_buffer.tensor_dict['rewards'] += skill_reward * self._enc_rew_w
-        self._write_stat(
-            enc_reward_mean=skill_reward.mean().item(),
-            enc_reward_std=skill_reward.std().item(),
-        )
+        # skill_reward = enc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'],
+        #                           self.experience_buffer.tensor_dict['latent']) * self._enc_rew_scale
+        # self.experience_buffer.tensor_dict['rewards'] += skill_reward * self._enc_rew_w
+        # self.play_info['skill_reward'] = skill_reward
+        self.play_info['skill_reward'] = torch.tensor([0.0, 0.0], device=self.device)
 
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)
