@@ -1,7 +1,6 @@
-import torch
-
 from env.humanoidTask import HumanoidTask
 from utils import *
+from utils.angle import *
 from utils.env import drop_transform
 
 
@@ -27,6 +26,10 @@ class LocationTask(HumanoidTask):
         target_root_reshaped = self._buf["actor"].view(self._num_envs, actors_per_env, 13)[:, 1]
         self._buf["taskPos"] = target_root_reshaped[..., 0:3]
         self._buf["taskQuat"] = target_root_reshaped[..., 3:7]
+
+    def _compute_observations(self):
+        super()._compute_observations()
+        (self._buf["obs"])["goal"] = location_goal(self._buf["aPos"], self._buf["aRot"], self._buf["taskPos"])
 
     def _compute_reward(self):
         self._buf["rew"] = location_reward(self._buf["aPos"], self._buf["taskPos"])
@@ -79,8 +82,9 @@ class LocationTask(HumanoidTask):
 
             self._buf["taskPos"][env_ids] = self._buf["aPos"][env_ids] + distance
             self._buf["taskPos"][env_ids, 2] = 0
-            self._buf["taskRemain"][env_ids] = torch.randint(self._task_up_freq_min, self._task_up_freq_max, (num_update,),
-                                                             device=self._compute_device, dtype=torch.int32)
+            self._buf["taskRemain"][env_ids] = (
+                torch.randint(self._task_up_freq_min, self._task_up_freq_max, (num_update,),
+                              device=self._compute_device, dtype=torch.int32))
 
         if not (skip_draw or self._headless):
             self._draw_task(env_ids)
@@ -92,3 +96,12 @@ def location_reward(humanoid_position: torch.Tensor, marker_position: torch.Tens
     b = 2.0
     distance = torch.square(humanoid_position[..., :2] - marker_position[..., :2]).sum(dim=-1)
     return a / (1 + b * distance)
+
+
+@torch.jit.script
+def location_goal(humanoid_position: torch.Tensor, humanoid_rotation: torch.Tensor, marker_position: torch.Tensor
+                  ) -> torch.Tensor:
+    heading_rot_inv = calc_heading_quat_inv(humanoid_rotation)
+    position_dif = marker_position - humanoid_position
+    local_dif = quat_rotate(heading_rot_inv, position_dif)
+    return local_dif[:, :2]

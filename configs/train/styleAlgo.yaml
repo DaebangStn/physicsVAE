@@ -40,9 +40,9 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/16-11-30-41_styleAlgo_git_f264_locationTask/nn/locationTask.pth
+#  runs/ep_5000_rew_176.21732_5000.pth
 
-  ckpts/style_loco4.pth
+#  ckpts/style_loco4.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth

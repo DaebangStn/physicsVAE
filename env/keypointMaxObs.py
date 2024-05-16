@@ -12,10 +12,18 @@ class KeypointMaxObsTask(KeypointTask):
     def _compute_observations(self):
         #  It must be processed before the model is called.
         #  Also, rPos should be picked to keypoint body ids.
-        self._buf["obs"] = (self._buf["aPos"].clone(), self._buf["aRot"].clone(), self._buf["aVel"].clone(),
-                            self._buf["aAnVel"].clone(), self._buf["dPos"].clone(), self._buf["dVel"].clone(),
-                            self._buf["rPos"].clone(), self._buf["rRot"].clone(), self._buf["rVel"].clone(),
-                            self._buf["rAnVel"].clone(),)
+        self._buf["obs"] = {
+            "aPos": self._buf["aPos"].clone(),
+            "aRot": self._buf["aRot"].clone(),
+            "aVel": self._buf["aVel"].clone(),
+            "aAnVel": self._buf["aAnVel"].clone(),
+            "dPos": self._buf["dPos"].clone(),
+            "dVel": self._buf["dVel"].clone(),
+            "rPos": self._buf["rPos"].clone(),
+            "rRot": self._buf["rRot"].clone(),
+            "rVel": self._buf["rVel"].clone(),
+            "rAnVel": self._buf["rAnVel"].clone(),
+        }
 
     def step(self, actions: torch.Tensor) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
         self._pre_physics(actions)

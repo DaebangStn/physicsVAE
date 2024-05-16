@@ -31,6 +31,8 @@ class HighLevelAlgorithm(CoreAlgorithm):
         self._disc_rew_scale = None
 
         # placeholders for the current episode
+        self._disc_obs_exp_buffer = None
+        self._
 
         super().__init__(**kwargs)
 
@@ -44,6 +46,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
         rew_step = torch.zeros(self.vec_env.num, device=self.device).unsqueeze(1)
         disc_rew_step = torch.zeros(self.vec_env.num, device=self.device).unsqueeze(1)
+        terminate = torch.zeros(self.vec_env.num, device=self.device, dtype=torch.bool)
         obs_step = None
         for i in range(self._llc_steps):
             obs_step = self.env_reset(self.dones.nonzero()[:, 0])
@@ -58,6 +61,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
             obs_step = {'obs': obs}
 
             disc_rew = disc_reward(self._llc, self._disc_obs_buf.history)
+            self._disc_obs_exp_buffer[i, :, :] = self._disc_obs_buf.history
 
             rew_step[~done] += rew[~done]
             disc_rew_step[~done] += disc_rew[~done]
@@ -66,16 +70,16 @@ class HighLevelAlgorithm(CoreAlgorithm):
                 self.dones = done
             else:
                 self.dones = self.dones | done
+            terminate = terminate | info['terminate']
 
         rew = rew_step * self._task_rew_scale + disc_rew_step * self._disc_rew_scale
 
-        return obs_step, rew, self.dones, {}
+        return obs_step, rew, self.dones, {'terminate': terminate}
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         obs = self.vec_env.reset(env_ids)
         obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
         return {'obs': obs, 'disc_obs': disc_obs}
-
 
     def _init_learning_variables(self, **kwargs):
         config_hparam = self.config
@@ -91,6 +95,8 @@ class HighLevelAlgorithm(CoreAlgorithm):
         config_disc = self._config_llc['hparam']['style']['disc']
         self._disc_obs_traj_len = config_disc['obs_traj_len']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
+        disc_obs_size = self._disc_obs_traj_len * config_disc['num_obs']
+        self._disc_obs_exp_buffer = torch.empty(self._llc_steps, self.vec_env.num, disc_obs_size, device=self.device)
 
         self._disc_rew_scale = config_hparam['reward']['disc_scale']
         self._task_rew_w = 1.0

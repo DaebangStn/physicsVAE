@@ -1,13 +1,10 @@
-from typing import Tuple, List
-
 import torch
-from matplotlib import pyplot as plt
-from rl_games.algos_torch import torch_ext
 
 from learning.core.player import CorePlayer
 from learning.style.algorithm import keyp_task_obs_angle_transform, StyleAlgorithm, disc_reward, obs_transform
 from learning.logger.motion import MotionLogger
 from learning.logger.matcher import Matcher
+from utils import *
 from utils.buffer import TensorHistoryFIFO, MotionLibFetcher
 from utils.angle import calc_heading_quat_inv, quat_rotate
 
@@ -59,7 +56,9 @@ class StylePlayer(CorePlayer):
             obs = {'obs': obs_concat}
 
         if self._matcher is not None:
-            obs['matcher'] = keyp_obs_to_matcher(obs_raw['obs'], self._key_body_ids)
+            _obs = obs_raw['obs']
+            obs['matcher'] = keyp_obs_to_matcher(_obs['rPos'], _obs['rRot'], _obs['rVel'], _obs['rAnVel'],
+                                                 _obs['dPos'], _obs['dVel'], self._key_body_ids)
         return obs
 
     def _init_variables(self, **kwargs):
@@ -132,34 +131,30 @@ class StylePlayer(CorePlayer):
                 self._motion_logger.log(motion_id)
 
 
-@torch.jit.script
-def keyp_task_concat_obs(
-        obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
-                   torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]) -> torch.Tensor:
-    aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
-    obs = obs_transform(rPos, rRot, rVel, rAnVel)
-    return obs
+def keyp_task_concat_obs(obs: dict) -> torch.Tensor:
+    transformed_obs = obs_transform(obs['dPos'], obs['dRot'], obs['dVel'], obs['dAnVel'])
+    if 'goal' in obs.keys():
+        transformed_obs = torch.cat([transformed_obs, obs['goal']], dim=-1)
+    return transformed_obs
 
 
 @torch.jit.script
-def keyp_obs_to_matcher(
-        obs: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
-                   torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
-        key_idx: List[int]) -> torch.Tensor:
+def keyp_obs_to_matcher(r_pos: torch.Tensor, r_rot: torch.Tensor, r_vel: torch.Tensor, r_an_vel: torch.Tensor,
+                        d_pos: torch.Tensor, d_vel: torch.Tensor, key_idx: List[int]) -> torch.Tensor:
     # returns: root_h, local_root_vel/anVel, dof_pos, dof_vel, local_keypoint_pos
     # dim:     1 +     3*2 +                 31[28] + 31[28] + 3 * 6[4]          = 87[75]
-    aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
+    # aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
 
-    root_h = rPos[:, 0, 2:3]  # dim0: num_env, dim1: 1
+    root_h = r_pos[:, 0, 2:3]  # dim0: num_env, dim1: 1
 
-    inv_heading_rot = calc_heading_quat_inv(rRot[:, 0])  # dim0: num_env, dim1: 4
-    local_root_vel = quat_rotate(inv_heading_rot, rVel[:, 0])  # dim0: num_env, dim1: 3
-    local_root_anVel = quat_rotate(inv_heading_rot, rAnVel[:, 0])  # dim0: num_env, dim1: 3
+    inv_heading_rot = calc_heading_quat_inv(r_rot[:, 0])  # dim0: num_env, dim1: 4
+    local_root_vel = quat_rotate(inv_heading_rot, r_vel[:, 0])  # dim0: num_env, dim1: 3
+    local_root_anVel = quat_rotate(inv_heading_rot, r_an_vel[:, 0])  # dim0: num_env, dim1: 3
 
-    dof_pos = dPos
-    dof_vel = dVel
+    dof_pos = d_pos
+    dof_vel = d_vel
 
-    local_rBody_pos = rPos - rPos[:, 0:1]  # dim0: num_env, dim1: number of rBody, dim2: 3
+    local_rBody_pos = r_pos - r_pos[:, 0:1]  # dim0: num_env, dim1: number of rBody, dim2: 3
 
     # dim0: num_env, dim1: number of rBody, dim2: 4
     inv_heading_rot_exp = inv_heading_rot.unsqueeze(1).repeat(1, local_rBody_pos.shape[1], 1)
