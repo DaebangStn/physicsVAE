@@ -1,3 +1,5 @@
+import torch
+
 from env.humanoidTask import HumanoidTask
 from utils import *
 from utils.angle import *
@@ -32,7 +34,7 @@ class LocationTask(HumanoidTask):
         (self._buf["obs"])["goal"] = location_goal(self._buf["aPos"], self._buf["aRot"], self._buf["taskPos"])
 
     def _compute_reward(self):
-        self._buf["rew"] = location_reward(self._buf["aPos"], self._buf["taskPos"])
+        self._buf["rew"] = location_reward(self._buf["aPos"], self._buf["taskPos"], self._buf["terminate"])
 
     def _create_env(self):
         super()._create_env()
@@ -69,6 +71,20 @@ class LocationTask(HumanoidTask):
         self._tar_away_ofs = (away_max + away_min) / 2
         return env_cfg
 
+    def _compute_reset(self):
+        height_min = 0.6
+        height_max = 1.5
+        force_criteria = 1.0
+
+        actor_height = self._buf["rPos"][:, self._humanoid_head_rBody_id, 2]
+        actor_down = (actor_height < height_min) | (actor_height > height_max)
+        self._buf["recoveryCounter"] = torch.where(actor_down, self._buf["recoveryCounter"] + 1, 0)
+        self._buf["terminate"] = self._buf["recoveryCounter"] > self._recovery_limit
+        # contact_off = (self._buf["sensor"] ** 2).sum(dim=1) < force_criteria
+        # self._buf["terminate"] = actor_down  # & contact_off
+        tooLongEpisode = self._buf["elapsedStep"] > self._max_episode_steps
+        self._buf["reset"] = tooLongEpisode | self._buf["terminate"]
+
     def _update_target(self, skip_draw: bool = False):
         self._buf["taskRemain"] -= 1
         env_ids = (self._buf["taskRemain"] <= 0).nonzero(as_tuple=False).flatten()
@@ -91,11 +107,13 @@ class LocationTask(HumanoidTask):
 
 
 @torch.jit.script
-def location_reward(humanoid_position: torch.Tensor, marker_position: torch.Tensor) -> torch.Tensor:
+def location_reward(humanoid_position: torch.Tensor, marker_position: torch.Tensor, terminated: torch.Tensor
+                    ) -> torch.Tensor:
     a = 3.0
     b = 2.0
     distance = torch.square(humanoid_position[..., :2] - marker_position[..., :2]).sum(dim=-1)
-    return a / (1 + b * distance)
+    reward = a / (1 + b * distance)
+    return torch.where(terminated, -5000.0, reward)
 
 
 @torch.jit.script

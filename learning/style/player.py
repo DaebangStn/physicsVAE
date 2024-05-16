@@ -132,7 +132,7 @@ class StylePlayer(CorePlayer):
 
 
 def keyp_task_concat_obs(obs: dict) -> torch.Tensor:
-    transformed_obs = obs_transform(obs['dPos'], obs['dRot'], obs['dVel'], obs['dAnVel'])
+    transformed_obs = obs_transform(obs['rPos'], obs['rRot'], obs['rVel'], obs['rAnVel'])
     if 'goal' in obs.keys():
         transformed_obs = torch.cat([transformed_obs, obs['goal']], dim=-1)
     return transformed_obs

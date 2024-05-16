@@ -146,8 +146,7 @@ class CorePlayer(PpoPlayerContinuous):
         obs, rew, done, info = super().env_step(env, actions)
 
         if self._dof_jitter is not None:
-            aPos, aRot, aVel, aAnVel, dPos, dVel, rPos, rRot, rVel, rAnVel = obs
-            self._dof_jitter.log(dPos, self._n_step)
+            self._dof_jitter.log(obs['dPos'], self._n_step)
 
         return {'obs': obs}, rew, done, info
 

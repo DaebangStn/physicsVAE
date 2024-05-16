@@ -10,8 +10,8 @@ env:
     assets/urdf/joint_information.yaml
 
   num_states: 1  # do not use
-  num_obs: 253  # sword and shield (max observation)
-#  num_obs: 223  # naive humanoid (max observation)
+  num_obs: 255  # sword and shield (max observation, 253) + goal (local xy, 2)
+#  num_obs: 225  # naive humanoid (max observation, 223) + goal (local xy, 2)
   num_act: 31  # dof(#) - sword and shield
 #  num_act: 28  # dof(#) - naive humanoid
   max_episode_steps: 1200
