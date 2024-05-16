@@ -40,9 +40,9 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/keypointMaxObsTask_amp_08-10-13-08_my_net/nn/keypointMaxObsTask.pth
+#  runs/16-11-30-41_styleAlgo_git_f264_locationTask/nn/locationTask.pth
 
-#  runs/keypointMaxObsTask_ep_3500_rew_7166.2437_3500.pth
+  ckpts/style_loco4.pth
 
 checkpoint_disc:  # from the project root
 #  runs/AMP_traj-4-Humanoid_22-15-29-08/nn/Humanoid_converted.pth
@@ -77,7 +77,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 8192
+  minibatch_size: 24000
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -88,15 +88,15 @@ hparam:
   entropy_coef: 0.0
 
   reward:
-    task_weight: 0.0
-    disc_weight: 1.0
-    task_scale: 0.0
+    task_weight: 0.3
+    disc_weight: 0.7
+    task_scale: 1.0
     disc_scale: 2.0
     show_on_player: False
 
   style:
     replay_buf:
-      size: 200000
+      size: 100000
       store_prob: 0.01
       num_demo_update: 128
 

@@ -19,12 +19,8 @@ class HumanoidTask(KeypointMaxObsTask, ABC):
     def _build_env(self, env, env_id):
         super()._build_env(env, env_id)
 
-    @abstractmethod
     def _build_tensors(self):
         super()._build_tensors()
-        actors_per_env = self._buf["actor"].shape[0] // self._num_envs
-        self._buf["humanoidPose"] = self._buf["actor"].view(self._num_envs, actors_per_env, 13)[:, 0]
-        self._buf["humanoidPos"] = self._buf["humanoidPose"][..., 0:3]
         self._buf["taskRemain"] = torch.zeros(self._num_envs, device=self._compute_device, dtype=torch.int32)
 
     def _parse_env_param(self, **kwargs):

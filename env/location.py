@@ -29,18 +29,19 @@ class LocationTask(HumanoidTask):
         self._buf["taskQuat"] = target_root_reshaped[..., 3:7]
 
     def _compute_reward(self):
-        self._buf["rew"] = location_reward(self._buf["humanoidPos"], self._buf["taskPos"])
+        self._buf["rew"] = location_reward(self._buf["aPos"], self._buf["taskPos"])
 
     def _create_env(self):
         super()._create_env()
         if not self._headless:
-            self._task_id_env = torch.tensor(self._task_id_env, device=self._compute_device, dtype=torch.int32)
-            self._task_id_sim = torch.tensor(self._task_id_sim, device=self._compute_device, dtype=torch.int32)
+            self._task_id_env = torch.tensor(self._task_id_env, device=self._compute_device, dtype=torch.long)
+            self._task_id_sim = torch.tensor(self._task_id_sim, device=self._compute_device, dtype=torch.long)
+
 
     def _draw_task(self, env_ids: Optional[torch.Tensor] = None):
         col = np.array([0.0, 1.0, 0.0], dtype=np.float32)
         self._gym.clear_lines(self._viewer)
-        lines = torch.cat([self._buf["taskPos"], self._buf["humanoidPose"]], dim=-1).cpu().numpy()
+        lines = torch.cat([self._buf["taskPos"], self._buf["aPos"]], dim=-1).cpu().numpy()
 
         for i in range(self.num):
             self._gym.add_lines(self._viewer, self._envs[i], 1, lines[i].reshape([1, 6]), col)
@@ -52,7 +53,7 @@ class LocationTask(HumanoidTask):
         if num_update == 0:
             return
 
-        _id = self._task_id_sim[env_ids]
+        _id = self._task_id_sim[env_ids].to(torch.int32)
         self._gym.set_actor_root_state_tensor_indexed(
             self._sim, gymtorch.unwrap_tensor(self._buf["actor"]), gymtorch.unwrap_tensor(_id), num_update)
 
@@ -66,22 +67,22 @@ class LocationTask(HumanoidTask):
         return env_cfg
 
     def _update_target(self, skip_draw: bool = False):
-        env_ids = (self._buf["taskRemain"] == 0).nonzero(as_tuple=False).squeeze()
+        self._buf["taskRemain"] -= 1
+        env_ids = (self._buf["taskRemain"] <= 0).nonzero(as_tuple=False).flatten()
 
         num_update = len(env_ids)
-        if num_update == 0:
-            return
+        if num_update != 0:
+            distance = torch.rand(num_update, 3, device=self._compute_device) * 2 - 1
+            distance[:, 2] = 0
+            distance = distance / torch.norm(distance, dim=-1, keepdim=True)
+            distance = distance * self._tar_away_scale + self._tar_away_ofs
 
-        distance = torch.rand(num_update, 3, device=self._compute_device) * 2 - 1
-        distance[:, 2] = 0
-        distance = distance / torch.norm(distance, dim=-1, keepdim=True)
-        distance = distance * self._tar_away_scale + self._tar_away_ofs
+            self._buf["taskPos"][env_ids] = self._buf["aPos"][env_ids] + distance
+            self._buf["taskPos"][env_ids, 2] = 0
+            self._buf["taskRemain"][env_ids] = torch.randint(self._task_up_freq_min, self._task_up_freq_max, (num_update,),
+                                                             device=self._compute_device, dtype=torch.int32)
 
-        # self._buf["taskPos"][env_ids] = self._buf["humanoidPos"][env_ids] + distance
-        self._buf["taskRemain"][env_ids] = torch.randint(self._task_up_freq_min, self._task_up_freq_max, (num_update,),
-                                                         device=self._compute_device, dtype=torch.int32)
-
-        if not skip_draw:
+        if not (skip_draw or self._headless):
             self._draw_task(env_ids)
 
 

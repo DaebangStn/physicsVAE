@@ -194,9 +194,9 @@ class CoreAlgorithm(A2CAgent):
                 self.print_game(frame, epoch_num, total_time)
                 self.save_ckpt(epoch_num)
 
-            if self.check_exit(epoch_num):
-                self._cleanup()
-                return self.last_mean_rewards, epoch_num
+                if self.check_exit(epoch_num):
+                    self._cleanup()
+                    return self.last_mean_rewards, epoch_num
 
     def train_epoch(self):
         super(ContinuousA2CBase, self).train_epoch()
@@ -255,7 +255,6 @@ class CoreAlgorithm(A2CAgent):
         })
 
         return train_info
-
 
     def play_steps(self):
         step_time = 0.0

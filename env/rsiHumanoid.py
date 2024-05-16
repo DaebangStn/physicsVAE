@@ -25,10 +25,10 @@ class RSIHumanoidTask(HumanoidTask):
         if rsi_ids.ndim > 0 and len(rsi_ids) > 0:
             root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos = (
                 self._motion_fetcher.fetch_snapshot(len(rsi_ids)))
-            self._buf["actor"][rsi_ids, 0:3] = root_pos
-            self._buf["actor"][rsi_ids, 3:7] = root_rot
-            self._buf["actor"][rsi_ids, 7:10] = root_vel
-            self._buf["actor"][rsi_ids, 10:13] = root_ang_vel
+            self._buf["aPos"][rsi_ids] = root_pos
+            self._buf["aRot"][rsi_ids] = root_rot
+            self._buf["aVel"][rsi_ids] = root_vel
+            self._buf["aAnVel"][rsi_ids] = root_ang_vel
             self._buf["dof"].view(self.num, self._dof_per_env, 2)[rsi_ids, :, 0] = dof_pos
             self._buf["dof"].view(self.num, self._dof_per_env, 2)[rsi_ids, :, 1] = dof_vel
 

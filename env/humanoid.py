@@ -206,7 +206,6 @@ class HumanoidTask(VecTask):
         self._buf["reset"][:], self._buf["terminate"][:] = \
             compute_amp_humanoid_reset(self._buf["reset"], self._buf["elapsedStep"], self._buf["contact"],
                                        self._contact_body_ids, self._buf["rPos"], self._max_episode_steps, 0.15)
-        self._buf["info"]["terminate"] = self._buf["terminate"]
 
     def _compute_reward(self):
         reset_reward = -100.0
@@ -234,6 +233,7 @@ class HumanoidTask(VecTask):
         return env_cfg
 
     def _pre_physics(self, actions: torch.Tensor):
+        actions = actions.to(self._compute_device).clone()
         pd_target = gymtorch.unwrap_tensor(actions * self._action_scale + self._action_ofs)
         self._gym.set_dof_position_target_tensor(self._sim, pd_target)
 
@@ -249,6 +249,7 @@ class HumanoidTask(VecTask):
         self._compute_observations()
         self._compute_reset()
         self._compute_reward()
+        self._buf["info"]["terminate"] = self._buf["terminate"]
 
     def reset(self, env_ids: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         if env_ids is None:
