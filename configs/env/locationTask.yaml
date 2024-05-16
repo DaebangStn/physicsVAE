@@ -1,6 +1,6 @@
 env:
   name: locationTask
-  num_envs: 3000
+  num_envs: 2750
   spacing: 4
 
   humanoid_asset_filename:  # from the project root
