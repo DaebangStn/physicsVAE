@@ -102,10 +102,10 @@ class LocationTask(HumanoidTask):
 @torch.jit.script
 def location_reward(humanoid_position: torch.Tensor, marker_position: torch.Tensor, terminated: torch.Tensor
                     ) -> torch.Tensor:
-    a = 1.0
-    b = 2.0
+    a = 0.7
+    b = 0.1
     distance = torch.square(humanoid_position[..., :2] - marker_position[..., :2]).sum(dim=-1)
-    reward = a / (1 + b * distance)
+    reward = a * torch.exp(-b * distance)
     return torch.where(terminated, -500.0, reward)
 
 
