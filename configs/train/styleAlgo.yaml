@@ -40,7 +40,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/ep_4000_rew_-3220.105_4000.pth
+  runs/ep_6500_rew_971.643_6500.pth
 
 #  ckpts/style_loco4.pth
 
@@ -88,9 +88,9 @@ hparam:
   entropy_coef: 0.0
 
   reward:
-    task_weight: 0.3
-    disc_weight: 0.7
-    task_scale: 0.2
+    task_weight: 0.5
+    disc_weight: 0.5
+    task_scale: 2.0
     disc_scale: 2.0
     show_on_player: False
 
