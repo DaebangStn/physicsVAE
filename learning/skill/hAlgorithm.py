@@ -32,7 +32,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
         # placeholders for the current episode
         self._disc_obs_exp_buffer = None
-        self._
+        self._done_exp_buffer = None
 
         super().__init__(**kwargs)
 
@@ -56,21 +56,28 @@ class HighLevelAlgorithm(CoreAlgorithm):
             normed_obs = self._llc.norm_obs(obs_step['obs'])
             llc_action, _ = self._llc.actor_latent(normed_obs, z)
             obs, rew, done, info = super().env_step(llc_action)
+            assert 'goal' in obs['obs'].keys(), "High-level algorithm must have 'goal' in the observation."
             obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
             self._disc_obs_buf.push(disc_obs)
             obs_step = {'obs': obs}
 
-            disc_rew = disc_reward(self._llc, self._disc_obs_buf.history)
-            self._disc_obs_exp_buffer[i, :, :] = self._disc_obs_buf.history
+            # disc_rew = disc_reward(self._llc, self._disc_obs_buf.history)
+            self._disc_obs_exp_buffer[:, i, :] = self._disc_obs_buf.history
+            self._done_exp_buffer[:, i] = done
 
             rew_step[~done] += rew[~done]
-            disc_rew_step[~done] += disc_rew[~done]
+            # disc_rew_step[~done] += disc_rew[~done]
 
             if i == 0:
                 self.dones = done
             else:
                 self.dones = self.dones | done
             terminate = terminate | info['terminate']
+
+        disc_rew = disc_reward(self._llc, self._disc_obs_exp_buffer.view(-1, self._disc_obs_exp_buffer.shape[-1]))
+        disc_rew = disc_rew.view(self.vec_env.num, self._llc_steps)
+        for i in range(self._llc_steps):
+            disc_rew_step += disc_rew[:, i] * ~self._done_exp_buffer[:, i]
 
         rew = rew_step * self._task_rew_scale + disc_rew_step * self._disc_rew_scale
 
@@ -96,7 +103,9 @@ class HighLevelAlgorithm(CoreAlgorithm):
         self._disc_obs_traj_len = config_disc['obs_traj_len']
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
         disc_obs_size = self._disc_obs_traj_len * config_disc['num_obs']
-        self._disc_obs_exp_buffer = torch.empty(self._llc_steps, self.vec_env.num, disc_obs_size, device=self.device)
+
+        self._disc_obs_exp_buffer = torch.empty(self.vec_env.num, self._llc_steps, disc_obs_size, device=self.device)
+        self._done_exp_buffer = torch.empty(self.vec_env.num, self._llc_steps, dtype=torch.bool, device=self.device)
 
         self._disc_rew_scale = config_hparam['reward']['disc_scale']
         self._task_rew_w = 1.0
@@ -149,10 +158,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
         model = model.build(**config_llc['network'], **additional_config)
         model.to(device)
 
-        # load checkpoint
         load_checkpoint_to_network(model, config_hparam['llc']['ckpt'])
-        # if config_llc['hparam']['normalize_input'] and 'running_mean_std' in ckpt:
-        #     model.running_mean_std.load_state_dict(ckpt['running_mean_std'])
 
         model.eval()
         return model, config_llc

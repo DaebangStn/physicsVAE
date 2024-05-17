@@ -40,7 +40,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/ep_5000_rew_176.21732_5000.pth
+#  runs/ep_32500_rew_-1187.138_32500.pth
 
 #  ckpts/style_loco4.pth
 
@@ -90,7 +90,7 @@ hparam:
   reward:
     task_weight: 0.3
     disc_weight: 0.7
-    task_scale: 1.0
+    task_scale: 0.2
     disc_scale: 2.0
     show_on_player: False
 

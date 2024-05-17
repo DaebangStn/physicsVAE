@@ -34,6 +34,8 @@ class SkillAlgorithm(StyleAlgorithm):
     def env_reset(self, env_ids: Optional[torch.Tensor] = None):
         self._update_latent()
         obs = super().env_reset(env_ids)
+        if "goal" in obs.keys():
+            raise ValueError("Low-level algorithm should not have 'goal' in the observation.")
         return obs
 
     def get_action_values(self, obs):
@@ -75,9 +77,8 @@ class SkillAlgorithm(StyleAlgorithm):
 
     def _additional_loss(self, batch_dict, res_dict):
         loss, train_result = super()._additional_loss(batch_dict, res_dict)
-        # e_loss, enc_train_result = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
-        # loss += e_loss * self._enc_loss_coef
-        enc_train_result = {'enc_loss': torch.tensor(0.0, device=self.device)}
+        e_loss, enc_train_result = self._enc_loss(res_dict['enc'], batch_dict['latent_enc'])
+        loss += e_loss * self._enc_loss_coef
         train_result.update(enc_train_result)
         div_loss, div_train_result = self._diversity_loss(batch_dict, res_dict['mus'])
         loss += div_loss * self._div_loss_coef
@@ -126,11 +127,10 @@ class SkillAlgorithm(StyleAlgorithm):
 
     def _calc_rollout_reward(self):
         super()._calc_rollout_reward()
-        # skill_reward = enc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'],
-        #                           self.experience_buffer.tensor_dict['latent']) * self._enc_rew_scale
-        # self.experience_buffer.tensor_dict['rewards'] += skill_reward * self._enc_rew_w
-        # self.play_info['skill_reward'] = skill_reward
-        self.play_info['skill_reward'] = torch.tensor([0.0, 0.0], device=self.device)
+        skill_reward = enc_reward(self.model, self.experience_buffer.tensor_dict['disc_obs'],
+                                  self.experience_buffer.tensor_dict['latent']) * self._enc_rew_scale
+        self.experience_buffer.tensor_dict['rewards'] += skill_reward * self._enc_rew_w
+        self.play_info['skill_reward'] = skill_reward
 
     def _init_learning_variables(self, **kwargs):
         super()._init_learning_variables(**kwargs)

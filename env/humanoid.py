@@ -320,3 +320,14 @@ def compute_amp_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_bod
     reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
 
     return reset, terminated
+
+
+@torch.jit.script
+def compute_height_humanoid_redset(progress_buf: torch.Tensor, actor_height: torch.Tensor, max_height: float,
+                                   min_height: float, max_episode_steps: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    terminated = torch.logical_or(actor_height < min_height, actor_height > max_height)
+    too_long_episode = progress_buf > max_episode_steps
+    reset = torch.logical_or(terminated, too_long_episode)
+    # contact_off = (self._buf["sensor"] ** 2).sum(dim=1) < force_criteria
+    # self._buf["terminate"] = actor_down  # & contact_off
+    return reset, terminated
