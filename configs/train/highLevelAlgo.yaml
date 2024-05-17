@@ -73,9 +73,11 @@ hparam:
 
   llc:
     steps: 5
-    cfg: ckpts/algo_config.yaml
-#    ckpt: ckpts/skill_ref_loco4.pth
-    ckpt: ckpts/skill_loco4_12.pth
+#    cfg: ckpts/algo_config.yaml
+    cfg: runs/algo_config.yaml
+
+#    ckpt: ckpts/skill_loco4_12.pth
+    ckpt: runs/ep_33300_rew_7193.704_33300.pth
 
 
 seed: 1

@@ -106,7 +106,7 @@ def location_reward(humanoid_position: torch.Tensor, marker_position: torch.Tens
     b = 2.0
     distance = torch.square(humanoid_position[..., :2] - marker_position[..., :2]).sum(dim=-1)
     reward = a / (1 + b * distance)
-    return torch.where(terminated, -50000.0, reward)
+    return torch.where(terminated, -500.0, reward)
 
 
 @torch.jit.script

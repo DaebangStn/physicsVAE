@@ -41,6 +41,7 @@ network:
     units: [512, 256]
 
   disc:  # discriminator and encoder shares the network
+#    units: [1024, 1024, 512]
     units: [1024, 1024, 512]
     activation: relu
     initializer:
@@ -49,7 +50,7 @@ network:
   enc:
     units: [1024, 512]
     activation: relu
-    separate: False
+    separate: True
 
     initializer:
       name: default
@@ -57,7 +58,7 @@ network:
 checkpoint:  # from the project root
 #  runs/keypointMaxObsTask_skillAlgo_24-23-10-54_enc_loss/nn/last_keypointMaxObsTask_ep_5000_rew_-60.58973.pth
 
-#  runs/Humanoid_ep_18500_rew_1155.2125_18500_converted.pth
+  runs/ep_33300_rew_7193.704_33300.pth
 
 checkpoint_disc:
 #  runs/style_sword_loco_last_keypointMaxObsTask_ep_83200_rew_7216.8003.pth
@@ -121,8 +122,8 @@ hparam:
       input_divisor: 16
       num_obs: 140
 #      num_obs: 125
-      obs_traj_len: 10
-#      obs_traj_len: 4
+#      obs_traj_len: 10
+      obs_traj_len: 4
       loss_coef: 5
       logit_reg_scale: 0.01
       reg_scale: 0.0001
