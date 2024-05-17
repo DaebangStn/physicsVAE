@@ -35,7 +35,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/17-13-37-09_highLevelAlgo_git_65e9_locationTask/nn/locationTask.pth
+#  runs/17-13-37-09_highLevelAlgo_git_65e9_locationTask/nn/locationTask.pth
 
 
 hparam:
@@ -74,7 +74,8 @@ hparam:
   llc:
     steps: 5
     cfg: ckpts/algo_config.yaml
-    ckpt: ckpts/skill_ref_loco4.pth
+#    ckpt: ckpts/skill_ref_loco4.pth
+    ckpt: ckpts/skill_loco4_12.pth
 
 
 seed: 1

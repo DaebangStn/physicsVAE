@@ -1,0 +1,242 @@
+algo:
+  joint_information:
+    dof_body_ids: &id001
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 7
+    - 8
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    dof_offsets: &id002
+    - 0
+    - 3
+    - 6
+    - 9
+    - 10
+    - 13
+    - 16
+    - 17
+    - 20
+    - 21
+    - 24
+    - 27
+    - 28
+    - 31
+    key_body_names: &id003
+    - right_hand
+    - left_hand
+    - right_foot
+    - left_foot
+    - sword
+    - shield
+  memo: myNet_enc_separate
+  motion_file: assets/motions/reallusion_sword_shield/locomotion_and_drop_recovery.yaml
+  name: skillAlgo
+config:
+  bound_loss_type: bound
+  bounds_loss_coef: 10
+  clip_value: false
+  critic_coef: 5
+  e_clip: 0.2
+  entropy_coef: 0.0
+  env_config:
+    env:
+      damping_coef: 1.0
+      drop_on_reset_prob: 0
+      humanoid_asset_filename: assets/urdf/amp_humanoid_sword_shield.xml
+      joint_information:
+        dof_body_ids: *id001
+        dof_offsets: *id002
+        key_body_names: *id003
+      joint_information_path: assets/urdf/joint_information.yaml
+      kinetic_fric: 1.0
+      max_episode_steps: 1200
+      name: keypointMaxObsTask
+      num_act: 31
+      num_envs: 2500
+      num_obs: 253
+      num_states: 1
+      recovery_limit: 0
+      reference_state_init_prob: 0.5
+      spacing: 4
+      static_fric: 1.0
+      stiffness_coef: 1.0
+      viewer_follow_env0: false
+    seed: 1
+    sim:
+      device_id: 0
+      engine: PHYSX
+      headless: true
+      num_sub_steps: 2
+  env_name: keypointMaxObsTask
+  features: {}
+  full_experiment_name: 13-13-50-56_skillAlgo_myNet_enc_separate_keypointMaxObsTask
+  gamma: 0.99
+  grad_norm: 1.0
+  horizon_length: 32
+  intermediate_save_frequency: 100
+  learning_rate: 2e-5
+  logger:
+    action: false
+    filename: plot
+    jitter: true
+    latent_motion_id: false
+    motion: false
+    motion_match_length: 4
+    motion_transition: false
+    show_matcher_out: false
+  lr_schedule: constant
+  mini_epochs: 6
+  minibatch_size: 20000
+  name: keypointMaxObsTask
+  normalize_advantage: true
+  normalize_input: true
+  normalize_value: true
+  num_actors: 2500
+  reward:
+    disc_scale: 4.0
+    disc_weight: 0.5
+    enc_scale: 1.0
+    enc_weight: 0.5
+    show_on_player: false
+    task_scale: 0.0
+    task_weight: 0.0
+  save_frequency: 1000
+  skill:
+    div_loss_coef: 0.01
+    enc:
+      loss_coef: 5
+    latent:
+      update_freq_max: 150
+      update_freq_min: 1
+  style:
+    disc:
+      grad_penalty_scale: 5
+      input_divisor: 16
+      log_hist: false
+      logit_reg_scale: 0.01
+      loss_coef: 5
+      num_obs: 140
+      obs_traj_len: 10
+      reg_scale: 0.0001
+    replay_buf:
+      num_demo_update: 128
+      size: 100000
+      store_prob: 0.01
+  tau: 0.95
+debug: false
+hparam:
+  bound_loss_type: bound
+  bounds_loss_coef: 10
+  clip_value: false
+  critic_coef: 5
+  e_clip: 0.2
+  entropy_coef: 0.0
+  gamma: 0.99
+  grad_norm: 1.0
+  horizon_length: 32
+  intermediate_save_frequency: 100
+  learning_rate: 2e-5
+  logger:
+    action: false
+    filename: plot
+    jitter: true
+    latent_motion_id: false
+    motion: false
+    motion_match_length: 4
+    motion_transition: false
+    show_matcher_out: false
+  lr_schedule: constant
+  mini_epochs: 6
+  minibatch_size: 32000
+  normalize_advantage: true
+  normalize_input: true
+  normalize_value: true
+  reward:
+    disc_scale: 4.0
+    disc_weight: 0.5
+    enc_scale: 1.0
+    enc_weight: 0.5
+    show_on_player: false
+    task_scale: 0.0
+    task_weight: 0.0
+  reward_shaper: {}
+  save_frequency: 1000
+  skill:
+    div_loss_coef: 0.01
+    enc:
+      loss_coef: 5
+    latent:
+      update_freq_max: 150
+      update_freq_min: 1
+  style:
+    disc:
+      grad_penalty_scale: 5
+      input_divisor: 16
+      log_hist: false
+      logit_reg_scale: 0.01
+      loss_coef: 5
+      num_obs: 140
+      obs_traj_len: 10
+      reg_scale: 0.0001
+    replay_buf:
+      num_demo_update: 128
+      size: 100000
+      store_prob: 0.01
+  tau: 0.95
+model:
+  name: skill
+network:
+  disc:
+    activation: relu
+    initializer:
+      name: default
+    num_inputs: 1400
+    units:
+    - 1024
+    - 1024
+    - 512
+  enc:
+    activation: relu
+    initializer:
+      name: default
+    separate: false
+    units:
+    - 1024
+    - 512
+  latent:
+    build: true
+    units:
+    - 512
+    - 256
+  mlp:
+    activation: relu
+    initializer:
+      name: default
+    units:
+    - 1024
+    - 1024
+    - 512
+  name: skill
+  separate: true
+  space:
+    continuous:
+      fixed_sigma: true
+      learn_sigma: false
+      mu_activation: None
+      mu_init:
+        name: default
+      sigma_activation: None
+      sigma_init:
+        name: const_initializer
+        val: -2.9
+    latent_dim: 64
+seed: 1
+test: false
