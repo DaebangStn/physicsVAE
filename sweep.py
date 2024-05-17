@@ -17,14 +17,14 @@ def main_with_args():
 
 wandb.login()
 sweep_config = {
-    "name": "test_sweep",
+    "name": "task_reward_scale",
     "method": "grid",
     "parameters": {
         "max_frames": {
-            "values": [200000]
+            "values": [400000000]
         },
-        "input_divisor": {
-            1, 4, 16, 64, 256
+        "task_scale": {
+            "values": [5, 10, 20, 40]
         }
     }
 }
