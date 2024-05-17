@@ -40,7 +40,7 @@ network:
 
 
 checkpoint:  # from the project root
-  runs/ep_9000_rew_-2432.3174_9000.pth
+#  runs/ep_9000_rew_-2432.3174_9000.pth
 
 #  ckpts/style_loco4.pth
 
