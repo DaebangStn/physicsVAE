@@ -322,15 +322,21 @@ def obs_transform(body_pos: torch.Tensor, body_rot: torch.Tensor, body_vel: torc
     return obs
 
 
-# @torch.jit.script
-def keyp_task_obs_angle_transform(obs: dict, key_idx: List[int], dof_offsets: List[int]):
+def keyp_task_obs_angle_transform(obs: dict, key_idx: List[int], dof_offsets: List[int], ignore_goal=False):
     transformed_obs = obs_transform(obs['rPos'], obs['rRot'], obs['rVel'], obs['rAnVel'])
-    if 'goal' in obs.keys():
+    if 'goal' in obs.keys() and not ignore_goal:
         transformed_obs = torch.cat([transformed_obs, obs['goal']], dim=-1)
     keyPos = obs['rPos'][:, key_idx, :]
     disc_obs = disc_obs_transform((obs['aPos'], obs['aRot'], obs['dPos'], obs['aVel'], obs['aAnVel'], obs['dVel'],
                                    keyPos), dof_offsets)
     return transformed_obs, disc_obs
+
+
+def obs_angle_transform(obs: dict, ignore_goal=False):
+    transformed_obs = obs_transform(obs['rPos'], obs['rRot'], obs['rVel'], obs['rAnVel'])
+    if 'goal' in obs.keys() and not ignore_goal:
+        transformed_obs = torch.cat([transformed_obs, obs['goal']], dim=-1)
+    return transformed_obs
 
 
 @torch.jit.script

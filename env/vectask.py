@@ -223,6 +223,10 @@ class VecTask:
     def num(self):
         return self._num_envs
 
+    @property
+    def obs(self):
+        return self._buf['obs']
+
     # Called by rl-games
     def get_number_of_agents(self):
         return self._num_agents

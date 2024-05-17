@@ -1,11 +1,7 @@
-from typing import Optional
-
-import yaml
-import torch
 from rl_games.algos_torch import model_builder
 
 from learning.core.algorithm import CoreAlgorithm
-from learning.style.algorithm import StyleAlgorithm, keyp_task_obs_angle_transform, disc_reward
+from learning.style.algorithm import StyleAlgorithm, keyp_task_obs_angle_transform, disc_reward, obs_angle_transform
 from utils import *
 from utils.buffer import TensorHistoryFIFO, MotionLibFetcher
 
@@ -32,6 +28,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
         # placeholders for the current episode
         self._disc_obs_exp_buffer = None
+        self._task_rew_exp_buffer = None
         self._done_exp_buffer = None
 
         super().__init__(**kwargs)
@@ -44,29 +41,24 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
         z = torch.nn.functional.normalize(actions, dim=-1)
 
-        rew_step = torch.zeros(self.vec_env.num, device=self.device).unsqueeze(1)
-        disc_rew_step = torch.zeros(self.vec_env.num, device=self.device).unsqueeze(1)
         terminate = torch.zeros(self.vec_env.num, device=self.device, dtype=torch.bool)
-        obs_step = None
+        obs_raw = None
         for i in range(self._llc_steps):
-            obs_step = self.env_reset(self.dones.nonzero()[:, 0])
+            obs_step = self.env_reset(self.dones.nonzero()[:, 0], ignore_goal=True)
 
             self._disc_obs_buf.push_on_reset(obs_step['disc_obs'], self.dones)
 
             normed_obs = self._llc.norm_obs(obs_step['obs'])
             llc_action, _ = self._llc.actor_latent(normed_obs, z)
-            obs, rew, done, info = super().env_step(llc_action)
-            assert 'goal' in obs['obs'].keys(), "High-level algorithm must have 'goal' in the observation."
-            obs, disc_obs = keyp_task_obs_angle_transform(obs['obs'], self._key_body_ids, self._dof_offsets)
+            obs_raw, rew, done, info = super().env_step(llc_action)
+            assert 'goal' in obs_raw['obs'].keys(), "High-level algorithm must have 'goal' in the observation."
+            obs, disc_obs = keyp_task_obs_angle_transform(obs_raw['obs'], self._key_body_ids, self._dof_offsets,
+                                                          ignore_goal=True)
             self._disc_obs_buf.push(disc_obs)
-            obs_step = {'obs': obs}
 
-            # disc_rew = disc_reward(self._llc, self._disc_obs_buf.history)
+            self._task_rew_exp_buffer[:, i] = rew.squeeze()
             self._disc_obs_exp_buffer[:, i, :] = self._disc_obs_buf.history
             self._done_exp_buffer[:, i] = done
-
-            rew_step[~done] += rew[~done]
-            # disc_rew_step[~done] += disc_rew[~done]
 
             if i == 0:
                 self.dones = done
@@ -74,18 +66,19 @@ class HighLevelAlgorithm(CoreAlgorithm):
                 self.dones = self.dones | done
             terminate = terminate | info['terminate']
 
+        task_rew_step = (self._task_rew_exp_buffer * ~self._done_exp_buffer).sum(dim=-1)
         disc_rew = disc_reward(self._llc, self._disc_obs_exp_buffer.view(-1, self._disc_obs_exp_buffer.shape[-1]))
         disc_rew = disc_rew.view(self.vec_env.num, self._llc_steps)
-        for i in range(self._llc_steps):
-            disc_rew_step += disc_rew[:, i] * ~self._done_exp_buffer[:, i]
+        disc_rew_step = (disc_rew * ~self._done_exp_buffer).sum(dim=-1)
 
-        rew = rew_step * self._task_rew_scale + disc_rew_step * self._disc_rew_scale
+        rew = task_rew_step * self._task_rew_scale + disc_rew_step * self._disc_rew_scale
 
-        return obs_step, rew, self.dones, {'terminate': terminate}
+        return {'obs': obs_angle_transform(obs_raw['obs'])}, rew.unsqueeze(-1), self.dones, {'terminate': terminate}
 
-    def env_reset(self, env_ids: Optional[torch.Tensor] = None):
+    def env_reset(self, env_ids: Optional[torch.Tensor] = None, ignore_goal=False):
         obs = self.vec_env.reset(env_ids)
-        obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets)
+        obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets,
+                                                      ignore_goal=ignore_goal)
         return {'obs': obs, 'disc_obs': disc_obs}
 
     def _init_learning_variables(self, **kwargs):
@@ -104,6 +97,7 @@ class HighLevelAlgorithm(CoreAlgorithm):
         self._disc_obs_buf = TensorHistoryFIFO(self._disc_obs_traj_len)
         disc_obs_size = self._disc_obs_traj_len * config_disc['num_obs']
 
+        self._task_rew_exp_buffer = torch.empty(self.vec_env.num, self._llc_steps, device=self.device)
         self._disc_obs_exp_buffer = torch.empty(self.vec_env.num, self._llc_steps, disc_obs_size, device=self.device)
         self._done_exp_buffer = torch.empty(self.vec_env.num, self._llc_steps, dtype=torch.bool, device=self.device)
 
@@ -133,10 +127,12 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
         # check config(env) between HLC and LLC is consistent
         config_llc_env = config_llc['config']['env_config']['env']
+        assert 'num_goal' in config_env, "HLC env must have 'num_goal' in the config."
         assert config_env['num_act'] == config_llc_env['num_act'], \
             f"Inconsistent action space. HLC: {config_env['num_act']} LLC: {config_llc_env['num_act']}"
-        assert config_env['num_obs'] == config_llc_env['num_obs'], \
-            f"Inconsistent observation space. HLC: {config_env['num_obs']} LLC: {config_llc_env['num_obs']}"
+        assert config_env['num_obs'] == config_llc_env['num_obs'] + config_env['num_goal'], \
+            f"Inconsistent observation space. HLC: {config_env['num_obs']} LLC: {config_llc_env['num_obs']}, " \
+            f"Goal: {config_env['num_goal']}"
 
         # Override Env# with HLC config
         config_llc_env['num_envs'] = config_env['num_envs']
@@ -147,13 +143,13 @@ class HighLevelAlgorithm(CoreAlgorithm):
         model = builder.load(config_llc)
 
         additional_config = {
-            'actions_num': config_env['num_act'],
-            'input_shape': (config_env['num_obs'],),
+            'actions_num': config_llc_env['num_act'],
+            'input_shape': (config_llc_env['num_obs'],),
             'num_seqs': config_hparam['num_actors'],
             'value_size': config_hparam.get('value_size', 1),
             'normalize_value': config_hparam['normalize_value'],
             'normalize_input': config_hparam['normalize_input'],
-            'obs_shape': config_env['num_obs'],
+            'obs_shape': config_llc_env['num_obs'],
         }
         model = model.build(**config_llc['network'], **additional_config)
         model.to(device)

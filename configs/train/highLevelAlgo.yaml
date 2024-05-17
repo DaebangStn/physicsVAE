@@ -35,7 +35,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/ep_3100_rew_6916.521_3100.pth
+  runs/17-13-37-09_highLevelAlgo_git_65e9_locationTask/nn/locationTask.pth
 
 
 hparam:
@@ -45,6 +45,7 @@ hparam:
   clip_value: False
   reward_shaper: {}
   save_frequency: 1000
+  save_best_after: 0
 
   # learning hyperparameters
   horizon_length: 32

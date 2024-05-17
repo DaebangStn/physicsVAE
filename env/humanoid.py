@@ -112,8 +112,8 @@ class HumanoidTask(VecTask):
             self._build_env(env, i)
             self._gym.end_aggregate(env)
 
-        self._humanoids_id_env = torch.tensor(self._humanoids_id_env, device=self._compute_device, dtype=torch.int32)
-        self._humanoids_id_sim = torch.tensor(self._humanoids_id_sim, device=self._compute_device, dtype=torch.int32)
+        self._humanoids_id_env = torch.tensor(self._humanoids_id_env, device=self._compute_device, dtype=torch.long)
+        self._humanoids_id_sim = torch.tensor(self._humanoids_id_sim, device=self._compute_device, dtype=torch.long)
         self._humanoid_head_rBody_id = (
             self._gym.find_actor_rigid_body_index(self._envs[0], self._humanoids_id_env[0], "head", gymapi.DOMAIN_ENV))
 
@@ -254,6 +254,7 @@ class HumanoidTask(VecTask):
     def reset(self, env_ids: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         if env_ids is None:
             env_ids = torch.nonzero(self._buf["reset"]).long()
+        env_ids = env_ids.flatten()
 
         if env_ids.ndim > 0 and len(env_ids) > 0:
             self._assign_reset_state(env_ids)
@@ -269,11 +270,12 @@ class HumanoidTask(VecTask):
 
     def _assign_reset_state(self, env_ids: torch.Tensor):
         self._buf["dof"].view(self.num, self._dof_per_env, 2)[env_ids] = self._buf["dofInit"][env_ids].clone()
-        self._buf["actor"][env_ids] = self._buf["actorInit"][env_ids].clone()
+        self._buf["actor"][self._humanoids_id_sim[env_ids]] = (
+            self._buf["actorInit"][self._humanoids_id_sim[env_ids]].clone())
 
     def _apply_reset_state(self, env_ids: torch.Tensor):
         # to prevent gc, this line is required
-        _id = self._humanoids_id_sim[env_ids]
+        _id = self._humanoids_id_sim[env_ids].to(torch.int32)
         id_gym = gymtorch.unwrap_tensor(_id)
         # reset actors
         self._gym.set_actor_root_state_tensor_indexed(

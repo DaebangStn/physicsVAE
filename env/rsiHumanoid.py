@@ -20,9 +20,9 @@ class RSIHumanoidTask(HumanoidTask):
         rand_indices = torch.randperm(num_reset)
         num_reference_reset = round(num_reset * self._rsi_prob)
 
-        rsi_ids = env_ids[rand_indices[:num_reference_reset]].squeeze()
+        rsi_ids = env_ids[rand_indices[:num_reference_reset]].flatten()
 
-        if rsi_ids.ndim > 0 and len(rsi_ids) > 0:
+        if len(rsi_ids) > 0:
             root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos = (
                 self._motion_fetcher.fetch_snapshot(len(rsi_ids)))
             self._buf["aPos"][rsi_ids] = root_pos

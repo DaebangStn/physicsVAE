@@ -11,7 +11,6 @@ def build_runner():
     from env.balance import BalanceTask
     from env.keypoint import KeypointTask
     from env.keypointMaxObs import KeypointMaxObsTask
-    from env.keypointLocation import KeypointLocationTask
     from env.location import LocationTask
     from env.cart import CartTask
 
@@ -46,7 +45,6 @@ def build_runner():
     register_env_rl_games('balanceTask', BalanceTask)
     register_env_rl_games('keypointTask', KeypointTask)
     register_env_rl_games('keypointMaxObsTask', KeypointMaxObsTask)
-    register_env_rl_games('keypointLocationTask', KeypointLocationTask)
     register_env_rl_games('locationTask', LocationTask)
     register_env_rl_games('cartTask', CartTask)
 

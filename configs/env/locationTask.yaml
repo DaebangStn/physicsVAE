@@ -14,6 +14,7 @@ env:
 #  num_obs: 225  # naive humanoid (max observation, 223) + goal (local xy, 2)
   num_act: 31  # dof(#) - sword and shield
 #  num_act: 28  # dof(#) - naive humanoid
+  num_goal: 2  # local xy
   max_episode_steps: 1200
 
   recovery_limit: 0
@@ -34,3 +35,4 @@ sim:
   headless: True
   device_id: 0
   engine: PHYSX
+  num_sub_steps: 1
