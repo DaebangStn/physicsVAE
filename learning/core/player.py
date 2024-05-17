@@ -57,7 +57,6 @@ class CorePlayer(PpoPlayerContinuous):
 
         self.wait_for_checkpoint()
 
-        need_init_rnn = self.is_rnn
         for _ in range(n_games):
             if self._games_played >= n_games:
                 break
@@ -66,8 +65,8 @@ class CorePlayer(PpoPlayerContinuous):
             batch_size = 1
             batch_size = self.get_batch_size(self.obs['obs'], batch_size)
 
-            cr = torch.zeros(batch_size, dtype=torch.float32)
-            steps = torch.zeros(batch_size, dtype=torch.float32)
+            cr = torch.zeros(batch_size, dtype=torch.float32, device=self.device)
+            steps = torch.zeros(batch_size, dtype=torch.float32, device=self.device)
 
             print_game_res = False
 
@@ -143,7 +142,7 @@ class CorePlayer(PpoPlayerContinuous):
         if self._action_jitter is not None:
             self._action_jitter.log(actions, self._n_step)
 
-        obs, rew, done, info = super().env_step(env, actions)
+        obs, rew, done, info = env.step(actions)
 
         if self._dof_jitter is not None:
             self._dof_jitter.log(obs['dPos'], self._n_step)
