@@ -1,4 +1,5 @@
 from rl_games.algos_torch import model_builder
+from rl_games.common.a2c_common import swap_and_flatten01
 
 from learning.core.algorithm import CoreAlgorithm
 from learning.style.algorithm import StyleAlgorithm, keyp_task_obs_angle_transform, disc_reward, obs_angle_transform
@@ -33,6 +34,79 @@ class HighLevelAlgorithm(CoreAlgorithm):
 
         super().__init__(**kwargs)
 
+    def init_tensors(self):
+        super().init_tensors()
+        batch_size = self.experience_buffer.obs_base_shape
+        self.experience_buffer.tensor_dict['disc_rewards'] = torch.empty(batch_size + (1,), device=self.device)
+
+    def play_steps(self):
+        step_time = 0.0
+        self._pre_rollout()
+
+        for n in range(self.horizon_length):
+            self.obs = self.env_reset(self.dones.nonzero()[:, 0])  # update latent
+            res_dict = self.get_action_values(self.obs)
+            self.experience_buffer.update_data('obses', n, self.obs['obs'])
+
+            for k in self.update_list:
+                self.experience_buffer.update_data(k, n, res_dict[k])
+
+            self._pre_step(n)
+            step_time_start = time.time()
+            self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
+            step_time_end = time.time()
+            self._post_step(n)
+
+            step_time += (step_time_end - step_time_start)
+
+            next_vals = self.get_values(self.obs)
+            next_vals *= ~infos['terminate'].unsqueeze(1)
+            self.experience_buffer.update_data('next_values', n, next_vals)
+            self.experience_buffer.update_data('rewards', n, rewards['task'])
+            self.experience_buffer.update_data('disc_rewards', n, rewards['disc'])
+            self.experience_buffer.update_data('dones', n, self.dones)
+
+            self.current_rewards += rewards['task'] * self._task_rew_scale + rewards['disc'] * self._disc_rew_scale
+            self.current_lengths += 1
+            all_done_indices = self.dones.nonzero(as_tuple=False)
+            env_done_indices = all_done_indices[::self.num_agents]
+
+            self.game_rewards.update(self.current_rewards[env_done_indices])
+            self.game_lengths.update(self.current_lengths[env_done_indices])
+            self.algo_observer.process_infos(infos, env_done_indices)
+
+            not_dones = 1.0 - self.dones.float()
+
+            self.current_rewards = self.current_rewards * not_dones.unsqueeze(1)
+            self.current_lengths = self.current_lengths * not_dones
+
+        self._calc_rollout_reward()
+        mb_rewards = self.experience_buffer.tensor_dict['rewards']
+        self.play_info['total_reward'] = mb_rewards.mean()
+
+        mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
+        mb_values = self.experience_buffer.tensor_dict['values']
+        mb_next_values = self.experience_buffer.tensor_dict['next_values']
+
+        mb_advs = self._discount_values(mb_fdones, mb_values, mb_rewards, mb_next_values)
+        mb_returns = mb_advs + mb_values
+
+        batch_dict = self.experience_buffer.get_transformed_list(swap_and_flatten01, self.tensor_list)
+        batch_dict['returns'] = swap_and_flatten01(mb_returns)
+        batch_dict['played_frames'] = self.batch_size
+        batch_dict['step_time'] = step_time
+
+        self._post_rollout(batch_dict)
+
+        return batch_dict
+
+    def _calc_rollout_reward(self):
+        task_reward = self.experience_buffer.tensor_dict['rewards'] * self._task_rew_scale
+        disc_reward = self.experience_buffer.tensor_dict['disc_rewards'] * self._disc_rew_scale
+        self.experience_buffer.tensor_dict['rewards'] = task_reward + disc_reward
+        self.play_info['task_reward'] = task_reward
+        self.play_info['disc_reward'] = disc_reward
+
     def env_step(self, actions):
         # 1. parameter for env_reset makes hard reset,
         #    because if the reset is done immediately, idle loop makes error
@@ -66,20 +140,26 @@ class HighLevelAlgorithm(CoreAlgorithm):
                 self.dones = self.dones | done
             terminate = terminate | info['terminate']
 
-        task_rew_step = (self._task_rew_exp_buffer * ~self._done_exp_buffer).sum(dim=-1)
+        task_rew_step = (self._task_rew_exp_buffer * ~self._done_exp_buffer).sum(dim=-1, keepdim=True)
         disc_rew = disc_reward(self._llc, self._disc_obs_exp_buffer.view(-1, self._disc_obs_exp_buffer.shape[-1]))
         disc_rew = disc_rew.view(self.vec_env.num, self._llc_steps)
-        disc_rew_step = (disc_rew * ~self._done_exp_buffer).sum(dim=-1)
+        disc_rew_step = (disc_rew * ~self._done_exp_buffer).sum(dim=-1, keepdim=True)
 
-        rew = task_rew_step * self._task_rew_scale + disc_rew_step * self._disc_rew_scale
-
-        return {'obs': obs_angle_transform(obs_raw['obs'])}, rew.unsqueeze(-1), self.dones, {'terminate': terminate}
+        return ({'obs': obs_angle_transform(obs_raw['obs'])}, {'task': task_rew_step, 'disc': disc_rew_step},
+                self.dones, {'terminate': terminate})
 
     def env_reset(self, env_ids: Optional[torch.Tensor] = None, ignore_goal=False):
         obs = self.vec_env.reset(env_ids)
         obs, disc_obs = keyp_task_obs_angle_transform(obs, self._key_body_ids, self._dof_offsets,
                                                       ignore_goal=ignore_goal)
         return {'obs': obs, 'disc_obs': disc_obs}
+
+    def write_tensorboard(self, train_info: dict):
+        super().write_tensorboard(train_info)
+        info = {
+            'disc_reward': train_info['disc_reward'].mean().item(),
+        }
+        self._write_stat(**info)
 
     def _init_learning_variables(self, **kwargs):
         config_hparam = self.config

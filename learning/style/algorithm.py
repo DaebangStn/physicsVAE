@@ -63,8 +63,8 @@ class StyleAlgorithm(CoreAlgorithm):
         batch_size = self.experience_buffer.obs_base_shape
         # Data for computing gradient should be passed as a tensor_list (post-processing uses tensor_list)
         self.tensor_list += ['disc_obs']
-        self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(batch_size + (self._disc_obs_size,),
-                                                                     device=self.device)
+        self.experience_buffer.tensor_dict['disc_obs'] = torch.empty(
+            batch_size + (self._disc_obs_size,), device=self.device)
 
     def set_stats_weights(self, weights):
         super().set_stats_weights(weights)
