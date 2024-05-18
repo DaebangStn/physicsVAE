@@ -84,10 +84,10 @@ class LocationTask(HumanoidTask):
 
         num_update = len(env_ids)
         if num_update != 0:
-            distance = torch.rand(num_update, 3, device=self._compute_device) * 2 - 1
-            distance[:, 2] = 0
-            distance = distance / torch.norm(distance, dim=-1, keepdim=True)
-            distance = distance * self._tar_away_scale + self._tar_away_ofs
+            tar_away = 2 * torch.rand(num_update, device=self._compute_device) - 1
+            tar_theta = 2 * np.pi * torch.rand(num_update, device=self._compute_device)
+            distance = torch.stack([tar_away * torch.cos(tar_theta), tar_away * torch.sin(tar_theta),
+                                    torch.zeros(num_update, device=self._compute_device)], dim=-1)
 
             self._buf["taskPos"][env_ids] = self._buf["aPos"][env_ids] + distance
             self._buf["taskPos"][env_ids, 2] = 0
@@ -103,9 +103,9 @@ class LocationTask(HumanoidTask):
 def location_reward(humanoid_position: torch.Tensor, marker_position: torch.Tensor, terminated: torch.Tensor
                     ) -> torch.Tensor:
     a = 0.7
-    b = 0.1
+    b = 0.5
     distance = torch.square(humanoid_position[..., :2] - marker_position[..., :2]).sum(dim=-1)
-    reward = a * torch.exp(-b * distance)
+    reward = a * torch.exp(-b * (distance ** 2))
     return torch.where(terminated, -500.0, reward)
 
 
