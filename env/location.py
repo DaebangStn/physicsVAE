@@ -84,9 +84,10 @@ class LocationTask(HumanoidTask):
 
         num_update = len(env_ids)
         if num_update != 0:
-            tar_away = 2 * torch.rand(num_update, device=self._compute_device) - 1
+            tar_length = 2 * torch.rand(num_update, device=self._compute_device) - 1
+            tar_length = tar_length * self._tar_away_scale + self._tar_away_ofs
             tar_theta = 2 * np.pi * torch.rand(num_update, device=self._compute_device)
-            distance = torch.stack([tar_away * torch.cos(tar_theta), tar_away * torch.sin(tar_theta),
+            distance = torch.stack([tar_length * torch.cos(tar_theta), tar_length * torch.sin(tar_theta),
                                     torch.zeros(num_update, device=self._compute_device)], dim=-1)
 
             self._buf["taskPos"][env_ids] = self._buf["aPos"][env_ids] + distance

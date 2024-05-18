@@ -57,6 +57,7 @@ hparam:
   clip_value: False
   reward_shaper: {}
   save_frequency: 1000
+  intermediate_save_frequency: 100
 
   logger:
     motion_match_length: 4
@@ -90,7 +91,7 @@ hparam:
   reward:
     task_weight: 0.5
     disc_weight: 0.5
-    task_scale: 0.5
+    task_scale: 1.0
     disc_scale: 2.0
     show_on_player: False
 

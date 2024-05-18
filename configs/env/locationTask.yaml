@@ -23,10 +23,10 @@ env:
   viewer_follow_env0: False
 
   task:
-    away_max: 3.0
+    away_max: 5.0
     away_min: 0.5
     update_freq_max: 500
-    update_freq_min: 150
+    update_freq_min: 100
 
     asset_filename:
       assets/urdf/location_marker.urdf
