@@ -15,7 +15,7 @@ env:
   num_act: 31  # dof(#) - sword and shield
 #  num_act: 28  # dof(#) - naive humanoid
   num_goal: 2  # local xy
-  max_episode_steps: 1200
+  max_episode_steps: 12000
 
   recovery_limit: 0
   drop_on_reset_prob: 0
@@ -24,9 +24,9 @@ env:
 
   task:
     away_max: 5.0
-    away_min: 0.5
-    update_freq_max: 500
-    update_freq_min: 150
+    away_min: 2.0
+    update_freq_max: 1500
+    update_freq_min: 1400
 
     asset_filename:
       assets/urdf/location_marker.urdf

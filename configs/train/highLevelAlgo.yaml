@@ -54,7 +54,7 @@ hparam:
   e_clip: 0.2
   grad_norm: 1.0
 
-  minibatch_size: 20000
+  minibatch_size: 32768
   mini_epochs: 6
 
   learning_rate: 2e-5
@@ -73,12 +73,12 @@ hparam:
 
   llc:
     steps: 5
-    cfg: ckpts/ref.yaml
-#    cfg: ckpts/disc4.yaml
+#    cfg: ckpts/ref.yaml
+    cfg: ckpts/disc4.yaml
 #    cfg: runs/algo_config.yaml
 
-    ckpt: ckpts/skill_ref.pth
-#    ckpt: ckpts/skill_disc4.pth
+#    ckpt: ckpts/skill_ref.pth
+    ckpt: ckpts/skill_disc4.pth
 #    ckpt: runs/skill_disc4.pth
 
 
