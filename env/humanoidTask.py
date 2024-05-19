@@ -32,6 +32,16 @@ class HumanoidTask(KeypointMaxObsTask, ABC):
                                                 marker_asset_option())
         return env_cfg
 
+    def _install_viewer(self):
+        super()._install_viewer()
+        self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_R, "reset_task")
+        self._register_evt_callback(self._reset_task)
+
+    def _reset_task(self, evt: gymapi.ActionEvent):
+        if evt.action == "reset_task" and evt.value > 0:
+            self._buf["taskRemain"] = torch.zeros(self._num_envs, device=self._compute_device, dtype=torch.int32)
+            print("-----------------Resetting task-----------------")
+
     def _post_physics(self, actions: torch.Tensor):
         super()._post_physics(actions)
         self._update_target()

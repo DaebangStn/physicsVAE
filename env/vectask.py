@@ -1,11 +1,6 @@
 import sys
-from abc import abstractmethod
-from typing import Dict, Tuple, Optional, Any
-import torch
-import numpy as np
-from gym import spaces
 
-from isaacgym import gymapi
+from utils import *
 
 
 class VecTask:
@@ -22,6 +17,7 @@ class VecTask:
         self._compute_device = None
         self._graphics_device = None
         self._sim = None
+        self._evt_callbacks = []
 
         self._parse_sim_param(**kwargs)
         self._create_sim()
@@ -81,8 +77,8 @@ class VecTask:
             return  # do not render when viewer is not declared
 
         for evt in self._gym.query_viewer_action_events(self._viewer):
-            if evt.action == "QUIT" and evt.value > 0:
-                sys.exit()
+            for cb in self._evt_callbacks:
+                cb(evt)
 
         self._gym.step_graphics(self._sim)
         self._gym.draw_viewer(self._viewer, self._sim, True)
@@ -98,15 +94,15 @@ class VecTask:
         }
 
         # To make no precision warning, we should use np.full. Not np.ones * scale
-        self.observation_space = spaces.Box(
+        self.observation_space = Box(
             low=np.full(self._num_obs, -np.Inf, dtype=np.float32),
             high=np.full(self._num_obs, np.Inf, dtype=np.float32),
             dtype=np.float32)
-        self.state_space = spaces.Box(
+        self.state_space = Box(
             low=np.full(self._num_states, -np.Inf, dtype=np.float32),
             high=np.full(self._num_states, np.Inf, dtype=np.float32),
             dtype=np.float32)
-        self.action_space = spaces.Box(
+        self.action_space = Box(
             low=np.full(self._num_actions, -1.0, dtype=np.float32),
             high=np.full(self._num_actions, 1.0, dtype=np.float32),
             dtype=np.float32)
@@ -136,6 +132,7 @@ class VecTask:
     def _install_viewer(self):
         self._viewer = self._gym.create_viewer(self._sim, gymapi.CameraProperties())
         self._gym.subscribe_viewer_keyboard_event(self._viewer, gymapi.KEY_ESCAPE, "QUIT")
+        self._register_evt_callback(self._quit_callback)
 
         # Suppose Z axis upward
         cam_pos = gymapi.Vec3(3.0, 3.0, 3.0)
@@ -210,6 +207,9 @@ class VecTask:
         self._gym.refresh_force_sensor_tensor(self._sim)
         self._gym.refresh_dof_force_tensor(self._sim)
         self._gym.refresh_net_contact_force_tensor(self._sim)
+
+    def _register_evt_callback(self, callback: Callable[[gymapi.ActionEvent], None]):
+        self._evt_callbacks.append(callback)
 
     @property
     def config(self):
@@ -286,3 +286,8 @@ class VecTask:
     @abstractmethod
     def _post_physics(self, actions: torch.Tensor):
         pass
+
+    @staticmethod
+    def _quit_callback(evt: gymapi.ActionEvent):
+        if evt.action == "QUIT" and evt.value > 0:
+            sys.exit()
