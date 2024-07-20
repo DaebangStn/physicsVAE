@@ -2,23 +2,32 @@
 # I cannot understand meaning of each values, so don't ask to me.
 
 amp_humanoid:
-  dof_body_ids:  # Maybe indices of movable body
+  dof_body_ids:  # body position stands for joint position
     [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14]
   dof_offsets:  # Each joints starting dof indices
     [0, 3, 6, 9, 10, 13, 14, 17, 18, 21, 24, 25, 28]
   key_body_names:
     ["right_hand", "left_hand", "right_foot", "left_foot"]
 amp_humanoid_sword_shield:
-  dof_body_ids:  # Maybe indices of movable body
+  dof_body_ids:
     [1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 14, 15, 16]
-  dof_offsets:  # Each joints starting dof indices
+  dof_offsets:
     [0, 3, 6, 9, 10, 13, 16, 17, 20, 21, 24, 27, 28, 31]
   key_body_names:
     ["right_hand", "left_hand", "right_foot", "left_foot", "sword", "shield"]
 amp_humanoid_no_sword_shield:
-  dof_body_ids:  # Maybe indices of movable body
+  dof_body_ids:
     [1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 14, 15, 16]
-  dof_offsets:  # Each joints starting dof indices
+  dof_offsets:
     [0, 3, 6, 9, 10, 13, 16, 17, 20, 21, 24, 27, 28, 31]
   key_body_names:
     ["right_hand", "left_hand", "right_foot", "left_foot", "sword", "shield"]
+smpl_humanoid:
+  dof_body_ids:
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+  dof_offsets:
+    [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63]
+  key_body_names:
+    ["R_Wrist", "L_Wrist", "R_Toe", "L_Toe"]
+  key_body_ids:
+    [22, 17, 8, 4]

@@ -1,3 +1,6 @@
+import isaacgym
+from isaacgym import gymapi, gymtorch
+
 import os
 import sys
 import time
@@ -5,16 +8,13 @@ import yaml
 import math
 import random
 from abc import abstractmethod
-from typing import Tuple, Optional, List, Dict, Any, Callable
+from typing import Tuple, Optional, List, Dict, Any, Callable, Union
 
+import torch
 import numpy as np
 from gym.spaces import Box
 from matplotlib import pyplot as plt
 from rl_games.algos_torch import torch_ext
-
-from isaacgym import gymapi, gymtorch
-
-import torch
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -30,6 +30,12 @@ def load_checkpoint_to_network(model, ckpt_path):
         model.load_state_dict(ckpt['model'])
     except RuntimeError as e:
         print(f"Error: {e}")
+
+
+def load_yaml(path: str) -> dict:
+    with open(path, 'r') as f:
+        y = yaml.load(f, Loader=yaml.SafeLoader)
+    return y
 
 
 def reshape_gym_box(box, shape: tuple):

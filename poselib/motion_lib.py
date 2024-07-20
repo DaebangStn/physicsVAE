@@ -26,13 +26,12 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import yaml
-from typing import Tuple, Any, Union
-from isaacgym.torch_utils import *
+from utils import *
 
 from poselib.skeleton.skeleton3d import SkeletonMotion
 from poselib.core.rotation3d import *
+
+from isaacgym.torch_utils import *
 
 from utils import angle
 
@@ -129,12 +128,7 @@ class MotionLib:
         return self._motions[motion_id]
 
     def sample_motions(self, n):
-        motion_ids = torch.multinomial(self._motion_weights, num_samples=n, replacement=True)
-
-        # m = self.num_motions()
-        # motion_ids = np.random.choice(m, size=n, replace=True, p=self._motion_weights)
-        # motion_ids = torch.tensor(motion_ids, device=self._device, dtype=torch.long)
-        return motion_ids
+        return torch.multinomial(self._motion_weights, num_samples=n, replacement=True)
 
     def sample_time(self, motion_ids, truncate_time=None):
         n = len(motion_ids)
@@ -152,10 +146,6 @@ class MotionLib:
         return self._motion_lengths[motion_ids]
 
     def get_motion_state(self, motion_ids, motion_times):
-        n = len(motion_ids)
-        num_bodies = self._get_num_bodies()
-        num_key_bodies = self._key_body_ids.shape[0]
-
         motion_len = self._motion_lengths[motion_ids]
         num_frames = self._motion_num_frames[motion_ids]
         dt = self._motion_dt[motion_ids]
@@ -211,8 +201,6 @@ class MotionLib:
         self._motion_num_frames = []
         self._motion_files = []
 
-        total_len = 0.0
-
         motion_files, motion_weights = self._fetch_motion_files(motion_file)
         num_motion_files = len(motion_files)
         for f in range(num_motion_files):
@@ -263,10 +251,8 @@ class MotionLib:
         self._motion_dt = torch.tensor(self._motion_dt, device=self._device, dtype=torch.float32)
         self._motion_num_frames = torch.tensor(self._motion_num_frames, device=self._device)
 
-        num_motions = self.num_motions()
-        total_len = self.get_total_length()
-
-        print("Loaded {:d} motions with a total length of {:.3f}s.".format(num_motions, total_len))
+        print("Loaded {:d} motions with a total length of {:.3f}s.".format(
+            self.num_motions(), self.get_total_length()))
 
         return
 

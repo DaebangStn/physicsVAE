@@ -35,7 +35,7 @@ network:
 
 
 checkpoint:  # from the project root
-#  runs/locationTask.pth
+  runs/ep_8500_rew_2245.1975_8500.pth
 
 
 hparam:

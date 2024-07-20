@@ -47,13 +47,11 @@ def get_current_git_hash(reduce: Optional[int] = None) -> str:
 def load_config(args: Namespace) -> Tuple[dict, dict]:
     config_train_path = Path(args.cfg_train)
     assert config_train_path.exists(), f"Config path {config_train_path} does not exist"
-    with open(config_train_path.as_posix(), 'r') as f:
-        config_train = yaml.load(f, Loader=yaml.SafeLoader)
+    config_train = load_yaml(config_train_path.as_posix())
 
     config_env_path = Path(args.cfg_env)
     assert config_env_path.exists(), f"Config path {config_env_path} does not exist"
-    with open(config_env_path.as_posix(), 'r') as f:
-        config_env = yaml.load(f, Loader=yaml.SafeLoader)
+    config_env = load_yaml(config_env_path.as_posix())
 
     # Overriding wandb config in the sweep
     if wandb.run is not None:

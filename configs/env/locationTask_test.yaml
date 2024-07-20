@@ -6,6 +6,7 @@ env:
   humanoid_asset_filename:  # from the project root
     assets/urdf/amp_humanoid_sword_shield.xml
 #    assets/urdf/amp_humanoid.xml
+#    assets/urdf/smpl_humanoid.xml
   joint_information_path:
     assets/urdf/joint_information.yaml
 
@@ -14,6 +15,7 @@ env:
 #  num_obs: 225  # naive humanoid (max observation, 223) + goal (local xy, 2)
   num_act: 31  # dof(#) - sword and shield
 #  num_act: 28  # dof(#) - naive humanoid
+#  num_act: 63  # dof(#) - smpl humanoid
   num_goal: 2  # local xy
   max_episode_steps: 12000
 
